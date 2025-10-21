@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import json
 import requests
+from bs4 import BeautifulSoup
 
 # Cargar configuración
 with open("config.json", "r") as f:
@@ -33,7 +34,7 @@ async def personaje(ctx, nombre: str):
 
         # URLs de la API
         url_summary = f"https://armory.warmane.com/api/character/{nombre}/Lordaeron/summary"
-        url_achievements = f"https://armory.warmane.com/api/character/{nombre}/Lordaeron/achievements"
+        url_achievements = f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"
 
         # Peticiones HTTP con headers
         resp_summary = requests.get(url_summary, headers=headers)
@@ -45,41 +46,20 @@ async def personaje(ctx, nombre: str):
         if resp_summary.status_code != 200:
             await ctx.send(f"⚠️ No se pudo acceder a la API de Warmane (summary). Código {resp_summary.status_code}")
             return
-        if resp_achievements.status_code != 200:
-            await ctx.send(f"⚠️ No se pudo acceder a la API de Warmane (achievements). Código {resp_achievements.status_code}")
-            return
 
         # Intentar parsear JSON
         try:
             summary = resp_summary.json()
-            achievements = resp_achievements.json()
         except Exception as e:
             await ctx.send(f"⚠️ Error al leer JSON de Warmane: {e}")
             print("Respuesta summary:", resp_summary.text[:200])
-            print("Respuesta achievements:", resp_achievements.text[:200])
             return
-        
-        print(achievements)
         
         # DEBUG: ensure we have the expected types
         if not isinstance(summary, dict):
             await ctx.send("⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola.")
             print("summary raw:", summary)
             return
-        if not isinstance(achievements, dict):
-            # try to recover if achievements contains a JSON string
-            if isinstance(achievements, str):
-                import json as _json
-                try:
-                    achievements = _json.loads(achievements)
-                except Exception:
-                    await ctx.send("⚠️ Formato inesperado en 'achievements'. Revisa la respuesta en la consola.")
-                    print("achievements raw:", achievements)
-                    return
-            else:
-                await ctx.send("⚠️ Formato inesperado en 'achievements'. Revisa la respuesta en la consola.")
-                print("achievements raw:", achievements)
-                return
 
         # Extraer datos básicos de forma segura
         nombre_char = summary.get("name", nombre)
@@ -98,24 +78,47 @@ async def personaje(ctx, nombre: str):
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
-        # Progreso ICC / RS (si existen) — acceder de forma segura
-        instances = achievements.get("instances", {}) if isinstance(achievements, dict) else {}
-        if isinstance(instances, str):
-            import json as _json
-            try:
-                instances = _json.loads(instances)
-            except Exception:
-                instances = {}
 
-        def inst_progress(name, default):
-            if isinstance(instances, dict):
-                return instances.get(name, {}).get("progress", default)
-            return default
+        # Obtener la página
+        resp = requests.get(url_achievements, headers=headers)
+        html = resp.text
 
-        icc10 = inst_progress("Icecrown Citadel 10 Player", "0/12")
-        icc25 = inst_progress("Icecrown Citadel 25 Player", "0/12")
-        rs10 = inst_progress("The Ruby Sanctum 10 Player", "0/4")
-        rs25 = inst_progress("The Ruby Sanctum 25 Player", "0/4")
+        soup = BeautifulSoup(html, "lxml")
+
+        # Buscar las secciones "Fall of the Lich King"
+        sections = soup.find_all("div", class_="selected", string=lambda s: s and "Fall of the Lich King" in s)
+
+        icc10_progress = "0/12"
+        icc25_progress = "0/12"
+        rs10_progress = "0/4"
+        rs25_progress = "0/4"
+
+        for section in sections:
+            # Buscar el siguiente contenedor con logros
+            container = section.find_next("div", class_="achievements")
+            if not container:
+                continue
+
+            achievements = container.find_all("div", class_="achievement")
+
+            for ach in achievements:
+                name = ach.find("div", class_="title").get_text(strip=True)
+                complete = "completed" in ach.get("class", [])
+
+                # Detectar los logros de ICC o RS
+                if "The Frozen Throne (10 player)" in name:
+                    icc10_progress = "12/12" if complete else icc10_progress
+                elif "The Frozen Throne (25 player)" in name:
+                    icc25_progress = "12/12" if complete else icc25_progress
+                elif "The Twilight Destroyer (10 player)" in name:
+                    rs10_progress = "4/4" if complete else rs10_progress
+                elif "The Twilight Destroyer (25 player)" in name:
+                    rs25_progress = "4/4" if complete else rs25_progress
+
+        icc10 = icc10_progress
+        icc25 = icc25_progress
+        rs10 = rs10_progress
+        rs25 = rs25_progress
 
         mensaje = (
             f"🧙 **{nombre_char}**\n"

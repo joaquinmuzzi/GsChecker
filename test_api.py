@@ -1,13 +1,17 @@
 import requests
 
-url = "https://armory.warmane.com/api/character/Frodouwu/Lordaeron/summary"
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
+nombre = "Frodouwu"
+reino = "Lordaeron"
 
-response = requests.get(url, headers=headers)
+# ID de subcategoría 15041 y 15042 (Fall of the Lich King 10/25)
+urls = [
+    f"https://armory.warmane.com/api/character/{nombre}/{reino}/achievements/168/15041",
+    f"https://armory.warmane.com/api/character/{nombre}/{reino}/achievements/168/15042"
+]
 
-print("Status:", response.status_code)
-print("Content-Type:", response.headers.get("Content-Type"))
-print("Texto recibido (primeros 200 caracteres):")
-print(response.text[:200])
+headers = {"User-Agent": "Mozilla/5.0"}
+
+for url in urls:
+    r = requests.get(url, headers=headers)
+    print(url, "→", r.status_code)
+    print(r.text[:300])
