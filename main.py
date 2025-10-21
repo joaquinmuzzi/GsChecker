@@ -59,6 +59,8 @@ async def personaje(ctx, nombre: str):
             print("Respuesta achievements:", resp_achievements.text[:200])
             return
         
+        print(achievements)
+        
         # DEBUG: ensure we have the expected types
         if not isinstance(summary, dict):
             await ctx.send("⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola.")
@@ -92,8 +94,9 @@ async def personaje(ctx, nombre: str):
 
         gs = summary.get("gearScore", "N/A")
 
+
         guild_obj = summary.get("guild")
-        guild = guild_obj.get("name", "Sin guild") if isinstance(guild_obj, dict) else "Sin guild"
+        guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
         # Progreso ICC / RS (si existen) — acceder de forma segura
         instances = achievements.get("instances", {}) if isinstance(achievements, dict) else {}
