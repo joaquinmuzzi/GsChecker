@@ -3,6 +3,8 @@ from discord.ext import commands
 import json
 import requests
 from bs4 import BeautifulSoup
+from warmane_armory_parser_mod import CharacterParser
+
 
 # Cargar configuración
 with open("config.json", "r") as f:
@@ -27,6 +29,7 @@ async def ping(ctx):
 @bot.command()
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
+    print(CharacterParser("", "Lordaeron").build_character())
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
