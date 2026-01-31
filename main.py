@@ -4,6 +4,8 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from warmane_armory_parser import armory_parser
+import gearscore
+import profile_scraper
 
 # Cargar configuración
 with open("config.json", "r") as f:
@@ -138,7 +140,16 @@ async def personaje(ctx, nombre: str):
         else:
             especializacion = "N/A"
 
-        gs = summary.get("gearScore", "N/A")
+        # Try to compute GearScore locally using Warmane armory scraping + local table
+        try:
+            gear_ids = profile_scraper.get_gear_ids(nombre, "Lordaeron")
+            if gear_ids:
+                gs_values = gearscore.main(gear_ids)
+                gs = sum(gs_values)
+            else:
+                gs = summary.get("gearScore", "N/A")
+        except Exception:
+            gs = summary.get("gearScore", "N/A")
 
 
         guild_obj = summary.get("guild")
