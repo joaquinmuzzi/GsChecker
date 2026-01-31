@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import requests
 import os
+import sys
+import atexit
 from bs4 import BeautifulSoup
 import gearscore
 import profile_scraper
@@ -9,6 +11,38 @@ import profile_scraper
 # Cargar configuración desde .env
 from dotenv import load_dotenv
 load_dotenv()
+
+LOCK_PATH = "/tmp/gschecker.lock"
+
+def acquire_lock(lock_path: str) -> None:
+    if os.path.exists(lock_path):
+        try:
+            with open(lock_path, "r") as f:
+                pid_str = f.read().strip()
+            if pid_str:
+                pid = int(pid_str)
+                os.kill(pid, 0)
+                print(f"Otro proceso del bot ya está corriendo (PID {pid}). Saliendo.")
+                sys.exit(1)
+        except ProcessLookupError:
+            pass
+        except Exception:
+            pass
+
+    with open(lock_path, "w") as f:
+        f.write(str(os.getpid()))
+
+    def _cleanup() -> None:
+        try:
+            if os.path.exists(lock_path):
+                os.remove(lock_path)
+        except Exception:
+            pass
+
+    atexit.register(_cleanup)
+
+
+acquire_lock(LOCK_PATH)
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:

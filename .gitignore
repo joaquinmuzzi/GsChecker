@@ -27,7 +27,6 @@ wheels/
 *.egg
 
 # Environment
-.env
 .env.local
 
 # Backup
