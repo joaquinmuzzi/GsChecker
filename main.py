@@ -290,7 +290,7 @@ async def personaje(ctx, nombre: str):
         )
 
         embed.add_field(
-            name="Ruby Sanctum (Normal | Heroic)",
+            name="Ruby Sanctum",
             value=(
                 "```\n"
                 "       Normal    Heroic\n"

@@ -24,11 +24,7 @@ git clone https://github.com/tuusuario/GsChecker.git
 cd GsChecker
 ```
 
-2) Configurar el token
-```bash
-cp .env.example .env
-```
-Editar `.env` y agregar:
+2) Editar `.env` y agregar:
 ```
 DISCORD_TOKEN=tu_token_aqui
 ```
