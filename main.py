@@ -274,8 +274,8 @@ def _extract_icc_boss_kills(stats_rows):
         except Exception:
             return 0
 
-    icc_10 = {name: False for name in boss_patterns}
-    icc_25 = {name: False for name in boss_patterns}
+    icc_10 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
+    icc_25 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
 
     for desc, val in stats_rows:
         if "Icecrown" not in desc:
@@ -286,15 +286,18 @@ def _extract_icc_boss_kills(stats_rows):
 
         is_10 = "Icecrown 10 player" in desc
         is_25 = "Icecrown 25 player" in desc
+        is_hc = "Heroic" in desc
         if not (is_10 or is_25):
             continue
 
         for boss_name, patterns in boss_patterns.items():
             if any(pat in desc for pat in patterns):
                 if is_10:
-                    icc_10[boss_name] = True
+                    key = "hc" if is_hc else "nm"
+                    icc_10[boss_name][key] = max(icc_10[boss_name][key], value)
                 if is_25:
-                    icc_25[boss_name] = True
+                    key = "hc" if is_hc else "nm"
+                    icc_25[boss_name][key] = max(icc_25[boss_name][key], value)
                 break
 
     return icc_10, icc_25
@@ -384,11 +387,15 @@ async def personaje(ctx, nombre: str):
         def format_boss_rows(bosses: dict) -> str:
             width = 16
             rows = []
-            killed_count = sum(1 for v in bosses.values() if v)
+            killed_count = sum(1 for v in bosses.values() if v["nm"] > 0 or v["hc"] > 0)
             rows.append(f"Bosses killed: {killed_count}/12")
-            for name, killed in bosses.items():
-                mark = '✅' if killed else '❌'
-                rows.append(f"{name:<{width}} {mark}")
+            for name, counts in bosses.items():
+                nm_mark = '✅' if counts["nm"] > 0 else '❌'
+                hc_mark = '✅' if counts["hc"] > 0 else '❌'
+                rows.append(
+                    f"{name:<{width}} NM: {nm_mark} ({counts['nm']})  "
+                    f"HC: {hc_mark} ({counts['hc']})"
+                )
             return "\n".join(rows)
 
         # Construir embed con los datos solicitados
