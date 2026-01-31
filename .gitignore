@@ -39,6 +39,7 @@ _backup/
 *.swp
 *.swo
 *~
+*.log
 
 # OS
 .DS_Store

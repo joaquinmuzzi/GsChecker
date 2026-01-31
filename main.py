@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import json
 import requests
 import os
 from bs4 import BeautifulSoup
@@ -37,8 +36,7 @@ async def personaje(ctx, nombre: str):
     # Normalizar nombre: primera letra mayúscula
     nombre = nombre.capitalize()
     
-    icc_stats = {}
-    rs_stats = {}
+    
     
     try:
         headers = {
@@ -47,18 +45,8 @@ async def personaje(ctx, nombre: str):
 
         # URLs de la API y páginas HTML
         url_summary = f"https://armory.warmane.com/api/character/{nombre}/Lordaeron/summary"
-        url_achievements = f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"
-
-        print(f"\n=== DEBUG: Consultando {nombre} ===")
-        print(f"URL summary: {url_summary}")
-        print(f"URL achievements: {url_achievements}")
-
-        # Peticiones HTTP con headers
+        # Petición HTTP con headers
         resp_summary = requests.get(url_summary, headers=headers)
-        resp_achievements = requests.get(url_achievements, headers=headers)
-
-        print(f"Status summary: {resp_summary.status_code}")
-        print(f"Status achievements: {resp_achievements.status_code}")
 
         # Validar si devolvió algo
         if resp_summary.status_code != 200:
@@ -68,17 +56,12 @@ async def personaje(ctx, nombre: str):
         # Intentar parsear JSON
         try:
             summary = resp_summary.json()
-            print(f"Summary JSON keys: {summary.keys() if isinstance(summary, dict) else 'Not a dict'}")
-            print(f"Summary content: {json.dumps(summary, indent=2)[:500]}")
         except Exception as e:
             await ctx.send(f"⚠️ Error al leer JSON de Warmane: {e}")
-            print("Respuesta summary:", resp_summary.text[:500])
             return
         
-        # DEBUG: ensure we have the expected types
         if not isinstance(summary, dict):
             await ctx.send("⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola.")
-            print("summary raw:", summary)
             return
 
         # Extraer datos básicos de forma segura
@@ -87,8 +70,6 @@ async def personaje(ctx, nombre: str):
         raza = summary.get("race", "N/A")
         clase = summary.get("class", "N/A")
         
-        print(f"Nombre: {nombre_char}, Nivel: {nivel}, Clase: {clase}")
-
         talents = summary.get("talents") or []
         if isinstance(talents, list) and len(talents) > 0 and isinstance(talents[0], dict):
             especializacion = talents[0].get("tree", "N/A")
@@ -97,19 +78,14 @@ async def personaje(ctx, nombre: str):
 
         # Try to compute GearScore locally using Warmane armory scraping + local table
         try:
-            print(f"Intentando obtener gear IDs para {nombre}...")
             gear_ids = profile_scraper.get_gear_ids(nombre, "Lordaeron")
-            print(f"Gear IDs obtenidos: {gear_ids}")
             if gear_ids:
                 gs_values = gearscore.main(gear_ids)
                 gs = sum(gs_values)
-                print(f"GearScore calculado: {gs} (valores por slot: {gs_values})")
             else:
                 gs = summary.get("gearScore", "N/A")
-                print(f"No se obtuvieron gear IDs, usando summary GS: {gs}")
         except Exception as e:
             gs = summary.get("gearScore", "N/A")
-            print(f"Error calculando GS: {e}, usando summary GS: {gs}")
 
 
         guild_obj = summary.get("guild")
@@ -144,7 +120,9 @@ async def personaje(ctx, nombre: str):
         icc_25n_bosses = 0
         icc_10h_bosses = 0
         icc_25h_bosses = 0
+        halion_10n_achieved = False
         halion_10h_achieved = False
+        halion_25n_achieved = False
         halion_25h_achieved = False
         
         # Categories de Warmane para raids Wrath of the Lich King
@@ -156,41 +134,27 @@ async def personaje(ctx, nombre: str):
         # Los logros importantes de ICC y RS (IDs de achievement)
         # Source: WarmaneProfileParser/static/achievements.json
         target_achievements = {
-            '4817': ('halion_10h', 'The Twilight Destroyer (10)'),
+            '4817': ('halion_10n', 'The Twilight Destroyer (10)'),
             '4818': ('halion_10h', 'Heroic: The Twilight Destroyer (10)'),
-            '4815': ('halion_25h', 'The Twilight Destroyer (25)'),
+            '4815': ('halion_25n', 'The Twilight Destroyer (25)'),
             '4816': ('halion_25h', 'Heroic: The Twilight Destroyer (25)')
         }
 
-        icc_wing_achievements = {
-            '10N': {
-                '4531': 'Storming the Citadel',
-                '4528': 'The Plagueworks',
-                '4529': 'The Crimson Hall',
-                '4527': 'The Frostwing Halls',
-                '4532': 'Fall of the Lich King'
-            },
-            '10H': {
-                '4628': 'Heroic: Storming the Citadel',
-                '4629': 'Heroic: The Plagueworks',
-                '4630': 'Heroic: The Crimson Hall',
-                '4631': 'Heroic: The Frostwing Halls',
-                '4636': 'Heroic: Fall of the Lich King'
-            },
-            '25N': {
-                '4604': 'Storming the Citadel',
-                '4605': 'The Plagueworks',
-                '4606': 'The Crimson Hall',
-                '4607': 'The Frostwing Halls',
-                '4608': 'Fall of the Lich King'
-            },
-            '25H': {
-                '4632': 'Heroic: Storming the Citadel',
-                '4633': 'Heroic: The Plagueworks',
-                '4634': 'Heroic: The Crimson Hall',
-                '4635': 'Heroic: The Frostwing Halls',
-                '4637': 'Heroic: Fall of the Lich King'
-            }
+        icc_wing_pairs = {
+            '10M': [
+                ('Storming the Citadel', '4531', '4628'),
+                ('Plagueworks', '4528', '4629'),
+                ('Crimson Hall', '4529', '4630'),
+                ('Frostwing Halls', '4527', '4631'),
+                ('Fall of the Lich King', '4532', '4636'),
+            ],
+            '25M': [
+                ('Storming the Citadel', '4604', '4632'),
+                ('Plagueworks', '4605', '4633'),
+                ('Crimson Hall', '4606', '4634'),
+                ('Frostwing Halls', '4607', '4635'),
+                ('Fall of the Lich King', '4608', '4637'),
+            ],
         }
 
         completed_ids = set()
@@ -214,8 +178,6 @@ async def personaje(ctx, nombre: str):
                                 if 'locked' not in ach.get('class', [])
                             ]
                             
-                            print(f"Category {category_id}: {len(all_achievements)} total, {len(completed_achievements)} completados")
-                            
                             for ach_div in completed_achievements:
                                 # El ID está en el atributo id como "ach4530"
                                 ach_id_full = ach_div.get('id', '')
@@ -237,11 +199,14 @@ async def personaje(ctx, nombre: str):
                                     
                                     # Detectar Halion
                                     if ach_id in target_achievements:
-                                        key, name = target_achievements[ach_id]
-                                        print(f"✓ Logro encontrado: {name} (ID: {ach_id})")
+                                        key = target_achievements[ach_id][0]
                                         
-                                        if key == 'halion_10h':
+                                        if key == 'halion_10n':
+                                            halion_10n_achieved = True
+                                        elif key == 'halion_10h':
                                             halion_10h_achieved = True
+                                        elif key == 'halion_25n':
+                                            halion_25n_achieved = True
                                         elif key == 'halion_25h':
                                             halion_25h_achieved = True
                     except Exception as e:
@@ -250,39 +215,20 @@ async def personaje(ctx, nombre: str):
             except Exception as e:
                 print(f"Error fetching achievements for category {category_id}: {e}")
         
-        print(f"\nProgreso ICC/RS:")
-        print(f"  ICC 10N: {icc_10n_bosses}/12 bosses")
-        print(f"  ICC 25N: {icc_25n_bosses}/12 bosses")
-        print(f"  ICC 10HC: {icc_10h_bosses}/12 bosses")
-        print(f"  ICC 25HC: {icc_25h_bosses}/12 bosses")
-        print(f"  Halion 10HC: {'✅' if halion_10h_achieved else '❌'}")
-        print(f"  Halion 25HC: {'✅' if halion_25h_achieved else '❌'}")
-
-
-        def format_wing_list(mode_key: str) -> list[str]:
-            lines = []
-            for ach_id, name in icc_wing_achievements[mode_key].items():
-                status = '✅' if ach_id in completed_ids else '❌'
-                lines.append(f"{status} {name}")
-            return lines
-
-        def format_two_column(normal_key: str, heroic_key: str) -> str:
-            normal_lines = format_wing_list(normal_key)
-            heroic_lines = format_wing_list(heroic_key)
-            width = 34
+        def format_wing_rows(mode_key: str) -> str:
+            width = 26
             rows = []
-            max_len = max(len(normal_lines), len(heroic_lines))
-            for i in range(max_len):
-                left = normal_lines[i] if i < len(normal_lines) else ""
-                right = heroic_lines[i] if i < len(heroic_lines) else ""
-                rows.append(f"{left:<{width}}  {right}")
+            for name, nm_id, hc_id in icc_wing_pairs[mode_key]:
+                nm = '✅' if nm_id in completed_ids else '❌'
+                hc = '✅' if hc_id in completed_ids else '❌'
+                rows.append(f"{name:<{width}} NM: {nm}  | HC: {hc}")
             return "\n".join(rows)
 
         # Construir embed con los datos solicitados
         guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
 
         embed = discord.Embed(
-            title=f"Summary: {nombre_char}-Lordaeron",
+            title=f"Summary: {nombre_char}",
             color=0x2B2D31,
         )
         embed.add_field(name="GearScore", value=str(gs), inline=True)
@@ -291,42 +237,31 @@ async def personaje(ctx, nombre: str):
         embed.add_field(name="Guild", value=guild_display, inline=True)
 
         embed.add_field(
-            name="Icecrown Citadel (ICC) - Progress",
+            name="ICC 10M",
+            value=(
+                "```\n"
+                f"{format_wing_rows('10M')}\n"
+                "```"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="ICC 25M",
+            value=(
+                "```\n"
+                f"{format_wing_rows('25M')}\n"
+                "```"
+            ),
+            inline=False,
+        )
+
+        embed.add_field(
+            name="Ruby Sanctum (Normal | Heroic)",
             value=(
                 "```\n"
                 "       Normal    Heroic\n"
-                f"10M:   {icc_10n_bosses:2}/12      {icc_10h_bosses:2}/12\n"
-                f"25M:   {icc_25n_bosses:2}/12      {icc_25h_bosses:2}/12\n"
-                "```"
-            ),
-            inline=False,
-        )
-
-        embed.add_field(
-            name="ICC 10M (Normal | Heroic)",
-            value=(
-                "```\n"
-                f"{format_two_column('10N', '10H')}\n"
-                "```"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="ICC 25M (Normal | Heroic)",
-            value=(
-                "```\n"
-                f"{format_two_column('25N', '25H')}\n"
-                "```"
-            ),
-            inline=False,
-        )
-
-        embed.add_field(
-            name="Ruby Sanctum (Halion HC)",
-            value=(
-                "```\n"
-                f"10HC: {'✅' if halion_10h_achieved else '❌'}\n"
-                f"25HC: {'✅' if halion_25h_achieved else '❌'}\n"
+                f"10M:   {'✅' if halion_10n_achieved else '❌'}       {'✅' if halion_10h_achieved else '❌'}\n"
+                f"25M:   {'✅' if halion_25n_achieved else '❌'}       {'✅' if halion_25h_achieved else '❌'}\n"
                 "```"
             ),
             inline=False,
