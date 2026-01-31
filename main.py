@@ -7,6 +7,7 @@ import atexit
 import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import unicodedata
 from bs4 import BeautifulSoup
 import gearscore
 import profile_scraper
@@ -386,41 +387,90 @@ async def personaje(ctx, nombre: str):
 
         def cell(v):
             mark = '✅' if v > 0 else '❌'
-            return f"{mark} {v}"
+            return f"{mark} {v}" if isinstance(v, int) else str(v)
 
-        def calc_table_widths(bosses_10: dict, bosses_25: dict) -> tuple[int, int]:
-            width = max(len(name) for name in bosses_10.keys())
-            all_cells = []
-            for name in bosses_10.keys():
-                c10 = bosses_10[name]
-                c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
-                all_cells.extend([cell(c10['nm']), cell(c10['hc']), cell(c25['nm']), cell(c25['hc'])])
-            cell_width = max(5, max(len(c) for c in all_cells))
-            return width, cell_width
+        def calc_widths(rows, headers, header_labels=None):
+            header_labels = header_labels or {}
+            widths = {}
+            def display_width(text):
+                text = str(text)
+                width = 0
+                for ch in text:
+                    width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+                return width
+            for key in headers:
+                label = header_labels.get(key, key)
+                max_cell = max((display_width(row[key]) for row in rows), default=0)
+                widths[key] = max(display_width(label), max_cell)
+            return widths
 
-        def format_boss_rows(bosses_10: dict, bosses_25: dict) -> str:
-            width, cell_width = calc_table_widths(bosses_10, bosses_25)
+        def render_table(rows, headers, header_labels=None, widths=None):
+            header_labels = header_labels or {}
+            widths = widths or calc_widths(rows, headers, header_labels)
+
+            def display_width(text):
+                text = str(text)
+                width = 0
+                for ch in text:
+                    width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+                return width
+
+            def pad(text, width):
+                text = str(text)
+                if display_width(text) > width:
+                    return text
+                return text + " " * (width - display_width(text))
+
+            header_line = " | ".join(pad(header_labels.get(h, h), widths[h]) for h in headers)
+            total_width = sum(widths[h] for h in headers) + (len(headers)) * 3
+            sep_line = "-" * total_width
+            body_lines = [
+                " | ".join(pad(row[h], widths[h]) for h in headers)
+                for row in rows
+            ]
+            return "\n".join([header_line, sep_line] + body_lines)
+
+        def format_boss_rows(bosses_10: dict, bosses_25: dict):
             rows = []
-            rows.append(
-                f"{'Boss':<{width}} | {'10N':^{cell_width + 1}} | {'10H':^{cell_width + 1}} | {'25N':^{cell_width + 2}} | {'25H':^{cell_width + 2}}"
-            )
-            rows.append(
-                f"{'-' * width}-+{'-' * (cell_width + 3)}+{'-' * (cell_width + 3)}+{'-' * (cell_width + 3)}+{'-' * (cell_width + 4)}"
-            )
-
             for name in bosses_10.keys():
                 c10 = bosses_10[name]
                 c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
-                rows.append(
-                    f"{name:<{width}} | {cell(c10['nm']):<{cell_width}} | {cell(c10['hc']):<{cell_width}} | {cell(c25['nm']):<{cell_width}} | {cell(c25['hc']):<{cell_width}}"
-                )
-            return "\n".join(rows)
+                rows.append({
+                    "Boss": name,
+                    "10N": cell(c10["nm"]),
+                    "10H": cell(c10["hc"]),
+                    "25N": cell(c25["nm"]),
+                    "25H": cell(c25["hc"]),
+                })
+            def header_status(values):
+                if all(values):
+                    return "✅"
+                if any(values):
+                    return "⚠️"
+                return "❌"
 
+            col_status = {
+                "10N": header_status([bosses_10[b]["nm"] > 0 for b in bosses_10]),
+                "10H": header_status([bosses_10[b]["hc"] > 0 for b in bosses_10]),
+                "25N": header_status([bosses_25[b]["nm"] > 0 for b in bosses_25]),
+                "25H": header_status([bosses_25[b]["hc"] > 0 for b in bosses_25]),
+            }
+
+            headers = ["Boss", "10N", "10H", "25N", "25H"]
+            header_labels = {
+                "10N": f"{col_status['10N']}10N",
+                "10H": f"{col_status['10H']}10H",
+                "25N": f"{col_status['25N']}25N",
+                "25H": f"{col_status['25H']}25H",
+            }
+            widths = calc_widths(rows, headers, header_labels)
+            table = render_table(rows, headers, header_labels, widths)
+            return table, widths
         # Construir embed con los datos solicitados
         guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
 
         embed = discord.Embed(
-            title=f"Summary: {nombre_char}",
+            title=nombre_char,
             color=0x2B2D31,
         )
         embed.add_field(name="GearScore", value=str(gs), inline=True)
@@ -439,16 +489,32 @@ async def personaje(ctx, nombre: str):
             inline=False,
         )
 
-        icc_table = format_boss_rows(icc_10, icc_25)
-        width, cell_width = calc_table_widths(icc_10, icc_25)
-        rs_table = (
-            f"{'Boss':<{width}} | {'10N':^{cell_width + 1}} | {'10H':^{cell_width + 1}} | {'25N':^{cell_width + 2}} | {'25H':^{cell_width + 2}}\n"
-            f"{'-' * width}-+{'-' * (cell_width + 3)}+{'-' * (cell_width + 3)}+{'-' * (cell_width + 3)}+{'-' * (cell_width + 4)}\n"
-            f"{'Halion':<{width}} | {('✅' if halion_10n_achieved else '❌'):<{cell_width}} | {('✅' if halion_10h_achieved else '❌'):<{cell_width}} | {('✅' if halion_25n_achieved else '❌'):<{cell_width}} | {('✅' if halion_25h_achieved else '❌'):<{cell_width}}\n"
+        icc_table, icc_widths = format_boss_rows(icc_10, icc_25)
+        rs_rows = [{
+            "Boss": "Halion",
+            "10N": '✅' if halion_10n_achieved else '❌',
+            "10H": '✅' if halion_10h_achieved else '❌',
+            "25N": '✅' if halion_25n_achieved else '❌',
+            "25H": '✅' if halion_25h_achieved else '❌',
+        }]
+
+        def rs_header_status(done: bool) -> str:
+            return "✅" if done else "❌"
+
+        rs_table = render_table(
+            rs_rows,
+            ["Boss", "10N", "10H", "25N", "25H"],
+            {
+                "10N": f"{rs_header_status(halion_10n_achieved)}10N",
+                "10H": f"{rs_header_status(halion_10h_achieved)}10H",
+                "25N": f"{rs_header_status(halion_25n_achieved)}25N",
+                "25H": f"{rs_header_status(halion_25h_achieved)}25H",
+            },
+            icc_widths,
         )
 
         embed.add_field(
-            name="ICC",
+            name="Icecrown Citadel",
             value=(
                 "```\n"
                 f"{icc_table}\n"
