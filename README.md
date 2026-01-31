@@ -1,15 +1,68 @@
-# warmane_armory_parser_mod
+# GsChecker
 
-Este repositorio es una **versión modificada** del proyecto [`warmane_armory_parser`](https://github.com/sarahsturgeon/warmane_armory_parser.git) desarrollado por [Sarah Sturgeon](https://github.com/sarahsturgeon).
+Bot de Discord para verificar GearScore y progreso de personajes en Warmane.
 
-La modificación consiste en **adaptar el parser para que devuelva únicamente la información necesaria** para el proyecto **GsChecker**.
+## Instalación y Configuración
 
----
+### 1. Clonar el repositorio
+```bash
+git clone https://github.com/tuusuario/GsChecker.git
+cd GsChecker
+```
 
-## 🧩 Créditos y Licencia
+### 2. Crear archivo de configuración
+```bash
+cp .env.example .env
+```
 
-- **Autor original:** [Sarah Sturgeon](https://github.com/sarahsturgeon)  
-- **Licencia original:** [GNU General Public License (GPL)](https://www.gnu.org/licenses/gpl-3.0.html)  
-- **Modificaciones:** Joaquin Muzzi, 2025
+Edita `.env` y añade tu token de Discord:
+```
+DISCORD_TOKEN=tu_token_aqui
+```
 
-> © 2025 — Esta versión respeta la licencia GPL y mantiene el debido reconocimiento al autor original.
+### 3. Instalar dependencias
+
+**Opción A: Script automático (recomendado)**
+```bash
+./run.sh
+```
+
+**Opción B: Manual con pip**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+**Opción C: Con Poetry**
+```bash
+poetry install
+poetry run python main.py
+```
+
+### Comandos disponibles:
+
+- `!personaje <nombre>` - Muestra el GearScore y progreso del personaje (servidor Lordaeron por defecto)
+- `!personaje <nombre> <servidor>` - Muestra info del personaje en el servidor especificado
+
+## Características
+
+- Cálculo local de GearScore usando la tabla oficial de WotLK
+- Scraping ligero del Armory de Warmane
+- Muestra progreso en ICC 10/25 normal/heroico
+- Detecta logros de Halion HC 10 y 25
+- Fallback a la API de Warmane si el scraping falla
+
+## Estructura del proyecto
+
+```
+GsChecker/
+├── main.py              # Bot de Discord
+├── gearscore.py         # Cálculo de GearScore
+├── profile_scraper.py   # Scraper del Armory
+├── static/
+│   └── GS.json         # Tabla de GearScore
+├── requirements.txt     # Dependencias (pip)
+└── pyproject.toml      # Dependencias (Poetry)
+```

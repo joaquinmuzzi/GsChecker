@@ -3,6 +3,7 @@ import os
 
 # Try common locations for the static data file
 possible_paths = [
+    os.path.join(os.path.dirname(__file__), "static", "GS.json"),
     os.path.join(os.getcwd(), "static", "GS.json"),
     os.path.join(os.getcwd(), "WarmaneProfileParser", "static", "GS.json"),
     os.path.join(os.path.dirname(__file__), "..", "WarmaneProfileParser", "static", "GS.json"),

@@ -2,16 +2,19 @@ import discord
 from discord.ext import commands
 import json
 import requests
+import os
 from bs4 import BeautifulSoup
-from warmane_armory_parser import armory_parser
 import gearscore
 import profile_scraper
 
-# Cargar configuración
-with open("config.json", "r") as f:
-    config = json.load(f)
+# Cargar configuración desde .env
+from dotenv import load_dotenv
+load_dotenv()
 
-TOKEN = config["TOKEN"]
+TOKEN = os.getenv("DISCORD_TOKEN")
+if not TOKEN:
+    raise ValueError("DISCORD_TOKEN no encontrado en .env")
+
 PREFIX = "!"
 
 # Crear el bot
@@ -30,85 +33,32 @@ async def ping(ctx):
 @bot.command()
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
-    data = armory_parser.parse_character(nombre, "Lordaeron")
-    with open("mi_archivo.txt", "w") as archivo:
-        archivo.write(data.to_json())
     
-    # Extract ICC and RS achievements from data
-    try:
-        stats = data.to_json()
-        if isinstance(stats, str):
-            stats = json.loads(stats)
-            
-        icc_stats = {}
-        rs_stats = {}
-
-        # Known ICC bosses (except Lich King which is handled specially)
-        known_icc_bosses = {
-            "lord marrowgar", "gunship battle", "lady deathwhisper", "deathbringer",
-            "festergut", "rotface", "blood prince council", "valithria dreamwalker",
-            "professor putricide", "blood queen lana'thel", "sindragosa"
-        }
-
-        # verbs that indicate relevant stats
-        relevant_verbs = ("kills", "victories", "rescue", "rescues", "victories over")
-
-        # Collect all relevant statistics across all categories/subcategories
-        for category in stats.get("statistics", []):
-            for stat in category.get("statistics", []):
-                name = stat.get("name", "")
-                value = stat.get("value", "0")
-                lc_name = name.lower()
-                print(lc_name)
-
-                # Ruby Sanctum / Halion: collect regardless of category
-                if "ruby sanctum" in lc_name or "halion" in lc_name or "halion" in lc_name or "twilight" in lc_name:
-                    rs_stats[name] = value
-                    continue
-
-                # Direct Icecrown entries are always ICC
-                if "icecrown" in lc_name:
-                    icc_stats[name] = value
-                    continue
-
-                # Lich King: only accept the actual "Victories over the Lich King" stat,
-                # reject unrelated dungeon lines like "Lich King escapes (Halls of Reflection)"
-                if "lich king" in lc_name:
-                    if "victories" in lc_name and "lich king" in lc_name:
-                        icc_stats[name] = value
-                    # otherwise skip this stat (likely a dungeon-specific line)
-                    continue
-
-                # For other known bosses: require a relevant verb (kills/victories/rescue)
-                matched = False
-                for boss in known_icc_bosses:
-                    if boss in lc_name and any(v in lc_name for v in relevant_verbs):
-                        icc_stats[name] = value
-                        matched = True
-                        break
-                if matched:
-                    continue
-
-                # Defensive: if stat mentions a known boss without region but contains a verb, accept it
-                if any(boss in lc_name for boss in known_icc_bosses) and any(v in lc_name for v in relevant_verbs):
-                    icc_stats[name] = value
-                    continue
-
-    except Exception as e:
-        print(f"Error parsing ICC stats: {e}")
-
+    # Normalizar nombre: primera letra mayúscula
+    nombre = nombre.capitalize()
+    
+    icc_stats = {}
+    rs_stats = {}
+    
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
 
-        # URLs de la API
+        # URLs de la API y páginas HTML
         url_summary = f"https://armory.warmane.com/api/character/{nombre}/Lordaeron/summary"
         url_achievements = f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"
+
+        print(f"\n=== DEBUG: Consultando {nombre} ===")
+        print(f"URL summary: {url_summary}")
+        print(f"URL achievements: {url_achievements}")
 
         # Peticiones HTTP con headers
         resp_summary = requests.get(url_summary, headers=headers)
         resp_achievements = requests.get(url_achievements, headers=headers)
+
+        print(f"Status summary: {resp_summary.status_code}")
+        print(f"Status achievements: {resp_achievements.status_code}")
 
         # Validar si devolvió algo
         if resp_summary.status_code != 200:
@@ -118,9 +68,11 @@ async def personaje(ctx, nombre: str):
         # Intentar parsear JSON
         try:
             summary = resp_summary.json()
+            print(f"Summary JSON keys: {summary.keys() if isinstance(summary, dict) else 'Not a dict'}")
+            print(f"Summary content: {json.dumps(summary, indent=2)[:500]}")
         except Exception as e:
             await ctx.send(f"⚠️ Error al leer JSON de Warmane: {e}")
-            print("Respuesta summary:", resp_summary.text[:200])
+            print("Respuesta summary:", resp_summary.text[:500])
             return
         
         # DEBUG: ensure we have the expected types
@@ -133,6 +85,8 @@ async def personaje(ctx, nombre: str):
         nombre_char = summary.get("name", nombre)
         nivel = summary.get("level", "N/A")
         clase = summary.get("class", "N/A")
+        
+        print(f"Nombre: {nombre_char}, Nivel: {nivel}, Clase: {clase}")
 
         talents = summary.get("talents") or []
         if isinstance(talents, list) and len(talents) > 0 and isinstance(talents[0], dict):
@@ -142,89 +96,127 @@ async def personaje(ctx, nombre: str):
 
         # Try to compute GearScore locally using Warmane armory scraping + local table
         try:
+            print(f"Intentando obtener gear IDs para {nombre}...")
             gear_ids = profile_scraper.get_gear_ids(nombre, "Lordaeron")
+            print(f"Gear IDs obtenidos: {gear_ids}")
             if gear_ids:
                 gs_values = gearscore.main(gear_ids)
                 gs = sum(gs_values)
+                print(f"GearScore calculado: {gs} (valores por slot: {gs_values})")
             else:
                 gs = summary.get("gearScore", "N/A")
-        except Exception:
+                print(f"No se obtuvieron gear IDs, usando summary GS: {gs}")
+        except Exception as e:
             gs = summary.get("gearScore", "N/A")
+            print(f"Error calculando GS: {e}, usando summary GS: {gs}")
 
 
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
-
-        def safe_int(value):
-            """Return int(value) or 0 if not numeric."""
-            if not isinstance(value, str):
-                try:
-                    return int(value)
-                except Exception:
-                    return 0
-            cleaned = value.strip().replace(",", "")
-            if cleaned == "- -" or cleaned == "":
-                return 0
+        # Parse achievements using POST requests (same method as WarmaneProfileParser)
+        icc_10n_achieved = False
+        icc_25n_achieved = False
+        icc_10h_achieved = False
+        icc_25h_achieved = False
+        halion_10h_achieved = False
+        halion_25h_achieved = False
+        
+        # Categories de Warmane para raids Wrath of the Lich King
+        # Source: WarmaneProfileParser/static/categories.json
+        # 15041 = ICC 10-player, 15042 = ICC 25-player
+        # 14922 = Naxx/RS 10-player, 14923 = Naxx/RS 25-player
+        raid_categories = [15041, 15042, 14922, 14923]
+        
+        # Los logros importantes de ICC y RS (IDs de achievement)
+        # Source: WarmaneProfileParser/static/achievements.json
+        target_achievements = {
+            '4530': ('icc_10n', 'The Frozen Throne (10)'),
+            '4597': ('icc_25n', 'The Frozen Throne (25)'),  
+            '4583': ('icc_10h', 'Bane of the Fallen King (10 HC)'),
+            '4584': ('icc_25h', 'The Light of Dawn (25 HC)'),
+            '4817': ('halion_10n', 'The Twilight Destroyer (10)'),
+            '4818': ('halion_10h', 'The Twilight Destroyer (10 HC)'),
+            '4815': ('halion_25n', 'The Twilight Destroyer (25)'),
+            '4816': ('halion_25h', 'The Twilight Destroyer (25 HC)')
+        }
+        
+        for category_id in raid_categories:
             try:
-                return int(cleaned)
-            except Exception:
-                return 0
+                url_achi_post = f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"
+                data = {"category": category_id}
+                resp_achi = requests.post(url_achi_post, headers=headers, data=data)
+                
+                if resp_achi.status_code == 200:
+                    try:
+                        achi_json = resp_achi.json()
+                        if 'content' in achi_json:
+                            soup = BeautifulSoup(achi_json['content'], 'html.parser')
+                            all_achievements = soup.find_all('div', class_='achievement')
+                            
+                            # Filtrar solo los achievements completados (sin la clase 'locked')
+                            completed_achievements = [
+                                ach for ach in all_achievements 
+                                if 'locked' not in ach.get('class', [])
+                            ]
+                            
+                            print(f"Category {category_id}: {len(all_achievements)} total, {len(completed_achievements)} completados")
+                            
+                            for ach_div in completed_achievements:
+                                # El ID está en el atributo id como "ach4530"
+                                ach_id_full = ach_div.get('id', '')
+                                if ach_id_full.startswith('ach'):
+                                    ach_id = ach_id_full.replace('ach', '')
+                                    
+                                    if ach_id in target_achievements:
+                                        key, name = target_achievements[ach_id]
+                                        print(f"✓ Logro encontrado: {name} (ID: {ach_id})")
+                                        
+                                        if key == 'icc_10n':
+                                            icc_10n_achieved = True
+                                        elif key == 'icc_25n':
+                                            icc_25n_achieved = True
+                                        elif key == 'icc_10h':
+                                            icc_10h_achieved = True
+                                        elif key == 'icc_25h':
+                                            icc_25h_achieved = True
+                                        elif key == 'halion_10h':
+                                            halion_10h_achieved = True
+                                        elif key == 'halion_25h':
+                                            halion_25h_achieved = True
+                    except Exception as e:
+                        print(f"Error parsing achievements JSON for category {category_id}: {e}")
+                        
+            except Exception as e:
+                print(f"Error fetching achievements for category {category_id}: {e}")
+        
+        print(f"\nLogros ICC/RS:")
+        print(f"  ICC 10N: {'✅' if icc_10n_achieved else '❌'}")
+        print(f"  ICC 25N: {'✅' if icc_25n_achieved else '❌'}")
+        print(f"  ICC 10HC: {'✅' if icc_10h_achieved else '❌'}")
+        print(f"  ICC 25HC: {'✅' if icc_25h_achieved else '❌'}")
+        print(f"  Halion 10HC: {'✅' if halion_10h_achieved else '❌'}")
+        print(f"  Halion 25HC: {'✅' if halion_25h_achieved else '❌'}")
 
-        def calculate_progress(stats_dict, bosses, region_indicator, difficulty):
-            """Calculate progress for given bosses list and region substring and difficulty string ('10' or '25')."""
-            killed = 0
-            for boss in bosses:
-                lower_boss = boss.lower()
-                found = False
-                for name, value in stats_dict.items():
-                    lc_name = name.lower()
-                    # match if boss present and difficulty/region present or verbs present
-                    if lower_boss in lc_name:
-                        # prefer specific difficulty mention
-                        if f"{region_indicator.lower()} {difficulty} player" in lc_name or f"{difficulty} player" in lc_name or any(v in lc_name for v in ("kills", "victories", "rescue", "rescues")):
-                            if safe_int(value) > 0:
-                                killed += 1
-                            found = True
-                            break
-                # no rigid match found -> assume not killed
-            return f"{killed}/{len(bosses)}"
 
-        icc_bosses = [
-            "Lord Marrowgar",
-            "Gunship Battle",
-            "Lady Deathwhisper",
-            "Deathbringer",
-            "Festergut",
-            "Rotface",
-            "Blood Prince Council",
-            "Valithria Dreamwalker",
-            "Professor Putricide",
-            "Blood Queen Lana'thel",
-            "Sindragosa",
-            "Victories over the Lich King"
-        ]
-
-        rs_bosses = ["Halion"]
-
-        icc10 = calculate_progress(icc_stats, icc_bosses, "Icecrown", "10")
-        icc25 = calculate_progress(icc_stats, icc_bosses, "Icecrown", "25")
-        rs10 = calculate_progress(rs_stats if rs_stats else icc_stats, rs_bosses, "Ruby Sanctum", "10")
-        rs25 = calculate_progress(rs_stats if rs_stats else icc_stats, rs_bosses, "Ruby Sanctum", "25")
-
-        # Split the message into two parts
+        # Construir mensaje con logros de ICC/RS
         mensaje_basico = (
-            f"🧙 **{nombre_char}**\n"
-            f"🏅 Nivel: {nivel}\n"
-            f"⚔️ Clase: {clase}\n"
-            f"💫 Especialización: {especializacion}\n"
-            f"🏰 Guild: {guild}\n"
-            f"💎 GearScore: {gs}\n"
+            f"💎 **GearScore: {gs}**\n"
+            f"🧙 **{nombre_char}** - Lvl {nivel} {clase}\n"
+            f"💫 {especializacion}\n"
+            f"🏰 {guild}\n"
         )
 
+        # Usar emojis para mostrar completado/no completado
         mensaje_raid = (
-            f"\n🧊 *ICC* — 10N: {icc10} | 25N: {icc25}\n"
-            f"🔥 *RS* — 10N: {rs10} | 25N: {rs25}\n"
+            f"\n🧊 **Icecrown Citadel:**\n"
+            f"  10N: {'✅' if icc_10n_achieved else '❌'} | "
+            f"25N: {'✅' if icc_25n_achieved else '❌'} | "
+            f"10HC: {'✅' if icc_10h_achieved else '❌'} | "
+            f"25HC: {'✅' if icc_25h_achieved else '❌'}\n"
+            f"🔥 **Ruby Sanctum (Halion HC):**\n"
+            f"  10HC: {'✅' if halion_10h_achieved else '❌'} | "
+            f"25HC: {'✅' if halion_25h_achieved else '❌'}\n"
         )
 
         # Send messages separately to avoid length limit
