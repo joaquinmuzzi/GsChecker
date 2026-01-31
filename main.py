@@ -4,6 +4,9 @@ import requests
 import os
 import sys
 import atexit
+import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 import gearscore
 import profile_scraper
@@ -50,6 +53,174 @@ if not TOKEN:
 
 PREFIX = ["!", "/"]
 
+SESSION = requests.Session()
+HTTP_TIMEOUT = 8
+
+SUMMARY_CACHE = {}
+ACHIEVEMENTS_CACHE = {}
+GEAR_CACHE = {}
+SUMMARY_TTL = 120
+ACHIEVEMENTS_TTL = 300
+GEAR_TTL = 120
+
+EXECUTOR = ThreadPoolExecutor(max_workers=6)
+
+def _cache_get(cache: dict, key, ttl: int):
+    entry = cache.get(key)
+    if not entry:
+        return None
+    ts, value = entry
+    if time.time() - ts > ttl:
+        cache.pop(key, None)
+        return None
+    return value
+
+def _cache_set(cache: dict, key, value):
+    cache[key] = (time.time(), value)
+
+def _fetch_summary(nombre: str, server: str):
+    cache_key = (nombre, server)
+    cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
+    if cached is not None:
+        return cached
+
+    url_summary = f"https://armory.warmane.com/api/character/{nombre}/{server}/summary"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    resp_summary = SESSION.get(url_summary, headers=headers, timeout=HTTP_TIMEOUT)
+    if resp_summary.status_code != 200:
+        return {"__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Código {resp_summary.status_code}"}
+    try:
+        summary = resp_summary.json()
+    except Exception as e:
+        return {"__error__": f"⚠️ Error al leer JSON de Warmane: {e}"}
+    _cache_set(SUMMARY_CACHE, cache_key, summary)
+    return summary
+
+def _fetch_achievements(nombre: str, server: str):
+    cache_key = (nombre, server)
+    cached = _cache_get(ACHIEVEMENTS_CACHE, cache_key, ACHIEVEMENTS_TTL)
+    if cached is not None:
+        return cached
+
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    raid_categories = [15041, 15042, 14922, 14923]
+
+    icc_sections = {
+        '4531': 4,
+        '4528': 3,
+        '4529': 2,
+        '4527': 2,
+        '4532': 1,
+        '4604': 4,
+        '4605': 3,
+        '4606': 2,
+        '4607': 2,
+        '4608': 1,
+        '4628': 4,
+        '4629': 3,
+        '4630': 2,
+        '4631': 2,
+        '4636': 1,
+        '4632': 4,
+        '4633': 3,
+        '4634': 2,
+        '4635': 2,
+        '4637': 1,
+    }
+
+    target_achievements = {
+        '4817': ('halion_10n', 'The Twilight Destroyer (10)'),
+        '4818': ('halion_10h', 'Heroic: The Twilight Destroyer (10)'),
+        '4815': ('halion_25n', 'The Twilight Destroyer (25)'),
+        '4816': ('halion_25h', 'Heroic: The Twilight Destroyer (25)')
+    }
+
+    completed_ids = set()
+    icc_10n_bosses = 0
+    icc_25n_bosses = 0
+    icc_10h_bosses = 0
+    icc_25h_bosses = 0
+    halion_10n_achieved = False
+    halion_10h_achieved = False
+    halion_25n_achieved = False
+    halion_25h_achieved = False
+
+    def fetch_category(category_id: int):
+        url_achi_post = f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
+        data = {"category": category_id}
+        resp_achi = SESSION.post(url_achi_post, headers=headers, data=data, timeout=HTTP_TIMEOUT)
+        if resp_achi.status_code != 200:
+            return []
+        try:
+            achi_json = resp_achi.json()
+        except Exception:
+            return []
+        if 'content' not in achi_json:
+            return []
+        soup = BeautifulSoup(achi_json['content'], 'html.parser')
+        all_achievements = soup.find_all('div', class_='achievement')
+        completed_achievements = [
+            ach for ach in all_achievements
+            if 'locked' not in ach.get('class', [])
+        ]
+        ids = []
+        for ach_div in completed_achievements:
+            ach_id_full = ach_div.get('id', '')
+            if ach_id_full.startswith('ach'):
+                ids.append(ach_id_full.replace('ach', ''))
+        return ids
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(fetch_category, raid_categories))
+
+    for ids in results:
+        for ach_id in ids:
+            completed_ids.add(ach_id)
+            if ach_id in icc_sections:
+                bosses = icc_sections[ach_id]
+                if ach_id in ['4531', '4528', '4529', '4527', '4532']:
+                    icc_10n_bosses += bosses
+                elif ach_id in ['4604', '4605', '4606', '4607', '4608']:
+                    icc_25n_bosses += bosses
+                elif ach_id in ['4628', '4629', '4630', '4631', '4636']:
+                    icc_10h_bosses += bosses
+                elif ach_id in ['4632', '4633', '4634', '4635', '4637']:
+                    icc_25h_bosses += bosses
+
+            if ach_id in target_achievements:
+                key = target_achievements[ach_id][0]
+                if key == 'halion_10n':
+                    halion_10n_achieved = True
+                elif key == 'halion_10h':
+                    halion_10h_achieved = True
+                elif key == 'halion_25n':
+                    halion_25n_achieved = True
+                elif key == 'halion_25h':
+                    halion_25h_achieved = True
+
+    payload = {
+        "completed_ids": completed_ids,
+        "icc_10n_bosses": icc_10n_bosses,
+        "icc_25n_bosses": icc_25n_bosses,
+        "icc_10h_bosses": icc_10h_bosses,
+        "icc_25h_bosses": icc_25h_bosses,
+        "halion_10n_achieved": halion_10n_achieved,
+        "halion_10h_achieved": halion_10h_achieved,
+        "halion_25n_achieved": halion_25n_achieved,
+        "halion_25h_achieved": halion_25h_achieved,
+    }
+    _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
+    return payload
+
+def _fetch_gear_data(nombre: str, server: str):
+    cache_key = (nombre, server)
+    cached = _cache_get(GEAR_CACHE, cache_key, GEAR_TTL)
+    if cached is not None:
+        return cached
+    gear_data = profile_scraper.get_gear_data(nombre, server)
+    _cache_set(GEAR_CACHE, cache_key, gear_data)
+    return gear_data
+
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
@@ -73,27 +244,20 @@ async def personaje(ctx, nombre: str):
     
     
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        }
+        loop = asyncio.get_running_loop()
 
-        # URLs de la API y páginas HTML
-        url_summary = f"https://armory.warmane.com/api/character/{nombre}/Lordaeron/summary"
-        # Petición HTTP con headers
-        resp_summary = requests.get(url_summary, headers=headers)
+        summary_task = loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, "Lordaeron")
+        gear_task = loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre, "Lordaeron")
+        achi_task = loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre, "Lordaeron")
 
-        # Validar si devolvió algo
-        if resp_summary.status_code != 200:
-            await ctx.send(f"⚠️ No se pudo acceder a la API de Warmane (summary). Código {resp_summary.status_code}")
+        summary, gear_data, achi_payload = await asyncio.gather(
+            summary_task, gear_task, achi_task
+        )
+
+        if isinstance(summary, dict) and summary.get("__error__"):
+            await ctx.send(summary["__error__"])
             return
 
-        # Intentar parsear JSON
-        try:
-            summary = resp_summary.json()
-        except Exception as e:
-            await ctx.send(f"⚠️ Error al leer JSON de Warmane: {e}")
-            return
-        
         if not isinstance(summary, dict):
             await ctx.send("⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola.")
             return
@@ -112,18 +276,18 @@ async def personaje(ctx, nombre: str):
 
         # Try to compute GearScore locally using Warmane armory scraping + local table
         try:
-            gear_ids = profile_scraper.get_gear_ids(nombre, "Lordaeron")
+            gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
             if gear_ids:
                 gs_values = gearscore.main(gear_ids)
                 gs = sum(gs_values)
             else:
                 gs = summary.get("gearScore", "N/A")
-        except Exception as e:
+        except Exception:
             gs = summary.get("gearScore", "N/A")
 
         # Missing enchants and gems
         try:
-            missing_enchants, missing_gems = profile_scraper.get_missing_enchants_gems(nombre, "Lordaeron")
+            missing_enchants, missing_gems = profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
         except Exception:
             missing_enchants, missing_gems = [], []
 
@@ -131,54 +295,14 @@ async def personaje(ctx, nombre: str):
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
-        # Parse achievements using POST requests (same method as WarmaneProfileParser)
-        # ICC boss counts (cada achievement de sección representa ciertos bosses)
-        icc_sections = {
-            '4531': 4,  # ICC10N Storming the Citadel (4 bosses)
-            '4528': 3,  # ICC10N Plagueworks (3 bosses)
-            '4529': 2,  # ICC10N Crimson Hall (2 bosses)
-            '4527': 2,  # ICC10N Frostwing Halls (2 bosses)
-            '4532': 1,  # ICC10N Fall of Lich King (1 boss)
-            '4604': 4,  # ICC25N Storming the Citadel
-            '4605': 3,  # ICC25N Plagueworks
-            '4606': 2,  # ICC25N Crimson Hall
-            '4607': 2,  # ICC25N Frostwing Halls
-            '4608': 1,  # ICC25N Fall of Lich King
-            '4628': 4,  # ICC10HC Storming the Citadel
-            '4629': 3,  # ICC10HC Plagueworks
-            '4630': 2,  # ICC10HC Crimson Hall
-            '4631': 2,  # ICC10HC Frostwing Halls
-            '4636': 1,  # ICC10HC Fall of Lich King
-            '4632': 4,  # ICC25HC Storming the Citadel
-            '4633': 3,  # ICC25HC Plagueworks
-            '4634': 2,  # ICC25HC Crimson Hall
-            '4635': 2,  # ICC25HC Frostwing Halls
-            '4637': 1,  # ICC25HC Fall of Lich King
-        }
-        
-        icc_10n_bosses = 0
-        icc_25n_bosses = 0
-        icc_10h_bosses = 0
-        icc_25h_bosses = 0
-        halion_10n_achieved = False
-        halion_10h_achieved = False
-        halion_25n_achieved = False
-        halion_25h_achieved = False
-        
-        # Categories de Warmane para raids Wrath of the Lich King
-        # Source: WarmaneProfileParser/static/categories.json
-        # 15041 = ICC 10-player, 15042 = ICC 25-player
-        # 14922 = Naxx/RS 10-player, 14923 = Naxx/RS 25-player
-        raid_categories = [15041, 15042, 14922, 14923]
-        
-        # Los logros importantes de ICC y RS (IDs de achievement)
-        # Source: WarmaneProfileParser/static/achievements.json
-        target_achievements = {
-            '4817': ('halion_10n', 'The Twilight Destroyer (10)'),
-            '4818': ('halion_10h', 'Heroic: The Twilight Destroyer (10)'),
-            '4815': ('halion_25n', 'The Twilight Destroyer (25)'),
-            '4816': ('halion_25h', 'Heroic: The Twilight Destroyer (25)')
-        }
+        icc_10n_bosses = achi_payload["icc_10n_bosses"]
+        icc_25n_bosses = achi_payload["icc_25n_bosses"]
+        icc_10h_bosses = achi_payload["icc_10h_bosses"]
+        icc_25h_bosses = achi_payload["icc_25h_bosses"]
+        halion_10n_achieved = achi_payload["halion_10n_achieved"]
+        halion_10h_achieved = achi_payload["halion_10h_achieved"]
+        halion_25n_achieved = achi_payload["halion_25n_achieved"]
+        halion_25h_achieved = achi_payload["halion_25h_achieved"]
 
         icc_wing_pairs = {
             '10M': [
@@ -196,64 +320,7 @@ async def personaje(ctx, nombre: str):
                 ('Fall of the Lich King', '4608', '4637'),
             ],
         }
-
-        completed_ids = set()
-        
-        for category_id in raid_categories:
-            try:
-                url_achi_post = f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"
-                data = {"category": category_id}
-                resp_achi = requests.post(url_achi_post, headers=headers, data=data)
-                
-                if resp_achi.status_code == 200:
-                    try:
-                        achi_json = resp_achi.json()
-                        if 'content' in achi_json:
-                            soup = BeautifulSoup(achi_json['content'], 'html.parser')
-                            all_achievements = soup.find_all('div', class_='achievement')
-                            
-                            # Filtrar solo los achievements completados (sin la clase 'locked')
-                            completed_achievements = [
-                                ach for ach in all_achievements 
-                                if 'locked' not in ach.get('class', [])
-                            ]
-                            
-                            for ach_div in completed_achievements:
-                                # El ID está en el atributo id como "ach4530"
-                                ach_id_full = ach_div.get('id', '')
-                                if ach_id_full.startswith('ach'):
-                                    ach_id = ach_id_full.replace('ach', '')
-                                    completed_ids.add(ach_id)
-                                    
-                                    # Contar bosses de ICC por sección
-                                    if ach_id in icc_sections:
-                                        bosses = icc_sections[ach_id]
-                                        if ach_id in ['4531', '4528', '4529', '4527', '4532']:
-                                            icc_10n_bosses += bosses
-                                        elif ach_id in ['4604', '4605', '4606', '4607', '4608']:
-                                            icc_25n_bosses += bosses
-                                        elif ach_id in ['4628', '4629', '4630', '4631', '4636']:
-                                            icc_10h_bosses += bosses
-                                        elif ach_id in ['4632', '4633', '4634', '4635', '4637']:
-                                            icc_25h_bosses += bosses
-                                    
-                                    # Detectar Halion
-                                    if ach_id in target_achievements:
-                                        key = target_achievements[ach_id][0]
-                                        
-                                        if key == 'halion_10n':
-                                            halion_10n_achieved = True
-                                        elif key == 'halion_10h':
-                                            halion_10h_achieved = True
-                                        elif key == 'halion_25n':
-                                            halion_25n_achieved = True
-                                        elif key == 'halion_25h':
-                                            halion_25h_achieved = True
-                    except Exception as e:
-                        print(f"Error parsing achievements JSON for category {category_id}: {e}")
-                        
-            except Exception as e:
-                print(f"Error fetching achievements for category {category_id}: {e}")
+        completed_ids = set(achi_payload["completed_ids"])
         
         def format_wing_rows(mode_key: str) -> str:
             width = 26

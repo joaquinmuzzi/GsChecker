@@ -115,13 +115,15 @@ def get_gear_data(char_name: str, server: str = 'Lordaeron'):
         gear_data.append(item_properties)
     return gear_data
 
-def get_gear_ids(char_name: str, server: str = 'Lordaeron'):
-    gear_data = get_gear_data(char_name, server)
+def get_gear_ids_from_gear_data(gear_data):
     gear_ids = [item.get('item') for item in gear_data]
     return [gid if gid and str(gid).isdigit() else '' for gid in gear_ids]
 
-def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
+def get_gear_ids(char_name: str, server: str = 'Lordaeron'):
     gear_data = get_gear_data(char_name, server)
+    return get_gear_ids_from_gear_data(gear_data)
+
+def get_missing_enchants_gems_from_gear_data(gear_data):
     missing_enchants = []
     missing_gems = []
 
@@ -146,3 +148,7 @@ def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
                     missing_gems.append(f"{slot} ({missing_count})")
 
     return missing_enchants, missing_gems
+
+def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
+    gear_data = get_gear_data(char_name, server)
+    return get_missing_enchants_gems_from_gear_data(gear_data)
