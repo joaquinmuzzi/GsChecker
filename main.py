@@ -48,7 +48,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN no encontrado en .env")
 
-PREFIX = "!"
+PREFIX = ["!", "/"]
 
 # Crear el bot
 intents = discord.Intents.default()
@@ -63,7 +63,7 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send(f"Pong! Latencia: {round(bot.latency * 1000)}ms")
 
-@bot.command()
+@bot.command(aliases=["p", "per"])
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
     
