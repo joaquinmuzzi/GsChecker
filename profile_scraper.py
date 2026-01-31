@@ -1,3 +1,5 @@
+import re
+from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
 
@@ -13,6 +15,28 @@ ENCHANTABLE_SLOTS = {
     "Head", "Shoulder", "Chest", "Legs", "Hands", "Feet", "Wrist",
     "Back", "Main Hand", "Off Hand", "One-Hand", "Two-Hand"
 }
+
+ITEM_HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
+
+def _get_raw_stats(page_text: str) -> str:
+    try:
+        raw_stats = page_text[page_text.index("tooltip_enus") :]
+        return raw_stats[: raw_stats.index("_[")]
+    except ValueError:
+        return page_text
+
+@lru_cache(maxsize=512)
+def get_item_socket_count(item_id: str) -> int:
+    try:
+        item_url = f"https://wotlk.evowow.com/?item={item_id}"
+        resp = requests.get(item_url, headers=ITEM_HEADERS, timeout=10)
+        if resp.status_code != 200:
+            return 0
+        raw_stats = _get_raw_stats(resp.text)
+        sockets = re.findall("socket-([a-z]{3,9})", raw_stats)
+        return len(sockets)
+    except Exception:
+        return 0
 
 def _extract_slot_name(slot, index: int) -> str:
     for key in ("data-slot-name", "data-slot", "data-item-slot", "data-slotname"):
@@ -81,8 +105,11 @@ def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
 
         if "gems" in item:
             gems = item.get("gems") or []
-            missing_count = sum(1 for g in gems if not g or str(g) == "0")
-            if missing_count > 0:
-                missing_gems.append(f"{slot} ({missing_count})")
+            socket_count = get_item_socket_count(str(item_id))
+            if socket_count > 0:
+                filled_gems = sum(1 for g in gems if g and str(g) != "0")
+                missing_count = max(0, socket_count - filled_gems)
+                if missing_count > 0:
+                    missing_gems.append(f"{slot} ({missing_count})")
 
     return missing_enchants, missing_gems
