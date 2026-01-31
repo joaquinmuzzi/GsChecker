@@ -269,6 +269,11 @@ async def personaje(ctx, nombre: str):
         embed.add_field(name="Level | Race | Class", value=f"Level {nivel} {raza} {clase}", inline=True)
         embed.add_field(name="Spec", value=especializacion, inline=True)
         embed.add_field(name="Guild", value=guild_display, inline=True)
+        embed.add_field(
+            name="Armory",
+            value=(f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"),
+            inline=False,
+        )
 
         embed.add_field(
             name="ICC 10M",
@@ -300,6 +305,7 @@ async def personaje(ctx, nombre: str):
             ),
             inline=False,
         )
+
 
         await ctx.send(embed=embed)
 
