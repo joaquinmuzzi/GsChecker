@@ -84,6 +84,7 @@ async def personaje(ctx, nombre: str):
         # Extraer datos básicos de forma segura
         nombre_char = summary.get("name", nombre)
         nivel = summary.get("level", "N/A")
+        raza = summary.get("race", "N/A")
         clase = summary.get("class", "N/A")
         
         print(f"Nombre: {nombre_char}, Nivel: {nivel}, Clase: {clase}")
@@ -115,10 +116,34 @@ async def personaje(ctx, nombre: str):
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
         # Parse achievements using POST requests (same method as WarmaneProfileParser)
-        icc_10n_achieved = False
-        icc_25n_achieved = False
-        icc_10h_achieved = False
-        icc_25h_achieved = False
+        # ICC boss counts (cada achievement de sección representa ciertos bosses)
+        icc_sections = {
+            '4531': 4,  # ICC10N Storming the Citadel (4 bosses)
+            '4528': 3,  # ICC10N Plagueworks (3 bosses)
+            '4529': 2,  # ICC10N Crimson Hall (2 bosses)
+            '4527': 2,  # ICC10N Frostwing Halls (2 bosses)
+            '4532': 1,  # ICC10N Fall of Lich King (1 boss)
+            '4604': 4,  # ICC25N Storming the Citadel
+            '4605': 3,  # ICC25N Plagueworks
+            '4606': 2,  # ICC25N Crimson Hall
+            '4607': 2,  # ICC25N Frostwing Halls
+            '4608': 1,  # ICC25N Fall of Lich King
+            '4628': 4,  # ICC10HC Storming the Citadel
+            '4629': 3,  # ICC10HC Plagueworks
+            '4630': 2,  # ICC10HC Crimson Hall
+            '4631': 2,  # ICC10HC Frostwing Halls
+            '4636': 1,  # ICC10HC Fall of Lich King
+            '4632': 4,  # ICC25HC Storming the Citadel
+            '4633': 3,  # ICC25HC Plagueworks
+            '4634': 2,  # ICC25HC Crimson Hall
+            '4635': 2,  # ICC25HC Frostwing Halls
+            '4637': 1,  # ICC25HC Fall of Lich King
+        }
+        
+        icc_10n_bosses = 0
+        icc_25n_bosses = 0
+        icc_10h_bosses = 0
+        icc_25h_bosses = 0
         halion_10h_achieved = False
         halion_25h_achieved = False
         
@@ -131,15 +156,44 @@ async def personaje(ctx, nombre: str):
         # Los logros importantes de ICC y RS (IDs de achievement)
         # Source: WarmaneProfileParser/static/achievements.json
         target_achievements = {
-            '4530': ('icc_10n', 'The Frozen Throne (10)'),
-            '4597': ('icc_25n', 'The Frozen Throne (25)'),  
-            '4583': ('icc_10h', 'Bane of the Fallen King (10 HC)'),
-            '4584': ('icc_25h', 'The Light of Dawn (25 HC)'),
-            '4817': ('halion_10n', 'The Twilight Destroyer (10)'),
-            '4818': ('halion_10h', 'The Twilight Destroyer (10 HC)'),
-            '4815': ('halion_25n', 'The Twilight Destroyer (25)'),
-            '4816': ('halion_25h', 'The Twilight Destroyer (25 HC)')
+            '4817': ('halion_10h', 'The Twilight Destroyer (10)'),
+            '4818': ('halion_10h', 'Heroic: The Twilight Destroyer (10)'),
+            '4815': ('halion_25h', 'The Twilight Destroyer (25)'),
+            '4816': ('halion_25h', 'Heroic: The Twilight Destroyer (25)')
         }
+
+        icc_wing_achievements = {
+            '10N': {
+                '4531': 'Storming the Citadel',
+                '4528': 'The Plagueworks',
+                '4529': 'The Crimson Hall',
+                '4527': 'The Frostwing Halls',
+                '4532': 'Fall of the Lich King'
+            },
+            '10H': {
+                '4628': 'Heroic: Storming the Citadel',
+                '4629': 'Heroic: The Plagueworks',
+                '4630': 'Heroic: The Crimson Hall',
+                '4631': 'Heroic: The Frostwing Halls',
+                '4636': 'Heroic: Fall of the Lich King'
+            },
+            '25N': {
+                '4604': 'Storming the Citadel',
+                '4605': 'The Plagueworks',
+                '4606': 'The Crimson Hall',
+                '4607': 'The Frostwing Halls',
+                '4608': 'Fall of the Lich King'
+            },
+            '25H': {
+                '4632': 'Heroic: Storming the Citadel',
+                '4633': 'Heroic: The Plagueworks',
+                '4634': 'Heroic: The Crimson Hall',
+                '4635': 'Heroic: The Frostwing Halls',
+                '4637': 'Heroic: Fall of the Lich King'
+            }
+        }
+
+        completed_ids = set()
         
         for category_id in raid_categories:
             try:
@@ -167,20 +221,26 @@ async def personaje(ctx, nombre: str):
                                 ach_id_full = ach_div.get('id', '')
                                 if ach_id_full.startswith('ach'):
                                     ach_id = ach_id_full.replace('ach', '')
+                                    completed_ids.add(ach_id)
                                     
+                                    # Contar bosses de ICC por sección
+                                    if ach_id in icc_sections:
+                                        bosses = icc_sections[ach_id]
+                                        if ach_id in ['4531', '4528', '4529', '4527', '4532']:
+                                            icc_10n_bosses += bosses
+                                        elif ach_id in ['4604', '4605', '4606', '4607', '4608']:
+                                            icc_25n_bosses += bosses
+                                        elif ach_id in ['4628', '4629', '4630', '4631', '4636']:
+                                            icc_10h_bosses += bosses
+                                        elif ach_id in ['4632', '4633', '4634', '4635', '4637']:
+                                            icc_25h_bosses += bosses
+                                    
+                                    # Detectar Halion
                                     if ach_id in target_achievements:
                                         key, name = target_achievements[ach_id]
                                         print(f"✓ Logro encontrado: {name} (ID: {ach_id})")
                                         
-                                        if key == 'icc_10n':
-                                            icc_10n_achieved = True
-                                        elif key == 'icc_25n':
-                                            icc_25n_achieved = True
-                                        elif key == 'icc_10h':
-                                            icc_10h_achieved = True
-                                        elif key == 'icc_25h':
-                                            icc_25h_achieved = True
-                                        elif key == 'halion_10h':
+                                        if key == 'halion_10h':
                                             halion_10h_achieved = True
                                         elif key == 'halion_25h':
                                             halion_25h_achieved = True
@@ -190,38 +250,89 @@ async def personaje(ctx, nombre: str):
             except Exception as e:
                 print(f"Error fetching achievements for category {category_id}: {e}")
         
-        print(f"\nLogros ICC/RS:")
-        print(f"  ICC 10N: {'✅' if icc_10n_achieved else '❌'}")
-        print(f"  ICC 25N: {'✅' if icc_25n_achieved else '❌'}")
-        print(f"  ICC 10HC: {'✅' if icc_10h_achieved else '❌'}")
-        print(f"  ICC 25HC: {'✅' if icc_25h_achieved else '❌'}")
+        print(f"\nProgreso ICC/RS:")
+        print(f"  ICC 10N: {icc_10n_bosses}/12 bosses")
+        print(f"  ICC 25N: {icc_25n_bosses}/12 bosses")
+        print(f"  ICC 10HC: {icc_10h_bosses}/12 bosses")
+        print(f"  ICC 25HC: {icc_25h_bosses}/12 bosses")
         print(f"  Halion 10HC: {'✅' if halion_10h_achieved else '❌'}")
         print(f"  Halion 25HC: {'✅' if halion_25h_achieved else '❌'}")
 
 
-        # Construir mensaje con logros de ICC/RS
-        mensaje_basico = (
-            f"💎 **GearScore: {gs}**\n"
-            f"🧙 **{nombre_char}** - Lvl {nivel} {clase}\n"
-            f"💫 {especializacion}\n"
-            f"🏰 {guild}\n"
+        def format_wing_list(mode_key: str) -> list[str]:
+            lines = []
+            for ach_id, name in icc_wing_achievements[mode_key].items():
+                status = '✅' if ach_id in completed_ids else '❌'
+                lines.append(f"{status} {name}")
+            return lines
+
+        def format_two_column(normal_key: str, heroic_key: str) -> str:
+            normal_lines = format_wing_list(normal_key)
+            heroic_lines = format_wing_list(heroic_key)
+            width = 34
+            rows = []
+            max_len = max(len(normal_lines), len(heroic_lines))
+            for i in range(max_len):
+                left = normal_lines[i] if i < len(normal_lines) else ""
+                right = heroic_lines[i] if i < len(heroic_lines) else ""
+                rows.append(f"{left:<{width}}  {right}")
+            return "\n".join(rows)
+
+        # Construir embed con los datos solicitados
+        guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
+
+        embed = discord.Embed(
+            title=f"Summary: {nombre_char}-Lordaeron",
+            color=0x2B2D31,
+        )
+        embed.add_field(name="GearScore", value=str(gs), inline=True)
+        embed.add_field(name="Level | Race | Class", value=f"Level {nivel} {raza} {clase}", inline=True)
+        embed.add_field(name="Spec", value=especializacion, inline=True)
+        embed.add_field(name="Guild", value=guild_display, inline=True)
+
+        embed.add_field(
+            name="Icecrown Citadel (ICC) - Progress",
+            value=(
+                "```\n"
+                "       Normal    Heroic\n"
+                f"10M:   {icc_10n_bosses:2}/12      {icc_10h_bosses:2}/12\n"
+                f"25M:   {icc_25n_bosses:2}/12      {icc_25h_bosses:2}/12\n"
+                "```"
+            ),
+            inline=False,
         )
 
-        # Usar emojis para mostrar completado/no completado
-        mensaje_raid = (
-            f"\n🧊 **Icecrown Citadel:**\n"
-            f"  10N: {'✅' if icc_10n_achieved else '❌'} | "
-            f"25N: {'✅' if icc_25n_achieved else '❌'} | "
-            f"10HC: {'✅' if icc_10h_achieved else '❌'} | "
-            f"25HC: {'✅' if icc_25h_achieved else '❌'}\n"
-            f"🔥 **Ruby Sanctum (Halion HC):**\n"
-            f"  10HC: {'✅' if halion_10h_achieved else '❌'} | "
-            f"25HC: {'✅' if halion_25h_achieved else '❌'}\n"
+        embed.add_field(
+            name="ICC 10M (Normal | Heroic)",
+            value=(
+                "```\n"
+                f"{format_two_column('10N', '10H')}\n"
+                "```"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="ICC 25M (Normal | Heroic)",
+            value=(
+                "```\n"
+                f"{format_two_column('25N', '25H')}\n"
+                "```"
+            ),
+            inline=False,
         )
 
-        # Send messages separately to avoid length limit
-        await ctx.send(mensaje_basico)
-        await ctx.send(mensaje_raid)
+        embed.add_field(
+            name="Ruby Sanctum (Halion HC)",
+            value=(
+                "```\n"
+                f"10HC: {'✅' if halion_10h_achieved else '❌'}\n"
+                f"25HC: {'✅' if halion_25h_achieved else '❌'}\n"
+                "```"
+            ),
+            inline=False,
+        )
+
+        await ctx.send(embed=embed)
 
     except Exception as e:
         await ctx.send(f"❌ Error al obtener datos: {e}")
