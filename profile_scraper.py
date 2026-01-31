@@ -95,8 +95,7 @@ def parse_slot(slot):
         return {}
     item_properties_list = slot['rel'][0].split('&')
     item_properties = dict(property.split('=') for property in item_properties_list)
-    if 'gems' in item_properties:
-        item_properties['gems'] = item_properties.get('gems', '0:0:0').split(':')
+    item_properties['gems'] = item_properties.get('gems', '0:0:0').split(':')
     return item_properties
 
 def get_gear_data(char_name: str, server: str = 'Lordaeron'):
