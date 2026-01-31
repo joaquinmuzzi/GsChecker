@@ -140,11 +140,10 @@ def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
             gems = item.get("gems") or []
             filled_gems = sum(1 for g in gems if g and str(g) != "0")
             has_zeros = any(not g or str(g) == "0" for g in gems)
-            if has_zeros:
-                socket_count = get_item_socket_count(str(item_id))
-                if socket_count > 0:
-                    missing_count = max(0, socket_count - filled_gems)
-                    if missing_count > 0:
-                        missing_gems.append(f"{slot} ({missing_count})")
+            socket_count = get_item_socket_count(str(item_id))
+            if socket_count > 0:
+                missing_count = max(0, socket_count - filled_gems)
+                if missing_count > 0 and (has_zeros or len(gems) < socket_count):
+                    missing_gems.append(f"{slot} ({missing_count})")
 
     return missing_enchants, missing_gems
