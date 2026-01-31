@@ -276,6 +276,12 @@ async def personaje(ctx, nombre: str):
         )
 
         embed.add_field(
+            name="Uwulogs",
+            value=(f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"),
+            inline=False,
+        )
+
+        embed.add_field(
             name="ICC 10M",
             value=(
                 "```\n"
