@@ -1,3 +1,5 @@
+import json
+import os
 import re
 from functools import lru_cache
 import requests
@@ -17,6 +19,27 @@ ENCHANTABLE_SLOTS = {
 }
 
 ITEM_HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
+CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_sockets_cache.json")
+_SOCKET_CACHE = None
+
+def _load_socket_cache() -> dict:
+    global _SOCKET_CACHE
+    if _SOCKET_CACHE is not None:
+        return _SOCKET_CACHE
+    try:
+        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+            _SOCKET_CACHE = json.load(f)
+    except Exception:
+        _SOCKET_CACHE = {}
+    return _SOCKET_CACHE
+
+def _save_socket_cache(cache: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(cache, f)
+    except Exception:
+        pass
 
 def _get_raw_stats(page_text: str) -> str:
     try:
@@ -28,13 +51,20 @@ def _get_raw_stats(page_text: str) -> str:
 @lru_cache(maxsize=512)
 def get_item_socket_count(item_id: str) -> int:
     try:
+        cache = _load_socket_cache()
+        cached = cache.get(item_id)
+        if isinstance(cached, int):
+            return cached
         item_url = f"https://wotlk.evowow.com/?item={item_id}"
-        resp = requests.get(item_url, headers=ITEM_HEADERS, timeout=10)
+        resp = requests.get(item_url, headers=ITEM_HEADERS, timeout=6)
         if resp.status_code != 200:
             return 0
         raw_stats = _get_raw_stats(resp.text)
         sockets = re.findall("socket-([a-z]{3,9})", raw_stats)
-        return len(sockets)
+        count = len(sockets)
+        cache[item_id] = count
+        _save_socket_cache(cache)
+        return count
     except Exception:
         return 0
 
@@ -105,11 +135,13 @@ def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
 
         if "gems" in item:
             gems = item.get("gems") or []
-            socket_count = get_item_socket_count(str(item_id))
-            if socket_count > 0:
-                filled_gems = sum(1 for g in gems if g and str(g) != "0")
-                missing_count = max(0, socket_count - filled_gems)
-                if missing_count > 0:
-                    missing_gems.append(f"{slot} ({missing_count})")
+            filled_gems = sum(1 for g in gems if g and str(g) != "0")
+            has_zeros = any(not g or str(g) == "0" for g in gems)
+            if has_zeros:
+                socket_count = get_item_socket_count(str(item_id))
+                if socket_count > 0:
+                    missing_count = max(0, socket_count - filled_gems)
+                    if missing_count > 0:
+                        missing_gems.append(f"{slot} ({missing_count})")
 
     return missing_enchants, missing_gems
