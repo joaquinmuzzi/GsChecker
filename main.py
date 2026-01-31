@@ -302,6 +302,34 @@ def _extract_icc_boss_kills(stats_rows):
 
     return icc_10, icc_25
 
+def _extract_halion_kills(stats_rows):
+    halion = {"10n": 0, "10h": 0, "25n": 0, "25h": 0}
+
+    def parse_value(val: str) -> int:
+        if not val or val.strip() in {"- -", "--"}:
+            return 0
+        try:
+            return int(val.replace(",", ""))
+        except Exception:
+            return 0
+
+    for desc, val in stats_rows:
+        if "Halion kills" not in desc:
+            continue
+        value = parse_value(val)
+        if "Heroic" in desc:
+            if "Ruby Sanctum 10 player" in desc:
+                halion["10h"] = max(halion["10h"], value)
+            elif "Ruby Sanctum 25 player" in desc:
+                halion["25h"] = max(halion["25h"], value)
+        else:
+            if "Ruby Sanctum 10 player" in desc:
+                halion["10n"] = max(halion["10n"], value)
+            elif "Ruby Sanctum 25 player" in desc:
+                halion["25n"] = max(halion["25n"], value)
+
+    return halion
+
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
@@ -383,18 +411,27 @@ async def personaje(ctx, nombre: str):
         halion_25h_achieved = achi_payload["halion_25h_achieved"]
 
         icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
+        halion_kills = _extract_halion_kills(stats_rows)
 
-        def format_boss_rows(bosses: dict) -> str:
-            width = 16
+        def format_boss_rows(bosses_10: dict, bosses_25: dict) -> str:
+            width = 13
             rows = []
-            killed_count = sum(1 for v in bosses.values() if v["nm"] > 0 or v["hc"] > 0)
-            rows.append(f"Bosses killed: {killed_count}/12")
-            for name, counts in bosses.items():
-                nm_mark = '✅' if counts["nm"] > 0 else '❌'
-                hc_mark = '✅' if counts["hc"] > 0 else '❌'
+            killed_count_10 = sum(1 for v in bosses_10.values() if v["nm"] > 0 or v["hc"] > 0)
+            killed_count_25 = sum(1 for v in bosses_25.values() if v["nm"] > 0 or v["hc"] > 0)
+            rows.append(f"Bosses killed: 10M {killed_count_10}/12 | 25M {killed_count_25}/12")
+            rows.append("Boss".ljust(width) + " | 10N | 10H | 25N | 25H")
+            rows.append("-" * width + "+-----+-----+-----+-----")
+
+            for name in bosses_10.keys():
+                c10 = bosses_10[name]
+                c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
+
+                def cell(v):
+                    mark = '✅' if v > 0 else '❌'
+                    return f"{mark}({v})"
+
                 rows.append(
-                    f"{name:<{width}} NM: {nm_mark} ({counts['nm']})  "
-                    f"HC: {hc_mark} ({counts['hc']})"
+                    f"{name:<{width}} | {cell(c10['nm']):<4} | {cell(c10['hc']):<4} | {cell(c25['nm']):<4} | {cell(c25['hc']):<4}"
                 )
             return "\n".join(rows)
 
@@ -422,19 +459,10 @@ async def personaje(ctx, nombre: str):
         )
 
         embed.add_field(
-            name="ICC 10M",
+            name="ICC",
             value=(
                 "```\n"
-                f"{format_boss_rows(icc_10)}\n"
-                "```"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="ICC 25M",
-            value=(
-                "```\n"
-                f"{format_boss_rows(icc_25)}\n"
+                f"{format_boss_rows(icc_10, icc_25)}\n"
                 "```"
             ),
             inline=False,
@@ -444,9 +472,9 @@ async def personaje(ctx, nombre: str):
             name="Ruby Sanctum",
             value=(
                 "```\n"
-                "       Normal    Heroic\n"
-                f"10M:   {'✅' if halion_10n_achieved else '❌'}       {'✅' if halion_10h_achieved else '❌'}\n"
-                f"25M:   {'✅' if halion_25n_achieved else '❌'}       {'✅' if halion_25h_achieved else '❌'}\n"
+                "       Normal        Heroic\n"
+                f"10M:   {'✅' if halion_10n_achieved else '❌'} ({halion_kills['10n']})   {'✅' if halion_10h_achieved else '❌'} ({halion_kills['10h']})\n"
+                f"25M:   {'✅' if halion_25n_achieved else '❌'} ({halion_kills['25n']})   {'✅' if halion_25h_achieved else '❌'} ({halion_kills['25h']})\n"
                 "```"
             ),
             inline=False,
