@@ -20,6 +20,7 @@ ENCHANTABLE_SLOTS = {
 
 ITEM_HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_sockets_cache.json")
+SOCKET_CACHE_ONLY = False
 _SOCKET_CACHE = None
 
 def _load_socket_cache() -> dict:
@@ -55,6 +56,8 @@ def get_item_socket_count(item_id: str) -> int:
         cached = cache.get(item_id)
         if isinstance(cached, int):
             return cached
+        if SOCKET_CACHE_ONLY:
+            return 0
         item_url = f"https://wotlk.evowow.com/?item={item_id}"
         resp = requests.get(item_url, headers=ITEM_HEADERS, timeout=6)
         if resp.status_code != 200:

@@ -321,15 +321,15 @@ async def personaje(ctx, nombre: str):
         if missing_enchants or missing_gems:
             missing_lines = []
             if missing_enchants:
-                missing_lines.append("Encantamientos faltantes:")
+                missing_lines.append("Enchants Missing:")
                 missing_lines.extend(f"- {slot}" for slot in missing_enchants)
 
             if missing_gems:
-                missing_lines.append("Gemas faltantes (slots):")
+                missing_lines.append("Missing Gems (slots):")
                 missing_lines.extend(f"- {slot}" for slot in missing_gems)
 
             embed.add_field(
-                name="Encantamientos / Gemas",
+                name="Enchants / Gems",
                 value=(
                     "```\n"
                     + "\n".join(missing_lines)
