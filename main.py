@@ -121,6 +121,12 @@ async def personaje(ctx, nombre: str):
         except Exception as e:
             gs = summary.get("gearScore", "N/A")
 
+        # Missing enchants and gems
+        try:
+            missing_enchants, missing_gems = profile_scraper.get_missing_enchants_gems(nombre, "Lordaeron")
+        except Exception:
+            missing_enchants, missing_gems = [], []
+
 
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
@@ -311,6 +317,26 @@ async def personaje(ctx, nombre: str):
             ),
             inline=False,
         )
+
+        if missing_enchants or missing_gems:
+            missing_lines = []
+            if missing_enchants:
+                missing_lines.append("Encantamientos faltantes:")
+                missing_lines.extend(f"- {slot}" for slot in missing_enchants)
+
+            if missing_gems:
+                missing_lines.append("Gemas faltantes (slots):")
+                missing_lines.extend(f"- {slot}" for slot in missing_gems)
+
+            embed.add_field(
+                name="Encantamientos / Gemas",
+                value=(
+                    "```\n"
+                    + "\n".join(missing_lines)
+                    + "\n```"
+                ),
+                inline=False,
+            )
 
 
         await ctx.send(embed=embed)

@@ -53,6 +53,8 @@ poetry run python main.py
 ## Uso
 
 - `!personaje <nombre>`
+- `/p <nombre>`
+- `/per <nombre>`
 
 El nombre se normaliza automáticamente (primera letra en mayúscula).
 
