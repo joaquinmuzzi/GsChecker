@@ -5,11 +5,12 @@ Bot de Discord para consultar GearScore y logros de raids de personajes en Warma
 ## Características
 
 - Cálculo local de GearScore con tabla WotLK.
-- Progreso de ICC 10/25 en Normal y Heroic (por logros de alas).
-- Ruby Sanctum (Halion) en Normal y Heroic.
-- Salida en embed limpio y compacto.
+- Progreso de ICC 10/25 por boss (Normal y Heroic) usando estadísticas del Armory.
+- Ruby Sanctum (Halion) por logros The Twilight Destroyer (10/25, Normal/Heroic).
+- Tabla monoespaciada alineada en el embed.
+- Cache de sockets de ítems para detección rápida de gemas faltantes.
 
-> Nota: el progreso de ICC se basa en logros de alas, no en conteo por boss individual.
+> Nota: el progreso de ICC se calcula por boss individual desde la sección Statistics del Armory.
 
 ## Requisitos
 
@@ -58,6 +59,22 @@ poetry run python main.py
 
 El nombre se normaliza automáticamente (primera letra en mayúscula).
 
+## Cache de sockets (gemas)
+
+Para evitar consultas lentas a wotlk.evowow.com, se usa un cache en:
+
+- static/item_sockets_cache.json
+
+Podés precargarlo con:
+
+```bash
+python tools/preload_item_sockets_cache.py
+```
+
+También podés agregar IDs extra de ítems en:
+
+- static/raid_items_extra.json
+
 ## Estructura
 
 ```
@@ -65,8 +82,12 @@ GsChecker/
 ├── main.py              # Bot de Discord
 ├── gearscore.py         # Cálculo de GearScore
 ├── profile_scraper.py   # Scraper del Armory
+├── tools/
+│   └── preload_item_sockets_cache.py  # Precarga de sockets
 ├── static/
 │   └── GS.json          # Tabla de GearScore
+│   └── item_sockets_cache.json  # Cache de sockets
+│   └── raid_items_extra.json    # IDs extra para precarga
 ├── requirements.txt     # Dependencias (pip)
 ├── pyproject.toml       # Dependencias (Poetry)
 └── run.sh               # Script de arranque
