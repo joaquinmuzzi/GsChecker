@@ -59,9 +59,11 @@ HTTP_TIMEOUT = 8
 SUMMARY_CACHE = {}
 ACHIEVEMENTS_CACHE = {}
 GEAR_CACHE = {}
+STATS_CACHE = {}
 SUMMARY_TTL = 120
 ACHIEVEMENTS_TTL = 300
 GEAR_TTL = 120
+STATS_TTL = 300
 
 EXECUTOR = ThreadPoolExecutor(max_workers=6)
 
@@ -221,6 +223,82 @@ def _fetch_gear_data(nombre: str, server: str):
     _cache_set(GEAR_CACHE, cache_key, gear_data)
     return gear_data
 
+def _fetch_statistics(nombre: str, server: str, category_id: int):
+    cache_key = (nombre, server, category_id)
+    cached = _cache_get(STATS_CACHE, cache_key, STATS_TTL)
+    if cached is not None:
+        return cached
+
+    url_stats = f"https://armory.warmane.com/character/{nombre}/{server}/statistics"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    resp = SESSION.post(url_stats, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT)
+    if resp.status_code != 200:
+        return []
+    try:
+        js = resp.json()
+        content = js.get("content", "")
+    except Exception:
+        return []
+
+    soup = BeautifulSoup(content, "html.parser")
+    rows = []
+    for tr in soup.find_all("tr"):
+        tds = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
+        if tds:
+            rows.append(tds)
+
+    _cache_set(STATS_CACHE, cache_key, rows)
+    return rows
+
+def _extract_icc_boss_kills(stats_rows):
+    boss_patterns = {
+        "Marrowgar": ["Lord Marrowgar"],
+        "Deathwhisper": ["Lady Deathwhisper"],
+        "Gunship": ["Gunship Battle"],
+        "Saurfang": ["Deathbringer"],
+        "Festergut": ["Festergut"],
+        "Rotface": ["Rotface"],
+        "Putricide": ["Professor Putricide"],
+        "Blood Prince": ["Blood Prince Council"],
+        "Blood Queen": ["Blood Queen Lana'thel"],
+        "Valithria": ["Valithria Dreamwalker"],
+        "Sindragosa": ["Sindragosa"],
+        "Lich King": ["Victories over the Lich King", "Lich King"],
+    }
+
+    def parse_value(val: str) -> int:
+        if not val or val.strip() in {"- -", "--"}:
+            return 0
+        try:
+            return int(val.replace(",", ""))
+        except Exception:
+            return 0
+
+    icc_10 = {name: False for name in boss_patterns}
+    icc_25 = {name: False for name in boss_patterns}
+
+    for desc, val in stats_rows:
+        if "Icecrown" not in desc:
+            continue
+        value = parse_value(val)
+        if value <= 0:
+            continue
+
+        is_10 = "Icecrown 10 player" in desc
+        is_25 = "Icecrown 25 player" in desc
+        if not (is_10 or is_25):
+            continue
+
+        for boss_name, patterns in boss_patterns.items():
+            if any(pat in desc for pat in patterns):
+                if is_10:
+                    icc_10[boss_name] = True
+                if is_25:
+                    icc_25[boss_name] = True
+                break
+
+    return icc_10, icc_25
+
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
@@ -249,9 +327,10 @@ async def personaje(ctx, nombre: str):
         summary_task = loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, "Lordaeron")
         gear_task = loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre, "Lordaeron")
         achi_task = loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre, "Lordaeron")
+        stats_task = loop.run_in_executor(EXECUTOR, _fetch_statistics, nombre, "Lordaeron", 15062)
 
-        summary, gear_data, achi_payload = await asyncio.gather(
-            summary_task, gear_task, achi_task
+        summary, gear_data, achi_payload, stats_rows = await asyncio.gather(
+            summary_task, gear_task, achi_task, stats_task
         )
 
         if isinstance(summary, dict) and summary.get("__error__"):
@@ -295,40 +374,21 @@ async def personaje(ctx, nombre: str):
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
-        icc_10n_bosses = achi_payload["icc_10n_bosses"]
-        icc_25n_bosses = achi_payload["icc_25n_bosses"]
-        icc_10h_bosses = achi_payload["icc_10h_bosses"]
-        icc_25h_bosses = achi_payload["icc_25h_bosses"]
         halion_10n_achieved = achi_payload["halion_10n_achieved"]
         halion_10h_achieved = achi_payload["halion_10h_achieved"]
         halion_25n_achieved = achi_payload["halion_25n_achieved"]
         halion_25h_achieved = achi_payload["halion_25h_achieved"]
 
-        icc_wing_pairs = {
-            '10M': [
-                ('Storming the Citadel', '4531', '4628'),
-                ('Plagueworks', '4528', '4629'),
-                ('Crimson Hall', '4529', '4630'),
-                ('Frostwing Halls', '4527', '4631'),
-                ('Fall of the Lich King', '4532', '4636'),
-            ],
-            '25M': [
-                ('Storming the Citadel', '4604', '4632'),
-                ('Plagueworks', '4605', '4633'),
-                ('Crimson Hall', '4606', '4634'),
-                ('Frostwing Halls', '4607', '4635'),
-                ('Fall of the Lich King', '4608', '4637'),
-            ],
-        }
-        completed_ids = set(achi_payload["completed_ids"])
-        
-        def format_wing_rows(mode_key: str) -> str:
-            width = 26
+        icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
+
+        def format_boss_rows(bosses: dict) -> str:
+            width = 16
             rows = []
-            for name, nm_id, hc_id in icc_wing_pairs[mode_key]:
-                nm = '✅' if nm_id in completed_ids else '❌'
-                hc = '✅' if hc_id in completed_ids else '❌'
-                rows.append(f"{name:<{width}} NM: {nm}  | HC: {hc}")
+            killed_count = sum(1 for v in bosses.values() if v)
+            rows.append(f"Bosses killed: {killed_count}/12")
+            for name, killed in bosses.items():
+                mark = '✅' if killed else '❌'
+                rows.append(f"{name:<{width}} {mark}")
             return "\n".join(rows)
 
         # Construir embed con los datos solicitados
@@ -358,7 +418,7 @@ async def personaje(ctx, nombre: str):
             name="ICC 10M",
             value=(
                 "```\n"
-                f"{format_wing_rows('10M')}\n"
+                f"{format_boss_rows(icc_10)}\n"
                 "```"
             ),
             inline=False,
@@ -367,7 +427,7 @@ async def personaje(ctx, nombre: str):
             name="ICC 25M",
             value=(
                 "```\n"
-                f"{format_wing_rows('25M')}\n"
+                f"{format_boss_rows(icc_25)}\n"
                 "```"
             ),
             inline=False,
