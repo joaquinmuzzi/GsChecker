@@ -6,6 +6,8 @@ import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {'User-Agent': 'GsChecker/1.0'}
+SESSION = requests.Session()
+ITEM_SESSION = requests.Session()
 
 SLOT_FALLBACK_ORDER = [
     "Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard",
@@ -49,7 +51,7 @@ def _get_raw_stats(page_text: str) -> str:
     except ValueError:
         return page_text
 
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=4096)
 def get_item_socket_count(item_id: str) -> int:
     try:
         cache = _load_socket_cache()
@@ -59,7 +61,7 @@ def get_item_socket_count(item_id: str) -> int:
         if SOCKET_CACHE_ONLY:
             return 0
         item_url = f"https://wotlk.evowow.com/?item={item_id}"
-        resp = requests.get(item_url, headers=ITEM_HEADERS, timeout=6)
+        resp = ITEM_SESSION.get(item_url, headers=ITEM_HEADERS, timeout=6)
         if resp.status_code != 200:
             return 0
         raw_stats = _get_raw_stats(resp.text)
@@ -100,7 +102,7 @@ def parse_slot(slot):
 
 def get_gear_data(char_name: str, server: str = 'Lordaeron'):
     url = f"http://armory.warmane.com/character/{char_name}/{server}"
-    resp = requests.get(url, headers=HEADERS, timeout=10)
+    resp = SESSION.get(url, headers=HEADERS, timeout=8)
     if resp.status_code != 200:
         return []
     soup = BeautifulSoup(resp.text, 'html.parser')

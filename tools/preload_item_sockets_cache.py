@@ -8,6 +8,10 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 CACHE_PATH = BASE_DIR / "static" / "item_sockets_cache.json"
 EXTRA_ITEMS_PATH = BASE_DIR / "static" / "raid_items_extra.json"
 SETS_PATH = BASE_DIR.parent / "WarmaneProfileParser" / "static" / "sets.json"
+GS_PATHS = [
+    BASE_DIR / "static" / "GS.json",
+    BASE_DIR.parent / "WarmaneProfileParser" / "static" / "GS.json",
+]
 
 RAID_ILVLS = {219, 226, 232, 245, 258, 251, 264, 277}
 HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
@@ -60,6 +64,32 @@ def load_extra_items() -> set[str]:
         return set()
     return set()
 
+def load_gs_items() -> set[str]:
+    item_ids: set[str] = set()
+    for path in GS_PATHS:
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            continue
+
+        def collect(obj):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if isinstance(k, str) and k.isdigit():
+                        item_ids.add(k)
+                    collect(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    collect(v)
+            elif isinstance(obj, str) and obj.isdigit():
+                item_ids.add(obj)
+
+        collect(data)
+    return item_ids
+
 
 def load_cache() -> dict:
     if not CACHE_PATH.exists():
@@ -75,7 +105,7 @@ def save_cache(cache: dict) -> None:
 
 
 def main() -> None:
-    raid_items = load_sets_items() | load_extra_items()
+    raid_items = load_sets_items() | load_extra_items() | load_gs_items()
     cache = load_cache()
 
     missing = [item_id for item_id in raid_items if item_id not in cache]
