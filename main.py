@@ -52,7 +52,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN no encontrado en .env")
 
-PREFIX = ["!", "/"]
+PREFIX = ["/"]
 
 SESSION = requests.Session()
 HTTP_TIMEOUT = 8
@@ -215,6 +215,56 @@ def _fetch_achievements(nombre: str, server: str):
     _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
     return payload
 
+def _fetch_toc_achievements(nombre: str, server: str):
+    cache_key = ("toc", nombre, server)
+    cached = _cache_get(ACHIEVEMENTS_CACHE, cache_key, ACHIEVEMENTS_TTL)
+    if cached is not None:
+        return cached
+
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    url_achi_post = f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
+
+    target_titles = {
+        "Call of the Crusade (10 player)": "toc_10n",
+        "Call of the Crusade (25 player)": "toc_25n",
+        "Call of the Grand Crusade (10 player)": "toc_10h",
+        "Call of the Grand Crusade (25 player)": "toc_25h",
+    }
+
+    payload = {
+        "toc_10n": False,
+        "toc_10h": False,
+        "toc_25n": False,
+        "toc_25h": False,
+    }
+
+    for category_id in [15001, 15002]:
+        resp_achi = SESSION.post(url_achi_post, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT)
+        if resp_achi.status_code != 200:
+            continue
+        try:
+            achi_json = resp_achi.json()
+        except Exception:
+            continue
+        content = achi_json.get("content", "")
+        if not content:
+            continue
+
+        soup = BeautifulSoup(content, "html.parser")
+        for ach_div in soup.find_all("div", class_="achievement"):
+            title_el = ach_div.find("div", class_="title")
+            if not title_el:
+                continue
+            title = title_el.get_text(" ", strip=True)
+            key = target_titles.get(title)
+            if not key:
+                continue
+            achieved = "locked" not in ach_div.get("class", [])
+            payload[key] = achieved
+
+    _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
+    return payload
+
 def _fetch_gear_data(nombre: str, server: str):
     cache_key = (nombre, server)
     cached = _cache_get(GEAR_CACHE, cache_key, GEAR_TTL)
@@ -303,6 +353,145 @@ def _extract_icc_boss_kills(stats_rows):
 
     return icc_10, icc_25
 
+def _extract_toc_boss_kills(stats_rows):
+    boss_patterns = {
+        "Beasts": ["Beasts of Northrend"],
+        "Jaraxxus": ["Lord Jaraxxus"],
+        "Faction Champs": ["Faction Champions"],
+        "Val'kyr Twins": ["Val'kyr Twins", "Valkyr Twins"],
+        "Anub'arak": ["Anub'arak", "Anubarak"],
+    }
+
+    def parse_value(val: str) -> int:
+        if not val or val.strip() in {"- -", "--"}:
+            return 0
+        try:
+            return int(val.replace(",", ""))
+        except Exception:
+            return 0
+
+    toc_10 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
+    toc_25 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
+
+    for desc, val in stats_rows:
+        if "Trial of the Crusader" not in desc and "Trial of the Grand Crusader" not in desc:
+            continue
+        if "Trial of the Champion" in desc:
+            continue
+
+        value = parse_value(val)
+        if value <= 0:
+            continue
+
+        is_10 = "10 player" in desc
+        is_25 = "25 player" in desc
+        is_hc = "Trial of the Grand Crusader" in desc
+        if not (is_10 or is_25):
+            continue
+
+        if "Times completed the Trial of the Crusader" in desc or "Times completed the Trial of the Grand Crusader" in desc:
+            if is_10:
+                key = "hc" if is_hc else "nm"
+                toc_10["Anub'arak"][key] = max(toc_10["Anub'arak"][key], value)
+            if is_25:
+                key = "hc" if is_hc else "nm"
+                toc_25["Anub'arak"][key] = max(toc_25["Anub'arak"][key], value)
+            continue
+
+        for boss_name, patterns in boss_patterns.items():
+            if any(pat in desc for pat in patterns):
+                if is_10:
+                    key = "hc" if is_hc else "nm"
+                    toc_10[boss_name][key] = max(toc_10[boss_name][key], value)
+                if is_25:
+                    key = "hc" if is_hc else "nm"
+                    toc_25[boss_name][key] = max(toc_25[boss_name][key], value)
+                break
+
+    return toc_10, toc_25
+
+def _cell(v):
+    mark = '✅' if v > 0 else '❌'
+    return f"{mark} {v}" if isinstance(v, int) else str(v)
+
+def _calc_widths(rows, headers, header_labels=None):
+    header_labels = header_labels or {}
+    widths = {}
+    def display_width(text):
+        text = str(text)
+        width = 0
+        for ch in text:
+            width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+        return width
+    for key in headers:
+        label = header_labels.get(key, key)
+        max_cell = max((display_width(row[key]) for row in rows), default=0)
+        widths[key] = max(display_width(label), max_cell)
+    return widths
+
+def _render_table(rows, headers, header_labels=None, widths=None):
+    header_labels = header_labels or {}
+    widths = widths or _calc_widths(rows, headers, header_labels)
+
+    def display_width(text):
+        text = str(text)
+        width = 0
+        for ch in text:
+            width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+        return width
+
+    def pad(text, width):
+        text = str(text)
+        if display_width(text) > width:
+            return text
+        return text + " " * (width - display_width(text))
+
+    header_line = " | ".join(pad(header_labels.get(h, h), widths[h]) for h in headers)
+    total_width = sum(widths[h] for h in headers) + (len(headers)) * 3
+    sep_line = "-" * total_width
+    body_lines = [
+        " | ".join(pad(row[h], widths[h]) for h in headers)
+        for row in rows
+    ]
+    return "\n".join([header_line, sep_line] + body_lines)
+
+def _format_boss_rows(bosses_10: dict, bosses_25: dict):
+    rows = []
+    for name in bosses_10.keys():
+        c10 = bosses_10[name]
+        c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
+        rows.append({
+            "Boss": name,
+            "10N": _cell(c10["nm"]),
+            "10H": _cell(c10["hc"]),
+            "25N": _cell(c25["nm"]),
+            "25H": _cell(c25["hc"]),
+        })
+    def header_status(values):
+        if all(values):
+            return "✅"
+        if any(values):
+            return "⚠️"
+        return "❌"
+
+    col_status = {
+        "10N": header_status([bosses_10[b]["nm"] > 0 for b in bosses_10]),
+        "10H": header_status([bosses_10[b]["hc"] > 0 for b in bosses_10]),
+        "25N": header_status([bosses_25[b]["nm"] > 0 for b in bosses_25]),
+        "25H": header_status([bosses_25[b]["hc"] > 0 for b in bosses_25]),
+    }
+
+    headers = ["Boss", "10N", "10H", "25N", "25H"]
+    header_labels = {
+        "10N": f"{col_status['10N']}10N",
+        "10H": f"{col_status['10H']}10H",
+        "25N": f"{col_status['25N']}25N",
+        "25H": f"{col_status['25H']}25H",
+    }
+    widths = _calc_widths(rows, headers, header_labels)
+    table = _render_table(rows, headers, header_labels, widths)
+    return table, widths
+
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
@@ -316,7 +505,7 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send(f"Pong! Latencia: {round(bot.latency * 1000)}ms")
 
-@bot.command(aliases=["p", "per"])
+@bot.command(aliases=["p"])
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
     
@@ -384,88 +573,6 @@ async def personaje(ctx, nombre: str):
         halion_25h_achieved = achi_payload["halion_25h_achieved"]
 
         icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
-
-        def cell(v):
-            mark = '✅' if v > 0 else '❌'
-            return f"{mark} {v}" if isinstance(v, int) else str(v)
-
-        def calc_widths(rows, headers, header_labels=None):
-            header_labels = header_labels or {}
-            widths = {}
-            def display_width(text):
-                text = str(text)
-                width = 0
-                for ch in text:
-                    width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
-                return width
-            for key in headers:
-                label = header_labels.get(key, key)
-                max_cell = max((display_width(row[key]) for row in rows), default=0)
-                widths[key] = max(display_width(label), max_cell)
-            return widths
-
-        def render_table(rows, headers, header_labels=None, widths=None):
-            header_labels = header_labels or {}
-            widths = widths or calc_widths(rows, headers, header_labels)
-
-            def display_width(text):
-                text = str(text)
-                width = 0
-                for ch in text:
-                    width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
-                return width
-
-            def pad(text, width):
-                text = str(text)
-                if display_width(text) > width:
-                    return text
-                return text + " " * (width - display_width(text))
-
-            header_line = " | ".join(pad(header_labels.get(h, h), widths[h]) for h in headers)
-            total_width = sum(widths[h] for h in headers) + (len(headers)) * 3
-            sep_line = "-" * total_width
-            body_lines = [
-                " | ".join(pad(row[h], widths[h]) for h in headers)
-                for row in rows
-            ]
-            return "\n".join([header_line, sep_line] + body_lines)
-
-        def format_boss_rows(bosses_10: dict, bosses_25: dict):
-            rows = []
-            for name in bosses_10.keys():
-                c10 = bosses_10[name]
-                c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
-                rows.append({
-                    "Boss": name,
-                    "10N": cell(c10["nm"]),
-                    "10H": cell(c10["hc"]),
-                    "25N": cell(c25["nm"]),
-                    "25H": cell(c25["hc"]),
-                })
-            def header_status(values):
-                if all(values):
-                    return "✅"
-                if any(values):
-                    return "⚠️"
-                return "❌"
-
-            col_status = {
-                "10N": header_status([bosses_10[b]["nm"] > 0 for b in bosses_10]),
-                "10H": header_status([bosses_10[b]["hc"] > 0 for b in bosses_10]),
-                "25N": header_status([bosses_25[b]["nm"] > 0 for b in bosses_25]),
-                "25H": header_status([bosses_25[b]["hc"] > 0 for b in bosses_25]),
-            }
-
-            headers = ["Boss", "10N", "10H", "25N", "25H"]
-            header_labels = {
-                "10N": f"{col_status['10N']}10N",
-                "10H": f"{col_status['10H']}10H",
-                "25N": f"{col_status['25N']}25N",
-                "25H": f"{col_status['25H']}25H",
-            }
-            widths = calc_widths(rows, headers, header_labels)
-            table = render_table(rows, headers, header_labels, widths)
-            return table, widths
         # Construir embed con los datos solicitados
         guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
 
@@ -489,7 +596,7 @@ async def personaje(ctx, nombre: str):
             inline=False,
         )
 
-        icc_table, icc_widths = format_boss_rows(icc_10, icc_25)
+        icc_table, icc_widths = _format_boss_rows(icc_10, icc_25)
         rs_rows = [{
             "Boss": "Halion",
             "10N": '✅' if halion_10n_achieved else '❌',
@@ -501,7 +608,7 @@ async def personaje(ctx, nombre: str):
         def rs_header_status(done: bool) -> str:
             return "✅" if done else "❌"
 
-        rs_table = render_table(
+        rs_table = _render_table(
             rs_rows,
             ["Boss", "10N", "10H", "25N", "25H"],
             {
@@ -553,6 +660,62 @@ async def personaje(ctx, nombre: str):
                 inline=False,
             )
 
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        await ctx.send(f"❌ Error al obtener datos: {e}")
+
+@bot.command()
+async def ptoc(ctx, nombre: str):
+    """Muestra logros de Trial of the Crusader (TOC) con formato de tabla."""
+
+    nombre = nombre.capitalize()
+
+    try:
+        loop = asyncio.get_running_loop()
+        toc_payload = await loop.run_in_executor(EXECUTOR, _fetch_toc_achievements, nombre, "Lordaeron")
+
+        def toc_status(done: bool) -> str:
+            return "✅" if done else "❌"
+
+        toc_rows = [{
+            "Boss": "Trial of the Crusader",
+            "10N": toc_status(toc_payload["toc_10n"]),
+            "10H": toc_status(toc_payload["toc_10h"]),
+            "25N": toc_status(toc_payload["toc_25n"]),
+            "25H": toc_status(toc_payload["toc_25h"]),
+        }]
+
+        toc_table = _render_table(
+            toc_rows,
+            ["Boss", "10N", "10H", "25N", "25H"],
+            {
+                "10N": f"{toc_status(toc_payload['toc_10n'])}10N",
+                "10H": f"{toc_status(toc_payload['toc_10h'])}10H",
+                "25N": f"{toc_status(toc_payload['toc_25n'])}25N",
+                "25H": f"{toc_status(toc_payload['toc_25h'])}25H",
+            },
+        )
+
+        embed = discord.Embed(
+            title=f"{nombre} - Trial of the Crusader",
+            color=0x2B2D31,
+        )
+        embed.add_field(
+            name="Trial of the Crusader",
+            value=(
+                "```\n"
+                f"{toc_table}\n"
+                "```"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Armory",
+            value=(f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"),
+            inline=False,
+        )
 
         await ctx.send(embed=embed)
 

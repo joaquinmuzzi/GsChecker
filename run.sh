@@ -15,7 +15,7 @@ fi
 # Verificar si existe el archivo .env
 if [ ! -f ".env" ]; then
     echo "ERROR: No se encontró el archivo .env"
-    echo "Copia .env.example a .env y añade tu DISCORD_TOKEN"
+    echo "Crea el archivo .env y añade tu DISCORD_TOKEN"
     exit 1
 fi
 

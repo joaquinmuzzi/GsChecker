@@ -7,6 +7,7 @@ Bot de Discord para consultar GearScore y logros de raids de personajes en Warma
 - Cálculo local de GearScore con tabla WotLK.
 - Progreso de ICC 10/25 por boss (Normal y Heroic) usando estadísticas del Armory.
 - Ruby Sanctum (Halion) por logros The Twilight Destroyer (10/25, Normal/Heroic).
+- Trial of the Crusader (TOC) 10/25 Normal/Heroic por logros Call of the Crusade/Grand Crusade.
 - Tabla monoespaciada alineada en el embed.
 - Cache de sockets de ítems para detección rápida de gemas faltantes.
 
@@ -53,9 +54,12 @@ poetry run python main.py
 
 ## Uso
 
-- `!personaje <nombre>`
-- `/p <nombre>`
-- `/per <nombre>`
+Prefijos `/`.
+
+### Comandos
+
+- `/p <nombre>`: resumen general (GS, ICC, RS, enchants/gemas).
+- `/ptoc <nombre>`: muestra solo logros TOC 10/25 NM/HC.
 
 El nombre se normaliza automáticamente (primera letra en mayúscula).
 
