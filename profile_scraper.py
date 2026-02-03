@@ -17,13 +17,15 @@ SLOT_FALLBACK_ORDER = [
 
 ENCHANTABLE_SLOTS = {
     "Head", "Shoulder", "Chest", "Legs", "Hands", "Feet", "Wrist",
-    "Back", "Main Hand", "Off Hand", "One-Hand", "Two-Hand"
+    "Back", "Main Hand", "One-Hand", "Two-Hand"
 }
 
 ITEM_HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_sockets_cache.json")
+SLOT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_slot_cache.json")
 SOCKET_CACHE_ONLY = False
 _SOCKET_CACHE = None
+_SLOT_CACHE = None
 
 def _load_socket_cache() -> dict:
     global _SOCKET_CACHE
@@ -44,12 +46,80 @@ def _save_socket_cache(cache: dict) -> None:
     except Exception:
         pass
 
+def _load_slot_cache() -> dict:
+    global _SLOT_CACHE
+    if _SLOT_CACHE is not None:
+        return _SLOT_CACHE
+    try:
+        with open(SLOT_CACHE_PATH, "r", encoding="utf-8") as f:
+            _SLOT_CACHE = json.load(f)
+    except Exception:
+        _SLOT_CACHE = {}
+    return _SLOT_CACHE
+
+def _save_slot_cache(cache: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(SLOT_CACHE_PATH), exist_ok=True)
+        with open(SLOT_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(cache, f)
+    except Exception:
+        pass
+
 def _get_raw_stats(page_text: str) -> str:
     try:
         raw_stats = page_text[page_text.index("tooltip_enus") :]
         return raw_stats[: raw_stats.index("_[")]
     except ValueError:
         return page_text
+
+def _normalize_slot_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower().replace("-", " "))
+
+@lru_cache(maxsize=4096)
+def get_item_equip_slot(item_id: str) -> str:
+    try:
+        cache = _load_slot_cache()
+        cached = cache.get(item_id)
+        if isinstance(cached, str):
+            return cached
+        if SOCKET_CACHE_ONLY:
+            return ""
+        item_url = f"https://wotlk.evowow.com/?item={item_id}"
+        resp = ITEM_SESSION.get(item_url, headers=ITEM_HEADERS, timeout=6)
+        if resp.status_code != 200:
+            return ""
+        raw_stats = _get_raw_stats(resp.text)
+        slot_texts = re.findall(r"td>([^<]+)<", raw_stats)
+        candidates = {
+            "one hand",
+            "two hand",
+            "main hand",
+            "off hand",
+            "held in off hand",
+        }
+        equip_slot = ""
+        for text in slot_texts:
+            norm = _normalize_slot_text(text)
+            if norm in candidates:
+                equip_slot = norm
+                break
+        cache[item_id] = equip_slot
+        _save_slot_cache(cache)
+        return equip_slot
+    except Exception:
+        return ""
+
+def is_enchantable_slot(slot: str, item_id: str) -> bool:
+    if slot != "Off Hand":
+        return slot in ENCHANTABLE_SLOTS
+
+    equip_slot = get_item_equip_slot(str(item_id))
+    weapon_slots = {"one hand", "two hand", "main hand", "off hand"}
+    if equip_slot in weapon_slots:
+        return True
+    if equip_slot == "held in off hand":
+        return False
+    return False
 
 @lru_cache(maxsize=4096)
 def get_item_socket_count(item_id: str) -> int:
@@ -100,6 +170,7 @@ def parse_slot(slot):
     item_properties['gems'] = item_properties.get('gems', '0:0:0').split(':')
     return item_properties
 
+
 def get_gear_data(char_name: str, server: str = 'Lordaeron'):
     url = f"http://armory.warmane.com/character/{char_name}/{server}"
     resp = SESSION.get(url, headers=HEADERS, timeout=8)
@@ -136,7 +207,7 @@ def get_missing_enchants_gems_from_gear_data(gear_data):
             continue
 
         ench_id = item.get("ench")
-        if slot in ENCHANTABLE_SLOTS and (not ench_id or str(ench_id) == "0"):
+        if is_enchantable_slot(slot, item_id) and (not ench_id or str(ench_id) == "0"):
             missing_enchants.append(slot)
 
         if "gems" in item:
