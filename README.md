@@ -8,12 +8,12 @@ Bot de Discord para consultar GearScore y logros de raids de personajes en Warma
 - Progreso de ICC 10/25 por boss (Normal y Heroic) usando estadísticas del Armory.
 - Ruby Sanctum (Halion) por logros The Twilight Destroyer (10/25, Normal/Heroic).
 - Trial of the Crusader (TOC) 10/25 Normal/Heroic por logros Call of the Crusade/Grand Crusade.
-- Overview con link al model viewer de Warmane.
-- Opción de renderer externo (imagen) vía `EXTERNAL_RENDER_URL`.
 - Tabla monoespaciada alineada en el embed.
 - Cache de sockets de ítems para detección rápida de gemas faltantes.
 
-> Nota: el progreso de ICC se calcula por boss individual desde la sección Statistics del Armory.
+## Ejemplo
+
+![Ejemplo del bot](docs/ejemplo.png)
 
 ## Requisitos
 
@@ -28,7 +28,7 @@ git clone https://github.com/tuusuario/GsChecker.git
 cd GsChecker
 ```
 
-2) Editar `.env` y agregar:
+2) Crear `.env` y agregar:
 ```
 DISCORD_TOKEN=tu_token_aqui
 ```
@@ -56,54 +56,12 @@ poetry run python main.py
 
 ## Uso
 
-Prefijos `/`.
+Prefijo `/`.
 
 ### Comandos
 
-- `/p <nombre>`: resumen general (GS, ICC, RS, enchants/gemas).
+- `/p <nombre>`: resumen general (GS, ICC, RS, enchants/gemas y links).
 - `/ptoc <nombre>`: muestra solo logros TOC 10/25 NM/HC.
-- `/overview <nombre>` (o `/pov`): muestra info básica y link al model viewer.
-
-### Renderer externo (opcional)
-
-Podés configurar un renderer externo para incrustar una imagen en el centro del grid con la variable `EXTERNAL_RENDER_URL` en `.env`.
-Usa estos placeholders:
-
-- `{name}`: nombre del personaje
-- `{server}`: servidor (ej. Lordaeron)
-- `{race}`: raza (texto)
-- `{gender}`: género (Male/Female)
-
-#### Renderer local (incluido)
-
-Se agregó un renderer local en la carpeta renderer/ usando wow-model-viewer + Playwright.
-
-1) Entrá a renderer/ e instalá dependencias:
-
-```bash
-cd renderer
-npm install
-```
-
-2) Levantá el renderer:
-
-```bash
-npm start
-```
-
-3) En tu .env, configurá:
-
-```
-EXTERNAL_RENDER_URL=http://localhost:5005/render?name={name}&server={server}
-```
-
-Opcional (para el renderer):
-- RENDERER_PORT (default 5005)
-- CONTENT_PATH (default https://wow.zamimg.com/modelviewer/live/)
-- WOTLK_TO_RETAIL_DISPLAY_ID_API (default https://wotlk.murlocvillage.com/api/items)
-- RENDER_ENV (default live)
-
-El nombre se normaliza automáticamente (primera letra en mayúscula).
 
 ## Cache de sockets (gemas)
 
