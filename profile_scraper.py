@@ -5,27 +5,57 @@ from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
 
-HEADERS = {'User-Agent': 'GsChecker/1.0'}
+HEADERS = {"User-Agent": "GsChecker/1.0"}
 SESSION = requests.Session()
 ITEM_SESSION = requests.Session()
 
 SLOT_FALLBACK_ORDER = [
-    "Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard",
-    "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger 1", "Finger 2",
-    "Trinket 1", "Trinket 2", "Main Hand", "Off Hand", "Ranged"
+    "Head",
+    "Neck",
+    "Shoulder",
+    "Back",
+    "Chest",
+    "Shirt",
+    "Tabard",
+    "Wrist",
+    "Hands",
+    "Waist",
+    "Legs",
+    "Feet",
+    "Finger 1",
+    "Finger 2",
+    "Trinket 1",
+    "Trinket 2",
+    "Main Hand",
+    "Off Hand",
+    "Ranged",
 ]
 
 ENCHANTABLE_SLOTS = {
-    "Head", "Shoulder", "Chest", "Legs", "Hands", "Feet", "Wrist",
-    "Back", "Main Hand", "One-Hand", "Two-Hand"
+    "Head",
+    "Shoulder",
+    "Chest",
+    "Legs",
+    "Hands",
+    "Feet",
+    "Wrist",
+    "Back",
+    "Main Hand",
+    "One-Hand",
+    "Two-Hand",
 }
 
 ITEM_HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
-CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_sockets_cache.json")
-SLOT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_slot_cache.json")
+CACHE_PATH = os.path.join(
+    os.path.dirname(__file__), "static", "item_sockets_cache.json"
+)
+SLOT_CACHE_PATH = os.path.join(
+    os.path.dirname(__file__), "static", "item_slot_cache.json"
+)
 SOCKET_CACHE_ONLY = False
 _SOCKET_CACHE = None
 _SLOT_CACHE = None
+
 
 def _load_socket_cache() -> dict:
     global _SOCKET_CACHE
@@ -38,6 +68,7 @@ def _load_socket_cache() -> dict:
         _SOCKET_CACHE = {}
     return _SOCKET_CACHE
 
+
 def _save_socket_cache(cache: dict) -> None:
     try:
         os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
@@ -45,6 +76,7 @@ def _save_socket_cache(cache: dict) -> None:
             json.dump(cache, f)
     except Exception:
         pass
+
 
 def _load_slot_cache() -> dict:
     global _SLOT_CACHE
@@ -57,6 +89,7 @@ def _load_slot_cache() -> dict:
         _SLOT_CACHE = {}
     return _SLOT_CACHE
 
+
 def _save_slot_cache(cache: dict) -> None:
     try:
         os.makedirs(os.path.dirname(SLOT_CACHE_PATH), exist_ok=True)
@@ -65,6 +98,7 @@ def _save_slot_cache(cache: dict) -> None:
     except Exception:
         pass
 
+
 def _get_raw_stats(page_text: str) -> str:
     try:
         raw_stats = page_text[page_text.index("tooltip_enus") :]
@@ -72,8 +106,10 @@ def _get_raw_stats(page_text: str) -> str:
     except ValueError:
         return page_text
 
+
 def _normalize_slot_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower().replace("-", " "))
+
 
 @lru_cache(maxsize=4096)
 def get_item_equip_slot(item_id: str) -> str:
@@ -109,6 +145,7 @@ def get_item_equip_slot(item_id: str) -> str:
     except Exception:
         return ""
 
+
 def is_enchantable_slot(slot: str, item_id: str) -> bool:
     if slot != "Off Hand":
         return slot in ENCHANTABLE_SLOTS
@@ -120,6 +157,7 @@ def is_enchantable_slot(slot: str, item_id: str) -> bool:
     if equip_slot == "held in off hand":
         return False
     return False
+
 
 @lru_cache(maxsize=4096)
 def get_item_socket_count(item_id: str) -> int:
@@ -143,6 +181,7 @@ def get_item_socket_count(item_id: str) -> int:
     except Exception:
         return 0
 
+
 def _extract_slot_name(slot, index: int) -> str:
     for key in ("data-slot-name", "data-slot", "data-item-slot", "data-slotname"):
         val = slot.get(key)
@@ -162,23 +201,24 @@ def _extract_slot_name(slot, index: int) -> str:
         return SLOT_FALLBACK_ORDER[index]
     return f"Slot {index + 1}"
 
+
 def parse_slot(slot):
-    if not slot.get('rel'):
+    if not slot.get("rel"):
         return {}
-    item_properties_list = slot['rel'][0].split('&')
-    item_properties = dict(property.split('=') for property in item_properties_list)
-    item_properties['gems'] = item_properties.get('gems', '0:0:0').split(':')
+    item_properties_list = slot["rel"][0].split("&")
+    item_properties = dict(property.split("=") for property in item_properties_list)
+    item_properties["gems"] = item_properties.get("gems", "0:0:0").split(":")
     return item_properties
 
 
-def get_gear_data(char_name: str, server: str = 'Lordaeron'):
+def get_gear_data(char_name: str, server: str = "Lordaeron"):
     url = f"http://armory.warmane.com/character/{char_name}/{server}"
     resp = SESSION.get(url, headers=HEADERS, timeout=8)
     if resp.status_code != 200:
         return []
-    soup = BeautifulSoup(resp.text, 'html.parser')
+    soup = BeautifulSoup(resp.text, "html.parser")
     try:
-        equipment = soup.find(class_="item-model").find_all('a')
+        equipment = soup.find(class_="item-model").find_all("a")
     except Exception:
         return []
     gear_data = []
@@ -188,13 +228,16 @@ def get_gear_data(char_name: str, server: str = 'Lordaeron'):
         gear_data.append(item_properties)
     return gear_data
 
-def get_gear_ids_from_gear_data(gear_data):
-    gear_ids = [item.get('item') for item in gear_data]
-    return [gid if gid and str(gid).isdigit() else '' for gid in gear_ids]
 
-def get_gear_ids(char_name: str, server: str = 'Lordaeron'):
+def get_gear_ids_from_gear_data(gear_data):
+    gear_ids = [item.get("item") for item in gear_data]
+    return [gid if gid and str(gid).isdigit() else "" for gid in gear_ids]
+
+
+def get_gear_ids(char_name: str, server: str = "Lordaeron"):
     gear_data = get_gear_data(char_name, server)
     return get_gear_ids_from_gear_data(gear_data)
+
 
 def get_missing_enchants_gems_from_gear_data(gear_data):
     missing_enchants = []
@@ -222,6 +265,7 @@ def get_missing_enchants_gems_from_gear_data(gear_data):
 
     return missing_enchants, missing_gems
 
-def get_missing_enchants_gems(char_name: str, server: str = 'Lordaeron'):
+
+def get_missing_enchants_gems(char_name: str, server: str = "Lordaeron"):
     gear_data = get_gear_data(char_name, server)
     return get_missing_enchants_gems_from_gear_data(gear_data)
