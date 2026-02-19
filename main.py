@@ -107,6 +107,11 @@ def _fetch_summary(nombre: str, server: str):
     return summary
 
 
+def _fetch_specs(nombre: str, server: str) -> list[dict]:
+    specs = profile_scraper.get_specs(nombre, server)
+    return specs
+
+
 def _fetch_achievements(nombre: str, server: str):
     cache_key = (nombre, server)
     cached = _cache_get(ACHIEVEMENTS_CACHE, cache_key, ACHIEVEMENTS_TTL)
@@ -549,10 +554,9 @@ async def ping(ctx):
 @bot.command(aliases=["p"])
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
-
+    print(f"[LOG] Comando 'personaje' usado por {ctx.author} para personaje: {nombre}")
     # Normalizar nombre: primera letra mayúscula
     nombre = nombre.capitalize()
-
     try:
         loop = asyncio.get_running_loop()
 
@@ -588,21 +592,24 @@ async def personaje(ctx, nombre: str):
         nivel = summary.get("level", "N/A")
         raza = summary.get("race", "N/A")
         clase = summary.get("class", "N/A")
+        active_specs = []
+        inactive_specs = []
 
-        talents = summary.get("talents") or []
-        if (
-            isinstance(talents, list)
-            and len(talents) > 0
-            and isinstance(talents[0], dict)
-        ):
-            especializacion = talents[0].get("tree", "N/A")
-            # Check if there's a second spec
-            if len(talents) > 1 and isinstance(talents[1], dict):
-                segunda_spec = talents[1].get("tree", "")
-                if segunda_spec:
-                    especializacion = f"{especializacion} / {segunda_spec}"
+        talents = _fetch_specs(nombre, "Lordaeron")
+        if isinstance(talents, list) and len(talents) > 0:
+            # unir varias especializaciones con comas si hay más de una, siempre poniendo la activa primera
+            sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
+            active_specs = [
+                t.get("name", "N/A") for t in sorted_talents if t.get("active", False)
+            ]
+            inactive_specs = [
+                t.get("name", "N/A")
+                for t in sorted_talents
+                if not t.get("active", False)
+            ]
         else:
-            especializacion = "N/A"
+            active_specs = ["N/A"]
+            inactive_specs = ["N/A"]
 
         # Try to compute GearScore locally using Warmane armory scraping + local table
         try:
@@ -634,6 +641,10 @@ async def personaje(ctx, nombre: str):
         icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
         # Construir embed con los datos solicitados
         guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
+        spec_display = " - ".join(
+            f"**{spec}**" if spec in active_specs else spec
+            for spec in active_specs + inactive_specs
+        )
 
         embed = discord.Embed(
             title=nombre_char,
@@ -645,7 +656,7 @@ async def personaje(ctx, nombre: str):
             value=f"Level {nivel} {raza} {clase}",
             inline=True,
         )
-        embed.add_field(name="Spec", value=especializacion, inline=True)
+        embed.add_field(name="Spec", value=spec_display, inline=True)
         embed.add_field(name="Guild", value=guild_display, inline=True)
         embed.add_field(
             name="Armory",
@@ -726,9 +737,8 @@ async def personaje(ctx, nombre: str):
 @bot.command()
 async def ptoc(ctx, nombre: str):
     """Muestra logros de Trial of the Crusader (TOC) con formato de tabla."""
-
+    print(f"[LOG] Comando 'ptoc' usado por {ctx.author} para personaje: {nombre}")
     nombre = nombre.capitalize()
-
     try:
         loop = asyncio.get_running_loop()
         toc_payload = await loop.run_in_executor(

@@ -78,6 +78,28 @@ def _save_socket_cache(cache: dict) -> None:
         pass
 
 
+def get_specs(char_name: str, server: str) -> list[dict]:
+    try:
+        url = f"http://armory.warmane.com/character/{char_name}/{server}/talents"
+        resp = SESSION.get(url, headers=HEADERS, timeout=8)
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        talents = soup.find_all("td", attrs={"data-spec": True})
+        specs = []
+        for td in talents:
+            specs.append(
+                {
+                    "name": td.get_text(strip=True),
+                    "active": "selected" in td.get("class", []),
+                }
+            )
+        return specs
+    except Exception:
+        pass
+    return []
+
+
 def _load_slot_cache() -> dict:
     global _SLOT_CACHE
     if _SLOT_CACHE is not None:
