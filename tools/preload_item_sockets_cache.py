@@ -64,6 +64,7 @@ def load_extra_items() -> set[str]:
         return set()
     return set()
 
+
 def load_gs_items() -> set[str]:
     item_ids: set[str] = set()
     for path in GS_PATHS:

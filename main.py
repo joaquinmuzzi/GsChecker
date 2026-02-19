@@ -14,9 +14,11 @@ import profile_scraper
 
 # Cargar configuración desde .env
 from dotenv import load_dotenv
+
 load_dotenv()
 
 LOCK_PATH = "/tmp/gschecker.lock"
+
 
 def acquire_lock(lock_path: str) -> None:
     if os.path.exists(lock_path):
@@ -68,6 +70,7 @@ STATS_TTL = 300
 
 EXECUTOR = ThreadPoolExecutor(max_workers=6)
 
+
 def _cache_get(cache: dict, key, ttl: int):
     entry = cache.get(key)
     if not entry:
@@ -78,8 +81,10 @@ def _cache_get(cache: dict, key, ttl: int):
         return None
     return value
 
+
 def _cache_set(cache: dict, key, value):
     cache[key] = (time.time(), value)
+
 
 def _fetch_summary(nombre: str, server: str):
     cache_key = (nombre, server)
@@ -91,13 +96,21 @@ def _fetch_summary(nombre: str, server: str):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     resp_summary = SESSION.get(url_summary, headers=headers, timeout=HTTP_TIMEOUT)
     if resp_summary.status_code != 200:
-        return {"__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Código {resp_summary.status_code}"}
+        return {
+            "__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Código {resp_summary.status_code}"
+        }
     try:
         summary = resp_summary.json()
     except Exception as e:
         return {"__error__": f"⚠️ Error al leer JSON de Warmane: {e}"}
     _cache_set(SUMMARY_CACHE, cache_key, summary)
     return summary
+
+
+def _fetch_specs(nombre: str, server: str) -> list[dict]:
+    specs = profile_scraper.get_specs(nombre, server)
+    return specs
+
 
 def _fetch_achievements(nombre: str, server: str):
     cache_key = (nombre, server)
@@ -109,33 +122,33 @@ def _fetch_achievements(nombre: str, server: str):
     raid_categories = [15041, 15042, 14922, 14923]
 
     icc_sections = {
-        '4531': 4,
-        '4528': 3,
-        '4529': 2,
-        '4527': 2,
-        '4532': 1,
-        '4604': 4,
-        '4605': 3,
-        '4606': 2,
-        '4607': 2,
-        '4608': 1,
-        '4628': 4,
-        '4629': 3,
-        '4630': 2,
-        '4631': 2,
-        '4636': 1,
-        '4632': 4,
-        '4633': 3,
-        '4634': 2,
-        '4635': 2,
-        '4637': 1,
+        "4531": 4,
+        "4528": 3,
+        "4529": 2,
+        "4527": 2,
+        "4532": 1,
+        "4604": 4,
+        "4605": 3,
+        "4606": 2,
+        "4607": 2,
+        "4608": 1,
+        "4628": 4,
+        "4629": 3,
+        "4630": 2,
+        "4631": 2,
+        "4636": 1,
+        "4632": 4,
+        "4633": 3,
+        "4634": 2,
+        "4635": 2,
+        "4637": 1,
     }
 
     target_achievements = {
-        '4817': ('halion_10n', 'The Twilight Destroyer (10)'),
-        '4818': ('halion_10h', 'Heroic: The Twilight Destroyer (10)'),
-        '4815': ('halion_25n', 'The Twilight Destroyer (25)'),
-        '4816': ('halion_25h', 'Heroic: The Twilight Destroyer (25)')
+        "4817": ("halion_10n", "The Twilight Destroyer (10)"),
+        "4818": ("halion_10h", "Heroic: The Twilight Destroyer (10)"),
+        "4815": ("halion_25n", "The Twilight Destroyer (25)"),
+        "4816": ("halion_25h", "Heroic: The Twilight Destroyer (25)"),
     }
 
     completed_ids = set()
@@ -149,28 +162,31 @@ def _fetch_achievements(nombre: str, server: str):
     halion_25h_achieved = False
 
     def fetch_category(category_id: int):
-        url_achi_post = f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
+        url_achi_post = (
+            f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
+        )
         data = {"category": category_id}
-        resp_achi = SESSION.post(url_achi_post, headers=headers, data=data, timeout=HTTP_TIMEOUT)
+        resp_achi = SESSION.post(
+            url_achi_post, headers=headers, data=data, timeout=HTTP_TIMEOUT
+        )
         if resp_achi.status_code != 200:
             return []
         try:
             achi_json = resp_achi.json()
         except Exception:
             return []
-        if 'content' not in achi_json:
+        if "content" not in achi_json:
             return []
-        soup = BeautifulSoup(achi_json['content'], 'html.parser')
-        all_achievements = soup.find_all('div', class_='achievement')
+        soup = BeautifulSoup(achi_json["content"], "html.parser")
+        all_achievements = soup.find_all("div", class_="achievement")
         completed_achievements = [
-            ach for ach in all_achievements
-            if 'locked' not in ach.get('class', [])
+            ach for ach in all_achievements if "locked" not in ach.get("class", [])
         ]
         ids = []
         for ach_div in completed_achievements:
-            ach_id_full = ach_div.get('id', '')
-            if ach_id_full.startswith('ach'):
-                ids.append(ach_id_full.replace('ach', ''))
+            ach_id_full = ach_div.get("id", "")
+            if ach_id_full.startswith("ach"):
+                ids.append(ach_id_full.replace("ach", ""))
         return ids
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -181,24 +197,24 @@ def _fetch_achievements(nombre: str, server: str):
             completed_ids.add(ach_id)
             if ach_id in icc_sections:
                 bosses = icc_sections[ach_id]
-                if ach_id in ['4531', '4528', '4529', '4527', '4532']:
+                if ach_id in ["4531", "4528", "4529", "4527", "4532"]:
                     icc_10n_bosses += bosses
-                elif ach_id in ['4604', '4605', '4606', '4607', '4608']:
+                elif ach_id in ["4604", "4605", "4606", "4607", "4608"]:
                     icc_25n_bosses += bosses
-                elif ach_id in ['4628', '4629', '4630', '4631', '4636']:
+                elif ach_id in ["4628", "4629", "4630", "4631", "4636"]:
                     icc_10h_bosses += bosses
-                elif ach_id in ['4632', '4633', '4634', '4635', '4637']:
+                elif ach_id in ["4632", "4633", "4634", "4635", "4637"]:
                     icc_25h_bosses += bosses
 
             if ach_id in target_achievements:
                 key = target_achievements[ach_id][0]
-                if key == 'halion_10n':
+                if key == "halion_10n":
                     halion_10n_achieved = True
-                elif key == 'halion_10h':
+                elif key == "halion_10h":
                     halion_10h_achieved = True
-                elif key == 'halion_25n':
+                elif key == "halion_25n":
                     halion_25n_achieved = True
-                elif key == 'halion_25h':
+                elif key == "halion_25h":
                     halion_25h_achieved = True
 
     payload = {
@@ -215,6 +231,7 @@ def _fetch_achievements(nombre: str, server: str):
     _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
     return payload
 
+
 def _fetch_toc_achievements(nombre: str, server: str):
     cache_key = ("toc", nombre, server)
     cached = _cache_get(ACHIEVEMENTS_CACHE, cache_key, ACHIEVEMENTS_TTL)
@@ -222,7 +239,9 @@ def _fetch_toc_achievements(nombre: str, server: str):
         return cached
 
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    url_achi_post = f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
+    url_achi_post = (
+        f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
+    )
 
     target_titles = {
         "Call of the Crusade (10 player)": "toc_10n",
@@ -239,7 +258,12 @@ def _fetch_toc_achievements(nombre: str, server: str):
     }
 
     for category_id in [15001, 15002]:
-        resp_achi = SESSION.post(url_achi_post, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT)
+        resp_achi = SESSION.post(
+            url_achi_post,
+            headers=headers,
+            data={"category": category_id},
+            timeout=HTTP_TIMEOUT,
+        )
         if resp_achi.status_code != 200:
             continue
         try:
@@ -265,6 +289,7 @@ def _fetch_toc_achievements(nombre: str, server: str):
     _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
     return payload
 
+
 def _fetch_gear_data(nombre: str, server: str):
     cache_key = (nombre, server)
     cached = _cache_get(GEAR_CACHE, cache_key, GEAR_TTL)
@@ -274,6 +299,7 @@ def _fetch_gear_data(nombre: str, server: str):
     _cache_set(GEAR_CACHE, cache_key, gear_data)
     return gear_data
 
+
 def _fetch_statistics(nombre: str, server: str, category_id: int):
     cache_key = (nombre, server, category_id)
     cached = _cache_get(STATS_CACHE, cache_key, STATS_TTL)
@@ -282,7 +308,9 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
 
     url_stats = f"https://armory.warmane.com/character/{nombre}/{server}/statistics"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    resp = SESSION.post(url_stats, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT)
+    resp = SESSION.post(
+        url_stats, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT
+    )
     if resp.status_code != 200:
         return []
     try:
@@ -300,6 +328,7 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
 
     _cache_set(STATS_CACHE, cache_key, rows)
     return rows
+
 
 def _extract_icc_boss_kills(stats_rows):
     boss_patterns = {
@@ -353,6 +382,7 @@ def _extract_icc_boss_kills(stats_rows):
 
     return icc_10, icc_25
 
+
 def _extract_toc_boss_kills(stats_rows):
     boss_patterns = {
         "Beasts": ["Beasts of Northrend"],
@@ -374,7 +404,10 @@ def _extract_toc_boss_kills(stats_rows):
     toc_25 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
 
     for desc, val in stats_rows:
-        if "Trial of the Crusader" not in desc and "Trial of the Grand Crusader" not in desc:
+        if (
+            "Trial of the Crusader" not in desc
+            and "Trial of the Grand Crusader" not in desc
+        ):
             continue
         if "Trial of the Champion" in desc:
             continue
@@ -389,7 +422,10 @@ def _extract_toc_boss_kills(stats_rows):
         if not (is_10 or is_25):
             continue
 
-        if "Times completed the Trial of the Crusader" in desc or "Times completed the Trial of the Grand Crusader" in desc:
+        if (
+            "Times completed the Trial of the Crusader" in desc
+            or "Times completed the Trial of the Grand Crusader" in desc
+        ):
             if is_10:
                 key = "hc" if is_hc else "nm"
                 toc_10["Anub'arak"][key] = max(toc_10["Anub'arak"][key], value)
@@ -410,24 +446,29 @@ def _extract_toc_boss_kills(stats_rows):
 
     return toc_10, toc_25
 
+
 def _cell(v):
-    mark = '✅' if v > 0 else '❌'
+    mark = "✅" if v > 0 else "❌"
     return f"{mark} {v}" if isinstance(v, int) else str(v)
+
 
 def _calc_widths(rows, headers, header_labels=None):
     header_labels = header_labels or {}
     widths = {}
+
     def display_width(text):
         text = str(text)
         width = 0
         for ch in text:
             width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
         return width
+
     for key in headers:
         label = header_labels.get(key, key)
         max_cell = max((display_width(row[key]) for row in rows), default=0)
         widths[key] = max(display_width(label), max_cell)
     return widths
+
 
 def _render_table(rows, headers, header_labels=None, widths=None):
     header_labels = header_labels or {}
@@ -449,24 +490,25 @@ def _render_table(rows, headers, header_labels=None, widths=None):
     header_line = " | ".join(pad(header_labels.get(h, h), widths[h]) for h in headers)
     total_width = sum(widths[h] for h in headers) + (len(headers)) * 3
     sep_line = "-" * total_width
-    body_lines = [
-        " | ".join(pad(row[h], widths[h]) for h in headers)
-        for row in rows
-    ]
+    body_lines = [" | ".join(pad(row[h], widths[h]) for h in headers) for row in rows]
     return "\n".join([header_line, sep_line] + body_lines)
+
 
 def _format_boss_rows(bosses_10: dict, bosses_25: dict):
     rows = []
     for name in bosses_10.keys():
         c10 = bosses_10[name]
         c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
-        rows.append({
-            "Boss": name,
-            "10N": _cell(c10["nm"]),
-            "10H": _cell(c10["hc"]),
-            "25N": _cell(c25["nm"]),
-            "25H": _cell(c25["hc"]),
-        })
+        rows.append(
+            {
+                "Boss": name,
+                "10N": _cell(c10["nm"]),
+                "10H": _cell(c10["hc"]),
+                "25N": _cell(c25["nm"]),
+                "25H": _cell(c25["hc"]),
+            }
+        )
+
     def header_status(values):
         if all(values):
             return "✅"
@@ -492,35 +534,44 @@ def _format_boss_rows(bosses_10: dict, bosses_25: dict):
     table = _render_table(rows, headers, header_labels, widths)
     return table, widths
 
+
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
+
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
+
 
 @bot.command()
 async def ping(ctx):
     await ctx.send(f"Pong! Latencia: {round(bot.latency * 1000)}ms")
 
+
 @bot.command(aliases=["p"])
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
-    
+    print(f"[LOG] Comando 'personaje' usado por {ctx.author} para personaje: {nombre}")
     # Normalizar nombre: primera letra mayúscula
     nombre = nombre.capitalize()
-    
-    
-    
     try:
         loop = asyncio.get_running_loop()
 
-        summary_task = loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, "Lordaeron")
-        gear_task = loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre, "Lordaeron")
-        achi_task = loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre, "Lordaeron")
-        stats_task = loop.run_in_executor(EXECUTOR, _fetch_statistics, nombre, "Lordaeron", 15062)
+        summary_task = loop.run_in_executor(
+            EXECUTOR, _fetch_summary, nombre, "Lordaeron"
+        )
+        gear_task = loop.run_in_executor(
+            EXECUTOR, _fetch_gear_data, nombre, "Lordaeron"
+        )
+        achi_task = loop.run_in_executor(
+            EXECUTOR, _fetch_achievements, nombre, "Lordaeron"
+        )
+        stats_task = loop.run_in_executor(
+            EXECUTOR, _fetch_statistics, nombre, "Lordaeron", 15062
+        )
 
         summary, gear_data, achi_payload, stats_rows = await asyncio.gather(
             summary_task, gear_task, achi_task, stats_task
@@ -531,7 +582,9 @@ async def personaje(ctx, nombre: str):
             return
 
         if not isinstance(summary, dict):
-            await ctx.send("⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola.")
+            await ctx.send(
+                "⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola."
+            )
             return
 
         # Extraer datos básicos de forma segura
@@ -539,12 +592,24 @@ async def personaje(ctx, nombre: str):
         nivel = summary.get("level", "N/A")
         raza = summary.get("race", "N/A")
         clase = summary.get("class", "N/A")
-        
-        talents = summary.get("talents") or []
-        if isinstance(talents, list) and len(talents) > 0 and isinstance(talents[0], dict):
-            especializacion = talents[0].get("tree", "N/A")
+        active_specs = []
+        inactive_specs = []
+
+        talents = _fetch_specs(nombre, "Lordaeron")
+        if isinstance(talents, list) and len(talents) > 0:
+            # unir varias especializaciones con comas si hay más de una, siempre poniendo la activa primera
+            sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
+            active_specs = [
+                t.get("name", "N/A") for t in sorted_talents if t.get("active", False)
+            ]
+            inactive_specs = [
+                t.get("name", "N/A")
+                for t in sorted_talents
+                if not t.get("active", False)
+            ]
         else:
-            especializacion = "N/A"
+            active_specs = ["N/A"]
+            inactive_specs = ["N/A"]
 
         # Try to compute GearScore locally using Warmane armory scraping + local table
         try:
@@ -559,10 +624,11 @@ async def personaje(ctx, nombre: str):
 
         # Missing enchants and gems
         try:
-            missing_enchants, missing_gems = profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
+            missing_enchants, missing_gems = (
+                profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
+            )
         except Exception:
             missing_enchants, missing_gems = [], []
-
 
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
@@ -575,35 +641,49 @@ async def personaje(ctx, nombre: str):
         icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
         # Construir embed con los datos solicitados
         guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
+        spec_display = " - ".join(
+            f"**{spec}**" if spec in active_specs else spec
+            for spec in active_specs + inactive_specs
+        )
 
         embed = discord.Embed(
             title=nombre_char,
             color=0x2B2D31,
         )
         embed.add_field(name="GearScore", value=str(gs), inline=True)
-        embed.add_field(name="Level | Race | Class", value=f"Level {nivel} {raza} {clase}", inline=True)
-        embed.add_field(name="Spec", value=especializacion, inline=True)
+        embed.add_field(
+            name="Level | Race | Class",
+            value=f"Level {nivel} {raza} {clase}",
+            inline=True,
+        )
+        embed.add_field(name="Spec", value=spec_display, inline=True)
         embed.add_field(name="Guild", value=guild_display, inline=True)
         embed.add_field(
             name="Armory",
-            value=(f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"),
+            value=(
+                f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"
+            ),
             inline=False,
         )
 
         embed.add_field(
             name="Uwulogs",
-            value=(f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"),
+            value=(
+                f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"
+            ),
             inline=False,
         )
 
         icc_table, icc_widths = _format_boss_rows(icc_10, icc_25)
-        rs_rows = [{
-            "Boss": "Halion",
-            "10N": '✅' if halion_10n_achieved else '❌',
-            "10H": '✅' if halion_10h_achieved else '❌',
-            "25N": '✅' if halion_25n_achieved else '❌',
-            "25H": '✅' if halion_25h_achieved else '❌',
-        }]
+        rs_rows = [
+            {
+                "Boss": "Halion",
+                "10N": "✅" if halion_10n_achieved else "❌",
+                "10H": "✅" if halion_10h_achieved else "❌",
+                "25N": "✅" if halion_25n_achieved else "❌",
+                "25H": "✅" if halion_25h_achieved else "❌",
+            }
+        ]
 
         def rs_header_status(done: bool) -> str:
             return "✅" if done else "❌"
@@ -622,21 +702,13 @@ async def personaje(ctx, nombre: str):
 
         embed.add_field(
             name="Icecrown Citadel",
-            value=(
-                "```\n"
-                f"{icc_table}\n"
-                "```"
-            ),
+            value=("```\n" f"{icc_table}\n" "```"),
             inline=False,
         )
 
         embed.add_field(
             name="Ruby Sanctum",
-            value=(
-                "```\n"
-                + rs_table
-                + "```"
-            ),
+            value=("```\n" + rs_table + "```"),
             inline=False,
         )
 
@@ -652,40 +724,39 @@ async def personaje(ctx, nombre: str):
 
             embed.add_field(
                 name="Enchants / Gems",
-                value=(
-                    "```\n"
-                    + "\n".join(missing_lines)
-                    + "\n```"
-                ),
+                value=("```\n" + "\n".join(missing_lines) + "\n```"),
                 inline=False,
             )
-
 
         await ctx.send(embed=embed)
 
     except Exception as e:
         await ctx.send(f"❌ Error al obtener datos: {e}")
 
+
 @bot.command()
 async def ptoc(ctx, nombre: str):
     """Muestra logros de Trial of the Crusader (TOC) con formato de tabla."""
-
+    print(f"[LOG] Comando 'ptoc' usado por {ctx.author} para personaje: {nombre}")
     nombre = nombre.capitalize()
-
     try:
         loop = asyncio.get_running_loop()
-        toc_payload = await loop.run_in_executor(EXECUTOR, _fetch_toc_achievements, nombre, "Lordaeron")
+        toc_payload = await loop.run_in_executor(
+            EXECUTOR, _fetch_toc_achievements, nombre, "Lordaeron"
+        )
 
         def toc_status(done: bool) -> str:
             return "✅" if done else "❌"
 
-        toc_rows = [{
-            "Boss": "Trial of the Crusader",
-            "10N": toc_status(toc_payload["toc_10n"]),
-            "10H": toc_status(toc_payload["toc_10h"]),
-            "25N": toc_status(toc_payload["toc_25n"]),
-            "25H": toc_status(toc_payload["toc_25h"]),
-        }]
+        toc_rows = [
+            {
+                "Boss": "Trial of the Crusader",
+                "10N": toc_status(toc_payload["toc_10n"]),
+                "10H": toc_status(toc_payload["toc_10h"]),
+                "25N": toc_status(toc_payload["toc_25n"]),
+                "25H": toc_status(toc_payload["toc_25h"]),
+            }
+        ]
 
         toc_table = _render_table(
             toc_rows,
@@ -704,16 +775,14 @@ async def ptoc(ctx, nombre: str):
         )
         embed.add_field(
             name="Trial of the Crusader",
-            value=(
-                "```\n"
-                f"{toc_table}\n"
-                "```"
-            ),
+            value=("```\n" f"{toc_table}\n" "```"),
             inline=False,
         )
         embed.add_field(
             name="Armory",
-            value=(f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"),
+            value=(
+                f"https://armory.warmane.com/character/{nombre}/Lordaeron/achievements"
+            ),
             inline=False,
         )
 
@@ -721,5 +790,6 @@ async def ptoc(ctx, nombre: str):
 
     except Exception as e:
         await ctx.send(f"❌ Error al obtener datos: {e}")
+
 
 bot.run(TOKEN)

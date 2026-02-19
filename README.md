@@ -1,112 +1,82 @@
 # GsChecker
 
-Bot de Discord para consultar GearScore y logros de raids de personajes en Warmane (Lordaeron).
+## Feature Summary
 
-## Características
+- GearScore calculation.
+- ICC 10/25 progression per boss (Normal and Heroic) using Armory statistics.
+- Ruby Sanctum (Halion) progression via The Twilight Destroyer achievements (10/25, Normal/Heroic).
+- Trial of the Crusader (TOC) 10/25 Normal/Heroic via Call of the Crusade / Grand Crusade achievements.
 
-- Cálculo local de GearScore con tabla WotLK.
-- Progreso de ICC 10/25 por boss (Normal y Heroic) usando estadísticas del Armory.
-- Ruby Sanctum (Halion) por logros The Twilight Destroyer (10/25, Normal/Heroic).
-- Trial of the Crusader (TOC) 10/25 Normal/Heroic por logros Call of the Crusade/Grand Crusade.
-- Tabla monoespaciada alineada en el embed.
-- Cache de sockets de ítems para detección rápida de gemas faltantes.
-
-## Ejemplo
+## Example
 
 ![Ejemplo del bot](docs/ejemplo.png)
 
-## Requisitos
+## Requirements
 
 - Python 3.10+
-- Token de Discord
+- Discord bot token
 
-## Instalación
+## Installation
 
-1) Clonar y entrar al repo
-```bash
-git clone https://github.com/tuusuario/GsChecker.git
-cd GsChecker
+1. Clone and enter the repository
+
+```python
+  1. git clone <https://github.com/yourusername/GsChecker.git>
+  2. cd GsChecker
 ```
 
-2) Crear `.env` y agregar:
-```
-DISCORD_TOKEN=tu_token_aqui
+2. Create a .env file and add:
+
+```python
+DISCORD_TOKEN=your_token_here
 ```
 
-3) Instalar dependencias
+3. Install dependencies
 
-**Opción A: Script**
-```bash
+### Option A: Script
+
+```Python
 ./run.sh
 ```
 
-**Opción B: Pip**
-```bash
+### Option B: Pip
+
+```Python
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
 
-**Opción C: Poetry**
-```bash
+### Option C: Poetry
+
+```Python
 poetry install
 poetry run python main.py
 ```
 
-## Uso
+#### Usage
 
-Prefijo `/`.
+Prefix: `/`
 
-### Comandos
+##### Commands
 
-- `/p <nombre>`: resumen general (GS, ICC, RS, enchants/gemas y links).
-- `/ptoc <nombre>`: muestra solo logros TOC 10/25 NM/HC.
+`/p <name>`: general summary (GS, ICC, RS, enchants/gems, and links).
 
-## Cache de sockets (gemas)
+`/ptoc <name>`: shows only TOC 10/25 NM/HC achievements.
 
-Para evitar consultas lentas a wotlk.evowow.com, se usa un cache en:
+### Code Reuse
 
-- static/item_sockets_cache.json
+This project is based on the logic and achievement ID mappings from the WarmaneProfileParser project (MIT).
 
-Podés precargarlo con:
+The original repository is not included in this project; only ideas and achievement mapping data were reused.
+
+Original repository:
+<https://github.com/Ridepad/WarmaneProfileParser>
+
+Original project license (MIT):
 
 ```bash
-python tools/preload_item_sockets_cache.py
-```
-
-También podés agregar IDs extra de ítems en:
-
-- static/raid_items_extra.json
-
-## Estructura
-
-```
-GsChecker/
-├── main.py              # Bot de Discord
-├── gearscore.py         # Cálculo de GearScore
-├── profile_scraper.py   # Scraper del Armory
-├── tools/
-│   └── preload_item_sockets_cache.py  # Precarga de sockets
-├── static/
-│   └── GS.json          # Tabla de GearScore
-│   └── item_sockets_cache.json  # Cache de sockets
-│   └── raid_items_extra.json    # IDs extra para precarga
-├── requirements.txt     # Dependencias (pip)
-├── pyproject.toml       # Dependencias (Poetry)
-└── run.sh               # Script de arranque
-```
-
-## Reutilización de código
-
-Este proyecto se apoya en la lógica y mapeos de IDs de logros del proyecto **WarmaneProfileParser** (MIT).
-No se incluye el repositorio original en este proyecto; solo se reutilizan ideas y datos de mapeo.
-
-Repositorio original: https://github.com/Ridepad/WarmaneProfileParser
-
-Licencia del proyecto original (MIT):
-
-```
 MIT License
 
 Copyright (c) 2020 Ridepad
