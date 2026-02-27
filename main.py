@@ -702,7 +702,10 @@ async def personaje(ctx, nombre: str):
 
         embed.add_field(
             name="Icecrown Citadel",
-            value=("```\n" f"{icc_table}\n" "```"),
+                value=(
+                    "```\n" f"{icc_table}\n" "```\n"
+                    "_Nota: Los datos de Marrowgar y Deathwhisper para 10H, 25N y 25H pueden no ser correctos._"
+                ),
             inline=False,
         )
 
