@@ -499,15 +499,18 @@ def _format_boss_rows(bosses_10: dict, bosses_25: dict):
     for name in bosses_10.keys():
         c10 = bosses_10[name]
         c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
-        rows.append(
-            {
-                "Boss": name,
-                "10N": _cell(c10["nm"]),
-                "10H": _cell(c10["hc"]),
-                "25N": _cell(c25["nm"]),
-                "25H": _cell(c25["hc"]),
-            }
-        )
+        row = {"Boss": name}
+        row["10N"] = _cell(c10["nm"])
+        # Mostrar '?' en 10H, 25N y 25H para Marrowgar y Deathwhisper
+        if name in ("Marrowgar", "Deathwhisper"):
+            row["10H"] = "?"
+            row["25N"] = "?"
+            row["25H"] = "?"
+        else:
+            row["10H"] = _cell(c10["hc"])
+            row["25N"] = _cell(c25["nm"])
+            row["25H"] = _cell(c25["hc"])
+        rows.append(row)
 
     def header_status(values):
         if all(values):
