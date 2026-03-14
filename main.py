@@ -58,15 +58,56 @@ PREFIX = ["/"]
 
 SESSION = requests.Session()
 HTTP_TIMEOUT = 8
+UWU_BASE = "https://uwu-logs.xyz"
+UWU_SERVER = "Lordaeron"
 
 SUMMARY_CACHE = {}
 ACHIEVEMENTS_CACHE = {}
 GEAR_CACHE = {}
 STATS_CACHE = {}
+UWU_CHARACTER_CACHE = {}
+UWU_TOP_CACHE = {}
 SUMMARY_TTL = 120
 ACHIEVEMENTS_TTL = 300
 GEAR_TTL = 120
 STATS_TTL = 300
+UWU_CHARACTER_TTL = 120
+UWU_TOP_TTL = 180
+
+UWU_BOSS_MODE = {
+    "Lord Marrowgar": "25H",
+    "Lady Deathwhisper": "25H",
+    "Deathbringer Saurfang": "25H",
+    "Festergut": "25H",
+    "Rotface": "25H",
+    "Professor Putricide": "25H",
+    "Blood Prince Council": "25H",
+    "Blood-Queen Lana'thel": "25H",
+    "Sindragosa": "25H",
+    "The Lich King": "25H",
+    "Toravon the Ice Watcher": "25N",
+    "Halion": "25H",
+    "Anub'arak": "25H",
+    "Valithria Dreamwalker": "25H",
+}
+
+UWU_BOSS_SHORT = {
+    "Lord Marrowgar": "Marrowgar",
+    "Lady Deathwhisper": "Deathwsp",
+    "Deathbringer Saurfang": "Saurfang",
+    "Festergut": "Festergut",
+    "Rotface": "Rotface",
+    "Professor Putricide": "Putricide",
+    "Blood Prince Council": "B. Prince",
+    "Blood-Queen Lana'thel": "B. Queen",
+    "Sindragosa": "Sindragosa",
+    "The Lich King": "Lich King",
+    "Toravon the Ice Watcher": "Toravon",
+    "Halion": "Halion",
+    "Anub'arak": "Anub'arak",
+    "Valithria Dreamwalker": "Valithria",
+}
+UWU_MODES_ALL = ("10N", "10H", "25N", "25H")
 
 EXECUTOR = ThreadPoolExecutor(max_workers=6)
 
@@ -328,6 +369,181 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
 
     _cache_set(STATS_CACHE, cache_key, rows)
     return rows
+
+
+def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
+    cache_key = (nombre, server, spec_i)
+    cached = _cache_get(UWU_CHARACTER_CACHE, cache_key, UWU_CHARACTER_TTL)
+    if cached is not None:
+        return cached
+
+    url = f"{UWU_BASE}/character/{server}/{nombre}/{spec_i}"
+    try:
+        resp = SESSION.get(url, timeout=HTTP_TIMEOUT)
+    except Exception as e:
+        return {"__error__": f"uwu character error: {e}"}
+
+    if resp.status_code != 200:
+        return {"__error__": f"uwu character status: {resp.status_code}"}
+
+    try:
+        payload = resp.json()
+    except Exception as e:
+        return {"__error__": f"uwu character json error: {e}"}
+
+    _cache_set(UWU_CHARACTER_CACHE, cache_key, payload)
+    return payload
+
+
+def _fetch_uwu_top(server: str, boss: str, mode: str, class_i: int, spec_i: int):
+    cache_key = (server, boss, mode, class_i, spec_i)
+    cached = _cache_get(UWU_TOP_CACHE, cache_key, UWU_TOP_TTL)
+    if cached is not None:
+        return cached
+
+    payload = {
+        "server": server,
+        "boss": boss,
+        "mode": mode,
+        "class_i": class_i,
+        "spec_i": spec_i,
+        "sort_by": "head-date",
+        "limit": 50000,
+        "best_only": False,
+        "externals": True,
+    }
+    try:
+        resp = SESSION.post(
+            f"{UWU_BASE}/top",
+            json=payload,
+            timeout=HTTP_TIMEOUT,
+        )
+    except Exception as e:
+        return {"__error__": f"uwu top error: {e}"}
+
+    if resp.status_code != 200:
+        return {"__error__": f"uwu top status: {resp.status_code}"}
+
+    try:
+        rows = resp.json()
+    except Exception as e:
+        return {"__error__": f"uwu top json error: {e}"}
+
+    _cache_set(UWU_TOP_CACHE, cache_key, rows)
+    return rows
+
+
+def _pick_uwu_spec(nombre: str, server: str):
+    payloads = []
+    for spec_i in (1, 2, 3):
+        data = _fetch_uwu_character(nombre, server, spec_i)
+        if isinstance(data, dict) and not data.get("__error__"):
+            payloads.append((spec_i, data))
+
+    if not payloads:
+        return None, None
+
+    def sort_key(item):
+        spec_i, data = item
+        bosses = data.get("bosses", {}) if isinstance(data, dict) else {}
+        bosses_with_data = sum(1 for v in bosses.values() if isinstance(v, dict) and v)
+        points = float(data.get("overall_points") or 0)
+        return (bosses_with_data, points, -spec_i)
+
+    best_spec_i, best_payload = max(payloads, key=sort_key)
+    return best_spec_i, best_payload
+
+
+def _uwu_row_dps(entry):
+    try:
+        duration = float(entry[1])
+        useful_amount = float(entry[4])
+    except Exception:
+        return None
+    if duration <= 0:
+        return None
+    return useful_amount / duration
+
+
+def _build_uwu_dps_summary(nombre: str, server: str):
+    bosses = {}
+    for candidate_spec in (1, 2, 3):
+        data = _fetch_uwu_character(nombre, server, candidate_spec)
+        if isinstance(data, dict) and not data.get("__error__"):
+            _bosses = data.get("bosses", {})
+            if isinstance(_bosses, dict):
+                bosses.update(_bosses)
+
+    if not bosses:
+        bosses = {boss_name: {} for boss_name in UWU_BOSS_SHORT}
+
+    rows = []
+    lower_name = nombre.lower()
+
+    boss_names = sorted(bosses.keys(), key=lambda x: UWU_BOSS_SHORT.get(x, x))
+    for boss_name in boss_names:
+        boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
+
+        for mode in UWU_MODES_ALL:
+            top_rows = _fetch_uwu_top(server, boss_name, mode, -1, -1)
+            if not isinstance(top_rows, list):
+                rows.append(
+                    {
+                        "Boss": boss_short,
+                        "Md": mode,
+                        "R": "0",
+                        "Max": "-",
+                        "Avg": "-",
+                        "_boss": boss_name,
+                    }
+                )
+                continue
+
+            player_rows = []
+            for row in top_rows:
+                if not isinstance(row, list) or len(row) < 6:
+                    continue
+                row_name = str(row[3]).lower() if len(row) > 3 else ""
+                if row_name == lower_name:
+                    player_rows.append(row)
+
+            dps_values = [x for x in (_uwu_row_dps(x) for x in player_rows) if x is not None]
+            if not dps_values:
+                rows.append(
+                    {
+                        "Boss": boss_short,
+                        "Md": mode,
+                        "R": "0",
+                        "Max": "-",
+                        "Avg": "-",
+                        "_boss": boss_name,
+                    }
+                )
+                continue
+
+            dps_avg = round(sum(dps_values) / len(dps_values), 2)
+            dps_max = round(max(dps_values), 2)
+
+            rows.append(
+                {
+                    "Boss": boss_short,
+                    "Md": mode,
+                    "R": str(len(dps_values)),
+                    "Max": f"{dps_max:.2f}",
+                    "Avg": f"{dps_avg:.2f}",
+                    "_boss": boss_name,
+                }
+            )
+
+    if not rows:
+        return {"rows": [], "__error__": "No hay datos de uwu-logs para el personaje."}
+
+    return {"rows": rows, "spec_i": "all"}
+
+
+def _format_uwu_dps_table(rows):
+    headers = ["Boss", "Md", "R", "Max", "Avg"]
+    return _render_table(rows, headers)
 
 
 def _extract_icc_boss_kills(stats_rows):
@@ -735,6 +951,51 @@ async def personaje(ctx, nombre: str):
 
     except Exception as e:
         await ctx.send(f"❌ Error al obtener datos: {e}")
+
+
+@bot.command()
+async def pdps(ctx, nombre: str):
+    """Muestra DPS max/avg por boss desde UwU Logs."""
+    print(f"[LOG] Comando 'pdps' usado por {ctx.author} para personaje: {nombre}")
+    nombre = nombre.capitalize()
+    try:
+        loop = asyncio.get_running_loop()
+        uwu_dps_summary = await loop.run_in_executor(
+            EXECUTOR, _build_uwu_dps_summary, nombre, UWU_SERVER
+        )
+
+        if not isinstance(uwu_dps_summary, dict):
+            await ctx.send("⚠️ No se pudo leer respuesta de UwU Logs.")
+            return
+
+        uwu_rows = uwu_dps_summary.get("rows", [])
+        if not uwu_rows:
+            await ctx.send(f"⚠️ No hay datos DPS en UwU Logs para {nombre}.")
+            return
+
+        uwu_rows = sorted(uwu_rows, key=lambda x: x.get("_boss", x.get("Boss", "")))
+        for row in uwu_rows:
+            row.pop("_boss", None)
+
+        uwu_table = _format_uwu_dps_table(uwu_rows)
+        table_block = f"```\n{uwu_table}\n```"
+        if len(table_block) > 3900:
+            table_block = f"```\n{uwu_table[:3880]}\n...\n```"
+
+        embed = discord.Embed(
+            title=f"{nombre} - Uwulogs DPS (all bosses/modes)",
+            description=table_block,
+            color=0x2B2D31,
+        )
+        embed.add_field(
+            name="Uwulogs",
+            value=f"https://uwu-logs.xyz/character?name={nombre}&server={UWU_SERVER}",
+            inline=False,
+        )
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        await ctx.send(f"❌ Error al obtener DPS: {e}")
 
 
 @bot.command()
