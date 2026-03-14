@@ -63,6 +63,8 @@ Prefix: `/`
 
 `/p <name>`: general summary (GS, ICC, RS, enchants/gems, and links).
 
+`/pdps <name>`: UwU Logs DPS by boss (max and average).
+
 `/ptoc <name>`: shows only TOC 10/25 NM/HC achievements.
 
 ### Code Reuse

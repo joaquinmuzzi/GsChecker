@@ -66,6 +66,7 @@ Prefijo `/`.
 ### Comandos
 
 - `/p <nombre>`: resumen general (GS, ICC, RS, enchants/gemas y links).
+- `/pdps <nombre>`: DPS por boss de UwU Logs (máximo y promedio).
 - `/ptoc <nombre>`: muestra solo logros TOC 10/25 NM/HC.
 
 ## Cache de sockets (gemas)
