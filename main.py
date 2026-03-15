@@ -133,6 +133,49 @@ UWU_PDPS_BOSS_ORDER = [
     "The Lich King",
 ]
 
+# Keyword → lista de spec_i posibles (1, 2 o 3 según orden de specs de la clase)
+UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
+    # Death Knight
+    "bdk": [1], "blood": [1],
+    "fdk": [2],
+    "udk": [3], "unholy": [3],
+    # Warrior
+    "arms": [1],
+    "fury": [2],
+    # Paladin
+    "holy": [1],
+    "prot": [2], "protection": [2],
+    "ret": [3], "retribution": [3],
+    # Hunter
+    "bm": [1], "beastmastery": [1], "beast": [1],
+    "mm": [2], "marks": [2], "marksmanship": [2],
+    "sv": [3], "survival": [3],
+    # Rogue
+    "assassination": [1], "mut": [1], "mutilate": [1],
+    "combat": [2],
+    "sub": [3], "subtlety": [3],
+    # Priest
+    "disc": [1], "discipline": [1],
+    "spriest": [3], "shadow": [3],
+    # Shaman
+    "ele": [1], "elemental": [1],
+    "enh": [2], "enhancement": [2],
+    "resto": [3], "restoration": [3],
+    # Mage
+    "arcane": [1],
+    "fire": [2],
+    # "frost" abarca DK spec_i=2 y Mage spec_i=3
+    "frost": [2, 3],
+    # Warlock
+    "affli": [1], "affliction": [1],
+    "demo": [2], "demonology": [2],
+    "destro": [3], "destruction": [3], "dest": [3],
+    # Druid
+    "boomkin": [1], "balance": [1],
+    "feral": [2],
+    "rdruid": [3],
+}
+
 EXECUTOR = ThreadPoolExecutor(max_workers=6)
 LOADING_FRAMES = ("⌛", "⏳")
 
@@ -546,23 +589,39 @@ def _uwu_row_dps(entry):
     return useful_amount / duration
 
 
-def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
+def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_filter: str | None = None):
     selected_bosses_key = tuple(selected_bosses) if selected_bosses else None
-    cache_key = (nombre.lower(), server, selected_bosses_key)
+    cache_key = (nombre.lower(), server, selected_bosses_key, spec_filter)
     cached = _cache_get(UWU_PDPS_SUMMARY_CACHE, cache_key, UWU_PDPS_SUMMARY_TTL)
     if cached is not None:
         return cached
+
+    # Obtener perfiles del personaje (spec_i, class_i) para filtrar eficientemente por clase
+    profiles = _uwu_profiles(nombre, server)
+    # Si no hay perfiles registrados en uwu, usar (-1, -1) como fallback
+    spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles] or [(-1, -1)]
+
+    if spec_filter:
+        kw = spec_filter.strip().lower()
+        allowed_spec_ids = UWU_SPEC_KEYWORDS.get(kw)
+        if allowed_spec_ids:
+            filtered = [(s, c) for s, c in spec_class_pairs if s in allowed_spec_ids]
+            if filtered:
+                spec_class_pairs = filtered
+            # Si no hay perfil registrado en uwu para esa spec, igual filtramos por spec_i
+            # usando el class_i del primer perfil disponible
+            elif profiles:
+                class_i_fallback = profiles[0][1]
+                spec_class_pairs = [(s, class_i_fallback) for s in allowed_spec_ids]
 
     if selected_bosses:
         boss_names = [boss for boss in selected_bosses if isinstance(boss, str) and boss]
     else:
         bosses = {}
-        for candidate_spec in (1, 2, 3):
-            data = _fetch_uwu_character(nombre, server, candidate_spec)
-            if isinstance(data, dict) and not data.get("__error__"):
-                _bosses = data.get("bosses", {})
-                if isinstance(_bosses, dict):
-                    bosses.update(_bosses)
+        for _, _, data in profiles:
+            _bosses = data.get("bosses", {})
+            if isinstance(_bosses, dict):
+                bosses.update(_bosses)
 
         if not bosses:
             bosses = {boss_name: {} for boss_name in UWU_BOSS_SHORT}
@@ -576,8 +635,22 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
         boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
 
         for mode in UWU_MODES_ALL:
-            top_rows = _fetch_uwu_top(server, boss_name, mode, -1, -1)
-            if not isinstance(top_rows, list):
+            # Buscar por cada spec que tiene el personaje y combinar resultados
+            player_rows = []
+            any_fetch_ok = False
+            for spec_i, class_i in spec_class_pairs:
+                top_rows = _fetch_uwu_top(server, boss_name, mode, class_i, spec_i)
+                if not isinstance(top_rows, list):
+                    continue
+                any_fetch_ok = True
+                for row in top_rows:
+                    if not isinstance(row, list) or len(row) < 6:
+                        continue
+                    row_name = str(row[3]).lower() if len(row) > 3 else ""
+                    if row_name == lower_name:
+                        player_rows.append(row)
+
+            if not any_fetch_ok:
                 rows.append(
                     {
                         "Boss": boss_short,
@@ -589,14 +662,6 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
                     }
                 )
                 continue
-
-            player_rows = []
-            for row in top_rows:
-                if not isinstance(row, list) or len(row) < 6:
-                    continue
-                row_name = str(row[3]).lower() if len(row) > 3 else ""
-                if row_name == lower_name:
-                    player_rows.append(row)
 
             dps_values = [x for x in (_uwu_row_dps(x) for x in player_rows) if x is not None]
             if not dps_values:
@@ -1195,16 +1260,17 @@ async def personaje(ctx, nombre: str):
 
 
 @bot.command()
-async def dps(ctx, nombre: str):
+async def dps(ctx, nombre: str, spec: str | None = None):
     """Muestra DPS max/avg por boss desde UwU Logs."""
     started_at = time.perf_counter()
     print(f"[LOG] Comando 'dps' usado por {ctx.author} para personaje: {nombre}")
     nombre = nombre.capitalize()
-    progress_msg = await ctx.send(f"⏳ Calculando DPS de {nombre}... esto puede tardar unos segundos")
+    spec_display = f" [{spec.upper()}]" if spec else ""
+    progress_msg = await ctx.send(f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos")
     try:
         loop = asyncio.get_running_loop()
         uwu_dps_summary = await loop.run_in_executor(
-            EXECUTOR, _build_uwu_dps_summary, nombre, UWU_SERVER, UWU_PDPS_BOSS_ORDER
+            EXECUTOR, _build_uwu_dps_summary, nombre, UWU_SERVER, UWU_PDPS_BOSS_ORDER, spec
         )
 
         if not isinstance(uwu_dps_summary, dict):
@@ -1259,7 +1325,7 @@ async def dps(ctx, nombre: str):
             table_block = f"```\n{uwu_table[:3880]}\n...\n```"
 
         embed = discord.Embed(
-            title=f"{nombre} - Uwulogs DPS",
+            title=f"{nombre} - Uwulogs DPS{spec_display}",
             description=table_block,
             color=0x2B2D31,
         )
