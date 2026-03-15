@@ -67,12 +67,16 @@ GEAR_CACHE = {}
 STATS_CACHE = {}
 UWU_CHARACTER_CACHE = {}
 UWU_TOP_CACHE = {}
+UWU_PDPS_SUMMARY_CACHE = {}
+UWU_ICC_KILLS_CACHE = {}
 SUMMARY_TTL = 120
 ACHIEVEMENTS_TTL = 300
 GEAR_TTL = 120
 STATS_TTL = 300
 UWU_CHARACTER_TTL = 120
 UWU_TOP_TTL = 180
+UWU_PDPS_SUMMARY_TTL = 180
+UWU_ICC_KILLS_TTL = 180
 
 UWU_BOSS_MODE = {
     "Lord Marrowgar": "25H",
@@ -109,7 +113,28 @@ UWU_BOSS_SHORT = {
 }
 UWU_MODES_ALL = ("10N", "10H", "25N", "25H")
 
+UWU_PDPS_EXCLUDED_BOSSES = {
+    "Anub'arak",
+    "Halion",
+    "Valithria Dreamwalker",
+    "Blood Prince Council",
+    "Blood-Queen Lana'thel",
+    "Lady Deathwhisper",
+    "Sindragosa",
+    "Toravon the Ice Watcher",
+}
+
+UWU_PDPS_BOSS_ORDER = [
+    "Lord Marrowgar",
+    "Deathbringer Saurfang",
+    "Festergut",
+    "Rotface",
+    "Professor Putricide",
+    "The Lich King",
+]
+
 EXECUTOR = ThreadPoolExecutor(max_workers=6)
+LOADING_FRAMES = ("⌛", "⏳")
 
 
 def _cache_get(cache: dict, key, ttl: int):
@@ -454,6 +479,62 @@ def _pick_uwu_spec(nombre: str, server: str):
     return best_spec_i, best_payload
 
 
+def _uwu_profiles(nombre: str, server: str):
+    profiles = []
+    for spec_i in (1, 2, 3):
+        data = _fetch_uwu_character(nombre, server, spec_i)
+        if not isinstance(data, dict) or data.get("__error__"):
+            continue
+        class_i = int(data.get("class_i", -1))
+        profiles.append((spec_i, class_i, data))
+    return profiles
+
+
+def _uwu_icc_bugfix_kills(nombre: str, server: str):
+    cache_key = (nombre.lower(), server)
+    cached = _cache_get(UWU_ICC_KILLS_CACHE, cache_key, UWU_ICC_KILLS_TTL)
+    if cached is not None:
+        return cached
+
+    target = {
+        "Marrowgar": "Lord Marrowgar",
+        "Deathwhisper": "Lady Deathwhisper",
+    }
+    modes = ("10H", "25N", "25H")
+    result = {
+        short_name: {mode: "❌" for mode in modes}
+        for short_name in target
+    }
+
+    profiles = _uwu_profiles(nombre, server)
+    lower_name = nombre.lower()
+
+    for short_name, full_boss_name in target.items():
+        for mode in modes:
+            found = False
+            for spec_i, class_i, _ in profiles:
+                top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
+                if not isinstance(top_rows, list):
+                    continue
+
+                for row in top_rows:
+                    if not isinstance(row, list) or len(row) < 6:
+                        continue
+                    row_name = str(row[3]).lower() if len(row) > 3 else ""
+                    if row_name != lower_name:
+                        continue
+                    if _uwu_row_dps(row) is not None:
+                        found = True
+                        break
+                if found:
+                    break
+
+            result[short_name][mode] = "✅" if found else "❌"
+
+    _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
+    return result
+
+
 def _uwu_row_dps(entry):
     try:
         duration = float(entry[1])
@@ -465,22 +546,32 @@ def _uwu_row_dps(entry):
     return useful_amount / duration
 
 
-def _build_uwu_dps_summary(nombre: str, server: str):
-    bosses = {}
-    for candidate_spec in (1, 2, 3):
-        data = _fetch_uwu_character(nombre, server, candidate_spec)
-        if isinstance(data, dict) and not data.get("__error__"):
-            _bosses = data.get("bosses", {})
-            if isinstance(_bosses, dict):
-                bosses.update(_bosses)
+def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
+    selected_bosses_key = tuple(selected_bosses) if selected_bosses else None
+    cache_key = (nombre.lower(), server, selected_bosses_key)
+    cached = _cache_get(UWU_PDPS_SUMMARY_CACHE, cache_key, UWU_PDPS_SUMMARY_TTL)
+    if cached is not None:
+        return cached
 
-    if not bosses:
-        bosses = {boss_name: {} for boss_name in UWU_BOSS_SHORT}
+    if selected_bosses:
+        boss_names = [boss for boss in selected_bosses if isinstance(boss, str) and boss]
+    else:
+        bosses = {}
+        for candidate_spec in (1, 2, 3):
+            data = _fetch_uwu_character(nombre, server, candidate_spec)
+            if isinstance(data, dict) and not data.get("__error__"):
+                _bosses = data.get("bosses", {})
+                if isinstance(_bosses, dict):
+                    bosses.update(_bosses)
+
+        if not bosses:
+            bosses = {boss_name: {} for boss_name in UWU_BOSS_SHORT}
+
+        boss_names = sorted(bosses.keys(), key=lambda x: UWU_BOSS_SHORT.get(x, x))
 
     rows = []
     lower_name = nombre.lower()
 
-    boss_names = sorted(bosses.keys(), key=lambda x: UWU_BOSS_SHORT.get(x, x))
     for boss_name in boss_names:
         boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
 
@@ -536,14 +627,44 @@ def _build_uwu_dps_summary(nombre: str, server: str):
             )
 
     if not rows:
-        return {"rows": [], "__error__": "No hay datos de uwu-logs para el personaje."}
+        payload = {"rows": [], "__error__": "No hay datos de uwu-logs para el personaje."}
+        _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
+        return payload
 
-    return {"rows": rows, "spec_i": "all"}
+    payload = {"rows": rows, "spec_i": "all"}
+    _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
+    return payload
 
 
 def _format_uwu_dps_table(rows):
     headers = ["Boss", "Md", "R", "Max", "Avg"]
-    return _render_table(rows, headers)
+    widths = _calc_widths(rows, headers)
+
+    def display_width(text):
+        text = str(text)
+        width = 0
+        for ch in text:
+            width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+        return width
+
+    def pad(text, width):
+        text = str(text)
+        if display_width(text) > width:
+            return text
+        return text + " " * (width - display_width(text))
+
+    header_line = " | ".join(pad(h, widths[h]) for h in headers)
+    total_width = sum(widths[h] for h in headers) + (len(headers)) * 3
+    sep_line = "-" * total_width
+
+    body_lines = []
+    for row in rows:
+        if row.get("_sep"):
+            body_lines.append(sep_line)
+            continue
+        body_lines.append(" | ".join(pad(row[h], widths[h]) for h in headers))
+
+    return "\n".join([header_line, sep_line] + body_lines)
 
 
 def _extract_icc_boss_kills(stats_rows):
@@ -710,7 +831,9 @@ def _render_table(rows, headers, header_labels=None, widths=None):
     return "\n".join([header_line, sep_line] + body_lines)
 
 
-def _format_boss_rows(bosses_10: dict, bosses_25: dict):
+def _format_boss_rows(
+    bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, loading_symbol="?"
+):
     rows = []
     for name in bosses_10.keys():
         c10 = bosses_10[name]
@@ -719,9 +842,22 @@ def _format_boss_rows(bosses_10: dict, bosses_25: dict):
         row["10N"] = _cell(c10["nm"])
         # Mostrar '?' en 10H, 25N y 25H para Marrowgar y Deathwhisper
         if name in ("Marrowgar", "Deathwhisper"):
-            row["10H"] = "?"
-            row["25N"] = "?"
-            row["25H"] = "?"
+            if uwu_icc_kills is None:
+                row["10H"] = loading_symbol
+                row["25N"] = loading_symbol
+                row["25H"] = loading_symbol
+                rows.append(row)
+                continue
+
+            special = (uwu_icc_kills or {}).get(name, {})
+
+            def special_cell(mode):
+                value = special.get(mode)
+                return value if value in {"✅", "❌"} else "❌"
+
+            row["10H"] = special_cell("10H")
+            row["25N"] = special_cell("25N")
+            row["25H"] = special_cell("25H")
         else:
             row["10H"] = _cell(c10["hc"])
             row["25N"] = _cell(c25["nm"])
@@ -754,6 +890,112 @@ def _format_boss_rows(bosses_10: dict, bosses_25: dict):
     return table, widths
 
 
+def _build_personaje_embed(
+    nombre_char,
+    gs,
+    nivel,
+    raza,
+    clase,
+    spec_display,
+    guild_display,
+    halion_10n_achieved,
+    halion_10h_achieved,
+    halion_25n_achieved,
+    halion_25h_achieved,
+    icc_10,
+    icc_25,
+    missing_enchants,
+    missing_gems,
+    uwu_icc_kills=None,
+    loading_symbol="?",
+):
+    embed = discord.Embed(
+        title=nombre_char,
+        color=0x2B2D31,
+    )
+    embed.add_field(name="GearScore", value=str(gs), inline=True)
+    embed.add_field(
+        name="Level | Race | Class",
+        value=f"Level {nivel} {raza} {clase}",
+        inline=True,
+    )
+    embed.add_field(name="Spec", value=spec_display, inline=True)
+    embed.add_field(name="Guild", value=guild_display, inline=True)
+    embed.add_field(
+        name="Armory",
+        value=(
+            f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"
+        ),
+        inline=False,
+    )
+
+    embed.add_field(
+        name="Uwulogs",
+        value=(
+            f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"
+        ),
+        inline=False,
+    )
+
+    icc_table, icc_widths = _format_boss_rows(
+        icc_10, icc_25, uwu_icc_kills, loading_symbol
+    )
+    rs_rows = [
+        {
+            "Boss": "Halion",
+            "10N": "✅" if halion_10n_achieved else "❌",
+            "10H": "✅" if halion_10h_achieved else "❌",
+            "25N": "✅" if halion_25n_achieved else "❌",
+            "25H": "✅" if halion_25h_achieved else "❌",
+        }
+    ]
+
+    def rs_header_status(done: bool) -> str:
+        return "✅" if done else "❌"
+
+    rs_table = _render_table(
+        rs_rows,
+        ["Boss", "10N", "10H", "25N", "25H"],
+        {
+            "10N": f"{rs_header_status(halion_10n_achieved)}10N",
+            "10H": f"{rs_header_status(halion_10h_achieved)}10H",
+            "25N": f"{rs_header_status(halion_25n_achieved)}25N",
+            "25H": f"{rs_header_status(halion_25h_achieved)}25H",
+        },
+        icc_widths,
+    )
+
+    embed.add_field(
+        name="Icecrown Citadel",
+        value=("```\n" f"{icc_table}\n" "```\n"),
+        inline=False,
+    )
+
+    embed.add_field(
+        name="Ruby Sanctum",
+        value=("```\n" + rs_table + "```"),
+        inline=False,
+    )
+
+    if missing_enchants or missing_gems:
+        missing_lines = []
+        if missing_enchants:
+            missing_lines.append("Enchants Missing:")
+            missing_lines.extend(f"- {slot}" for slot in missing_enchants)
+
+        if missing_gems:
+            missing_lines.append("Gems Missing:")
+            missing_lines.extend(f"- {slot}" for slot in missing_gems)
+
+        embed.add_field(
+            name="Enchants / Gems",
+            value=("```\n" + "\n".join(missing_lines) + "\n```"),
+            inline=False,
+        )
+
+    return embed
+
+
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
@@ -773,11 +1015,17 @@ async def ping(ctx):
 @bot.command(aliases=["p"])
 async def personaje(ctx, nombre: str):
     """Muestra información del personaje desde la API de Warmane."""
+    started_at = time.perf_counter()
     print(f"[LOG] Comando 'personaje' usado por {ctx.author} para personaje: {nombre}")
     # Normalizar nombre: primera letra mayúscula
     nombre = nombre.capitalize()
+    progress_msg = await ctx.send(f"⏳ Calculando perfil de {nombre}...")
     try:
         loop = asyncio.get_running_loop()
+
+        uwu_icc_task = loop.run_in_executor(
+            EXECUTOR, _uwu_icc_bugfix_kills, nombre, UWU_SERVER
+        )
 
         summary_task = loop.run_in_executor(
             EXECUTOR, _fetch_summary, nombre, "Lordaeron"
@@ -797,12 +1045,13 @@ async def personaje(ctx, nombre: str):
         )
 
         if isinstance(summary, dict) and summary.get("__error__"):
-            await ctx.send(summary["__error__"])
+            await progress_msg.edit(content=summary["__error__"], embed=None)
             return
 
         if not isinstance(summary, dict):
-            await ctx.send(
-                "⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola."
+            await progress_msg.edit(
+                content="⚠️ Formato inesperado en 'summary' (no es JSON objeto). Revisa la respuesta en la consola.",
+                embed=None,
             )
             return
 
@@ -865,115 +1114,142 @@ async def personaje(ctx, nombre: str):
             for spec in active_specs + inactive_specs
         )
 
-        embed = discord.Embed(
-            title=nombre_char,
-            color=0x2B2D31,
+        embed_initial = _build_personaje_embed(
+            nombre_char,
+            gs,
+            nivel,
+            raza,
+            clase,
+            spec_display,
+            guild_display,
+            halion_10n_achieved,
+            halion_10h_achieved,
+            halion_25n_achieved,
+            halion_25h_achieved,
+            icc_10,
+            icc_25,
+            missing_enchants,
+            missing_gems,
+            uwu_icc_kills=None,
+            loading_symbol=LOADING_FRAMES[0],
         )
-        embed.add_field(name="GearScore", value=str(gs), inline=True)
-        embed.add_field(
-            name="Level | Race | Class",
-            value=f"Level {nivel} {raza} {clase}",
-            inline=True,
-        )
-        embed.add_field(name="Spec", value=spec_display, inline=True)
-        embed.add_field(name="Guild", value=guild_display, inline=True)
-        embed.add_field(
-            name="Armory",
-            value=(
-                f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"
-            ),
-            inline=False,
-        )
+        await progress_msg.edit(content=None, embed=embed_initial)
 
-        embed.add_field(
-            name="Uwulogs",
-            value=(
-                f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"
-            ),
-            inline=False,
-        )
-
-        icc_table, icc_widths = _format_boss_rows(icc_10, icc_25)
-        rs_rows = [
-            {
-                "Boss": "Halion",
-                "10N": "✅" if halion_10n_achieved else "❌",
-                "10H": "✅" if halion_10h_achieved else "❌",
-                "25N": "✅" if halion_25n_achieved else "❌",
-                "25H": "✅" if halion_25h_achieved else "❌",
-            }
-        ]
-
-        def rs_header_status(done: bool) -> str:
-            return "✅" if done else "❌"
-
-        rs_table = _render_table(
-            rs_rows,
-            ["Boss", "10N", "10H", "25N", "25H"],
-            {
-                "10N": f"{rs_header_status(halion_10n_achieved)}10N",
-                "10H": f"{rs_header_status(halion_10h_achieved)}10H",
-                "25N": f"{rs_header_status(halion_25n_achieved)}25N",
-                "25H": f"{rs_header_status(halion_25h_achieved)}25H",
-            },
-            icc_widths,
-        )
-
-        embed.add_field(
-            name="Icecrown Citadel",
-            value=("```\n" f"{icc_table}\n" "```\n"),
-            inline=False,
-        )
-
-        embed.add_field(
-            name="Ruby Sanctum",
-            value=("```\n" + rs_table + "```"),
-            inline=False,
-        )
-
-        if missing_enchants or missing_gems:
-            missing_lines = []
-            if missing_enchants:
-                missing_lines.append("Enchants Missing:")
-                missing_lines.extend(f"- {slot}" for slot in missing_enchants)
-
-            if missing_gems:
-                missing_lines.append("Gems Missing:")
-                missing_lines.extend(f"- {slot}" for slot in missing_gems)
-
-            embed.add_field(
-                name="Enchants / Gems",
-                value=("```\n" + "\n".join(missing_lines) + "\n```"),
-                inline=False,
+        frame_idx = 1
+        while not uwu_icc_task.done():
+            await asyncio.sleep(0.8)
+            if uwu_icc_task.done():
+                break
+            embed_loading = _build_personaje_embed(
+                nombre_char,
+                gs,
+                nivel,
+                raza,
+                clase,
+                spec_display,
+                guild_display,
+                halion_10n_achieved,
+                halion_10h_achieved,
+                halion_25n_achieved,
+                halion_25h_achieved,
+                icc_10,
+                icc_25,
+                missing_enchants,
+                missing_gems,
+                uwu_icc_kills=None,
+                loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
             )
+            frame_idx += 1
+            await progress_msg.edit(content=None, embed=embed_loading)
 
-        await ctx.send(embed=embed)
+        try:
+            uwu_icc_kills = await uwu_icc_task
+        except Exception:
+            uwu_icc_kills = {}
+
+        embed_final = _build_personaje_embed(
+            nombre_char,
+            gs,
+            nivel,
+            raza,
+            clase,
+            spec_display,
+            guild_display,
+            halion_10n_achieved,
+            halion_10h_achieved,
+            halion_25n_achieved,
+            halion_25h_achieved,
+            icc_10,
+            icc_25,
+            missing_enchants,
+            missing_gems,
+            uwu_icc_kills=uwu_icc_kills,
+        )
+        await progress_msg.edit(content=None, embed=embed_final)
 
     except Exception as e:
-        await ctx.send(f"❌ Error al obtener datos: {e}")
+        await progress_msg.edit(content=f"❌ Error al obtener datos: {e}", embed=None)
+    finally:
+        elapsed = time.perf_counter() - started_at
+        print(f"[LOG] Comando 'personaje' finalizado en {elapsed:.2f}s")
 
 
 @bot.command()
-async def pdps(ctx, nombre: str):
+async def dps(ctx, nombre: str):
     """Muestra DPS max/avg por boss desde UwU Logs."""
-    print(f"[LOG] Comando 'pdps' usado por {ctx.author} para personaje: {nombre}")
+    started_at = time.perf_counter()
+    print(f"[LOG] Comando 'dps' usado por {ctx.author} para personaje: {nombre}")
     nombre = nombre.capitalize()
+    progress_msg = await ctx.send(f"⏳ Calculando DPS de {nombre}... esto puede tardar unos segundos")
     try:
         loop = asyncio.get_running_loop()
         uwu_dps_summary = await loop.run_in_executor(
-            EXECUTOR, _build_uwu_dps_summary, nombre, UWU_SERVER
+            EXECUTOR, _build_uwu_dps_summary, nombre, UWU_SERVER, UWU_PDPS_BOSS_ORDER
         )
 
         if not isinstance(uwu_dps_summary, dict):
-            await ctx.send("⚠️ No se pudo leer respuesta de UwU Logs.")
+            await progress_msg.edit(content="⚠️ No se pudo leer respuesta de UwU Logs.", embed=None)
             return
 
         uwu_rows = uwu_dps_summary.get("rows", [])
         if not uwu_rows:
-            await ctx.send(f"⚠️ No hay datos DPS en UwU Logs para {nombre}.")
+            await progress_msg.edit(content=f"⚠️ No hay datos DPS en UwU Logs para {nombre}.", embed=None)
             return
 
-        uwu_rows = sorted(uwu_rows, key=lambda x: x.get("_boss", x.get("Boss", "")))
+        boss_order = {name: idx for idx, name in enumerate(UWU_PDPS_BOSS_ORDER)}
+        mode_order = {mode: idx for idx, mode in enumerate(UWU_MODES_ALL)}
+
+        uwu_rows = sorted(
+            uwu_rows,
+            key=lambda x: (
+                boss_order.get(x.get("_boss"), 999),
+                mode_order.get(x.get("Md", ""), 999),
+                x.get("_boss", x.get("Boss", "")),
+            ),
+        )
+
+        grouped_rows = []
+        for i, row in enumerate(uwu_rows):
+            grouped_rows.append(row)
+            is_last = i == len(uwu_rows) - 1
+            if is_last:
+                continue
+            current_boss = row.get("_boss")
+            next_boss = uwu_rows[i + 1].get("_boss")
+            if current_boss != next_boss:
+                grouped_rows.append(
+                    {
+                        "Boss": "---------",
+                        "Md": "--",
+                        "R": "--",
+                        "Max": "---------",
+                        "Avg": "---------",
+                        "_boss": "__sep__",
+                        "_sep": True,
+                    }
+                )
+
+        uwu_rows = grouped_rows
         for row in uwu_rows:
             row.pop("_boss", None)
 
@@ -983,7 +1259,7 @@ async def pdps(ctx, nombre: str):
             table_block = f"```\n{uwu_table[:3880]}\n...\n```"
 
         embed = discord.Embed(
-            title=f"{nombre} - Uwulogs DPS (all bosses/modes)",
+            title=f"{nombre} - Uwulogs DPS",
             description=table_block,
             color=0x2B2D31,
         )
@@ -992,15 +1268,19 @@ async def pdps(ctx, nombre: str):
             value=f"https://uwu-logs.xyz/character?name={nombre}&server={UWU_SERVER}",
             inline=False,
         )
-        await ctx.send(embed=embed)
+        await progress_msg.edit(content=None, embed=embed)
 
     except Exception as e:
-        await ctx.send(f"❌ Error al obtener DPS: {e}")
+        await progress_msg.edit(content=f"❌ Error al obtener DPS: {e}", embed=None)
+    finally:
+        elapsed = time.perf_counter() - started_at
+        print(f"[LOG] Comando 'dps' finalizado en {elapsed:.2f}s")
 
 
 @bot.command()
 async def ptoc(ctx, nombre: str):
     """Muestra logros de Trial of the Crusader (TOC) con formato de tabla."""
+    started_at = time.perf_counter()
     print(f"[LOG] Comando 'ptoc' usado por {ctx.author} para personaje: {nombre}")
     nombre = nombre.capitalize()
     try:
@@ -1054,6 +1334,9 @@ async def ptoc(ctx, nombre: str):
 
     except Exception as e:
         await ctx.send(f"❌ Error al obtener datos: {e}")
+    finally:
+        elapsed = time.perf_counter() - started_at
+        print(f"[LOG] Comando 'ptoc' finalizado en {elapsed:.2f}s")
 
 
 bot.run(TOKEN)
