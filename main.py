@@ -581,10 +581,10 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
                 rows.append(
                     {
                         "Boss": boss_short,
-                        "Md": mode,
-                        "R": "0",
-                        "Max": "-",
-                        "Avg": "-",
+                        "Mode": mode,
+                        "Raids": "0",
+                        "Max DPS": "-",
+                        "Avg DPS": "-",
                         "_boss": boss_name,
                     }
                 )
@@ -603,10 +603,10 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
                 rows.append(
                     {
                         "Boss": boss_short,
-                        "Md": mode,
-                        "R": "0",
-                        "Max": "-",
-                        "Avg": "-",
+                        "Mode": mode,
+                        "Raids": "0",
+                        "Max DPS": "-",
+                        "Avg DPS": "-",
                         "_boss": boss_name,
                     }
                 )
@@ -618,10 +618,10 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
             rows.append(
                 {
                     "Boss": boss_short,
-                    "Md": mode,
-                    "R": str(len(dps_values)),
-                    "Max": f"{dps_max:.2f}",
-                    "Avg": f"{dps_avg:.2f}",
+                    "Mode": mode,
+                    "Raids": str(len(dps_values)),
+                    "Max DPS": f"{dps_max:.2f}",
+                    "Avg DPS": f"{dps_avg:.2f}",
                     "_boss": boss_name,
                 }
             )
@@ -637,7 +637,7 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None):
 
 
 def _format_uwu_dps_table(rows):
-    headers = ["Boss", "Md", "R", "Max", "Avg"]
+    headers = ["Boss", "Mode", "Raids", "Max DPS", "Avg DPS"]
     widths = _calc_widths(rows, headers)
 
     def display_width(text):
@@ -1223,7 +1223,7 @@ async def dps(ctx, nombre: str):
             uwu_rows,
             key=lambda x: (
                 boss_order.get(x.get("_boss"), 999),
-                mode_order.get(x.get("Md", ""), 999),
+                mode_order.get(x.get("Mode", ""), 999),
                 x.get("_boss", x.get("Boss", "")),
             ),
         )
@@ -1240,10 +1240,10 @@ async def dps(ctx, nombre: str):
                 grouped_rows.append(
                     {
                         "Boss": "---------",
-                        "Md": "--",
-                        "R": "--",
-                        "Max": "---------",
-                        "Avg": "---------",
+                        "Mode": "--",
+                        "Raids": "--",
+                        "Max DPS": "---------",
+                        "Avg DPS": "---------",
                         "_boss": "__sep__",
                         "_sep": True,
                     }
