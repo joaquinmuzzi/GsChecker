@@ -60,6 +60,7 @@ SESSION = requests.Session()
 HTTP_TIMEOUT = 8
 UWU_BASE = "https://uwu-logs.xyz"
 UWU_SERVER = "Lordaeron"
+DOCS_NOTAS_URL = "https://joaquinmuzzi.github.io/GsChecker/#notas"
 
 SUMMARY_CACHE = {}
 ACHIEVEMENTS_CACHE = {}
@@ -136,42 +137,64 @@ UWU_PDPS_BOSS_ORDER = [
 # Keyword → lista de spec_i posibles (1, 2 o 3 según orden de specs de la clase)
 UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
     # Death Knight
-    "bdk": [1], "blood": [1],
+    "bdk": [1],
+    "blood": [1],
     "fdk": [2],
-    "udk": [3], "unholy": [3],
+    "udk": [3],
+    "unholy": [3],
     # Warrior
     "arms": [1],
     "fury": [2],
     # Paladin
     "holy": [1],
-    "prot": [2], "protection": [2],
-    "ret": [3], "retribution": [3],
+    "prot": [2],
+    "protection": [2],
+    "ret": [3],
+    "retribution": [3],
     # Hunter
-    "bm": [1], "beastmastery": [1], "beast": [1],
-    "mm": [2], "marks": [2], "marksmanship": [2],
-    "sv": [3], "survival": [3],
+    "bm": [1],
+    "beastmastery": [1],
+    "beast": [1],
+    "mm": [2],
+    "marks": [2],
+    "marksmanship": [2],
+    "sv": [3],
+    "survival": [3],
     # Rogue
-    "assassination": [1], "mut": [1], "mutilate": [1],
+    "assassination": [1],
+    "mut": [1],
+    "mutilate": [1],
     "combat": [2],
-    "sub": [3], "subtlety": [3],
+    "sub": [3],
+    "subtlety": [3],
     # Priest
-    "disc": [1], "discipline": [1],
-    "spriest": [3], "shadow": [3],
+    "disc": [1],
+    "discipline": [1],
+    "spriest": [3],
+    "shadow": [3],
     # Shaman
-    "ele": [1], "elemental": [1],
-    "enh": [2], "enhancement": [2],
-    "resto": [3], "restoration": [3],
+    "ele": [1],
+    "elemental": [1],
+    "enh": [2],
+    "enhancement": [2],
+    "resto": [3],
+    "restoration": [3],
     # Mage
     "arcane": [1],
     "fire": [2],
     # "frost" abarca DK spec_i=2 y Mage spec_i=3
     "frost": [2, 3],
     # Warlock
-    "affli": [1], "affliction": [1],
-    "demo": [2], "demonology": [2],
-    "destro": [3], "destruction": [3], "dest": [3],
+    "affli": [1],
+    "affliction": [1],
+    "demo": [2],
+    "demonology": [2],
+    "destro": [3],
+    "destruction": [3],
+    "dest": [3],
     # Druid
-    "boomkin": [1], "balance": [1],
+    "boomkin": [1],
+    "balance": [1],
     "feral": [2],
     "rdruid": [3],
 }
@@ -547,10 +570,7 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
         "Deathwhisper": "Lady Deathwhisper",
     }
     modes = ("10H", "25N", "25H")
-    result = {
-        short_name: {mode: "❌" for mode in modes}
-        for short_name in target
-    }
+    result = {short_name: {mode: "❌" for mode in modes} for short_name in target}
 
     profiles = _uwu_profiles(nombre, server)
     lower_name = nombre.lower()
@@ -592,7 +612,9 @@ def _uwu_row_dps(entry):
     return useful_amount / duration
 
 
-def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_filter: str | None = None):
+def _build_uwu_dps_summary(
+    nombre: str, server: str, selected_bosses=None, spec_filter: str | None = None
+):
     selected_bosses_key = tuple(selected_bosses) if selected_bosses else None
     cache_key = (nombre.lower(), server, selected_bosses_key, spec_filter)
     cached = _cache_get(UWU_PDPS_SUMMARY_CACHE, cache_key, UWU_PDPS_SUMMARY_TTL)
@@ -602,7 +624,9 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_
     # Obtener perfiles del personaje (spec_i, class_i) para filtrar eficientemente por clase
     profiles = _uwu_profiles(nombre, server)
     # Si no hay perfiles registrados en uwu, usar (-1, -1) como fallback
-    spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles] or [(-1, -1)]
+    spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles] or [
+        (-1, -1)
+    ]
 
     if spec_filter:
         kw = spec_filter.strip().lower()
@@ -620,7 +644,9 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_
                 spec_class_pairs = [(s, -1) for s in allowed_spec_ids]
 
     if selected_bosses:
-        boss_names = [boss for boss in selected_bosses if isinstance(boss, str) and boss]
+        boss_names = [
+            boss for boss in selected_bosses if isinstance(boss, str) and boss
+        ]
     else:
         bosses = {}
         for _, _, data in profiles:
@@ -668,7 +694,9 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_
                 )
                 continue
 
-            dps_values = [x for x in (_uwu_row_dps(x) for x in player_rows) if x is not None]
+            dps_values = [
+                x for x in (_uwu_row_dps(x) for x in player_rows) if x is not None
+            ]
             if not dps_values:
                 rows.append(
                     {
@@ -697,7 +725,10 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_
             )
 
     if not rows:
-        payload = {"rows": [], "__error__": "No hay datos de uwu-logs para el personaje."}
+        payload = {
+            "rows": [],
+            "__error__": "No hay datos de uwu-logs para el personaje.",
+        }
         _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
         return payload
 
@@ -993,17 +1024,13 @@ def _build_personaje_embed(
     embed.add_field(name="Guild", value=guild_display, inline=True)
     embed.add_field(
         name="Armory",
-        value=(
-            f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"
-        ),
+        value=(f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile"),
         inline=False,
     )
 
     embed.add_field(
         name="Uwulogs",
-        value=(
-            f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"
-        ),
+        value=(f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron"),
         inline=False,
     )
 
@@ -1271,20 +1298,31 @@ async def dps(ctx, nombre: str, spec: str | None = None):
     print(f"[LOG] Comando 'dps' usado por {ctx.author} para personaje: {nombre}")
     nombre = nombre.capitalize()
     spec_display = f" [{spec.upper()}]" if spec else ""
-    progress_msg = await ctx.send(f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos")
+    progress_msg = await ctx.send(
+        f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos"
+    )
     try:
         loop = asyncio.get_running_loop()
         uwu_dps_summary = await loop.run_in_executor(
-            EXECUTOR, _build_uwu_dps_summary, nombre, UWU_SERVER, UWU_PDPS_BOSS_ORDER, spec
+            EXECUTOR,
+            _build_uwu_dps_summary,
+            nombre,
+            UWU_SERVER,
+            UWU_PDPS_BOSS_ORDER,
+            spec,
         )
 
         if not isinstance(uwu_dps_summary, dict):
-            await progress_msg.edit(content="⚠️ No se pudo leer respuesta de UwU Logs.", embed=None)
+            await progress_msg.edit(
+                content="⚠️ No se pudo leer respuesta de UwU Logs.", embed=None
+            )
             return
 
         uwu_rows = uwu_dps_summary.get("rows", [])
         if not uwu_rows:
-            await progress_msg.edit(content=f"⚠️ No hay datos DPS en UwU Logs para {nombre}.", embed=None)
+            await progress_msg.edit(
+                content=f"⚠️ No hay datos DPS en UwU Logs para {nombre}.", embed=None
+            )
             return
 
         boss_order = {name: idx for idx, name in enumerate(UWU_PDPS_BOSS_ORDER)}
@@ -1348,9 +1386,9 @@ async def dps(ctx, nombre: str, spec: str | None = None):
             color=0x2B2D31,
         )
         embed.add_field(
-            name="Uwulogs",
-            value=f"https://uwu-logs.xyz/character?name={nombre}&server={UWU_SERVER}",
-            inline=False,
+            name="Si ves datos vacíos, consulte:",
+            value=(f"{DOCS_NOTAS_URL}"),
+            inline=True,
         )
         await progress_msg.edit(content=None, embed=embed)
 

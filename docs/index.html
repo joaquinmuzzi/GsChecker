@@ -599,10 +599,16 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
 
       <h3>Fuentes de datos</h3>
       <ul style="padding-left:20px; line-height:2">
-        <li><strong>GearScore</strong> se calcula con una tabla local; puede diferir levemente de otros calculadores.</li>
-        <li><strong>Progresión ICC / RS</strong> viene de las <em>Statistics</em> y <em>Achievements</em> de la Armory de Warmane.</li>
-        <li><strong>Marrowgar y Deathwhisper 10H/25N/25H</strong> usan UwU Logs directamente porque la Armory no los registra correctamente.</li>
-        <li><strong>DPS</strong> y datos de <strong>/dps</strong> provienen exclusivamente de uwu-logs.xyz.</li>
+        <li><strong>GearScore</strong> se calcula asignando un número a cada item según su nivel y rareza.</li>
+        <li><strong>Progresión ICC / RS</strong> viene de las <a href="https://armory.warmane.com/character/Frodouwu/Lordaeron/statistics" target="_blank" style="color:var(--accent2)"><em>Statistics</em></a> y <a href="https://armory.warmane.com/character/Frodouwu/Lordaeron/achievements" target="_blank" style="color:var(--accent2)"><em>Achievements</em></a> de la Armory de Warmane.</li>
+        <li style="background:var(--surface2);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:6px 12px;margin:4px 0">
+          ⚠️ <strong>Marrowgar y Deathwhisper 10H/25N/25H</strong> usan UwU Logs directamente porque la Armory no los registra correctamente.
+          <em style="display:block;color:var(--muted);font-size:12.5px;margin-top:2px">Si no hay raids recientes subidas a uwu-logs, el bot puede mostrar información incorrecta o vacía para estos bosses.</em>
+        </li>
+        <li style="background:var(--surface2);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:6px 12px;margin:4px 0">
+          ⚠️ <strong>DPS</strong> y datos de <strong>/dps</strong> provienen exclusivamente de uwu-logs.xyz.
+          <em style="display:block;color:var(--muted);font-size:12.5px;margin-top:2px">Si el personaje no tiene logs subidos o las raids no fueron registradas, el comando puede retornar datos vacíos o erróneos.</em>
+        </li>
         <li><strong>ToC</strong> se detecta por logros de Armory; si el personaje no tiene el logro global, aparece ❌ aunque haya matado bosses individuales.</li>
       </ul>
 
