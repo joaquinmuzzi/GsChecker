@@ -23,6 +23,11 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
     body {
       background: var(--bg);
       color: var(--text);
@@ -69,6 +74,7 @@
     .page {
       display: grid;
       grid-template-columns: 220px 1fr;
+      width: 100%;
       max-width: 1100px;
       margin: 0 auto;
       gap: 0;
@@ -107,10 +113,31 @@
       color: var(--text);
     }
     nav a.cmd { padding-left: 22px; font-family: monospace; font-size: 13px; }
+    nav .nav-links { display: block; }
+    .nav-toggle {
+      display: none;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .nav-toggle .chev {
+      color: var(--muted);
+      transition: transform 0.2s ease;
+    }
+    nav.open .nav-toggle .chev { transform: rotate(180deg); }
 
     /* ── CONTENT ── */
     main {
       padding: 40px 40px 80px;
+      min-width: 0;
     }
 
     section { margin-bottom: 56px; }
@@ -215,6 +242,7 @@
       color: #b0b3c1;
       white-space: pre;
       overflow-x: auto;
+      max-width: 100%;
       margin: 12px 0;
       line-height: 1.7;
     }
@@ -325,6 +353,12 @@
     }
     .contact-card .cc-value { font-size: 15px; color: #fff; font-weight: 600; }
     .contact-card .cc-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .contact-card > div { min-width: 0; }
+    .contact-card .cc-value,
+    .contact-card .cc-sub {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
 
     /* ── FOOTER ── */
     footer {
@@ -335,10 +369,101 @@
       border-top: 1px solid var(--border);
     }
 
-    @media (max-width: 700px) {
+    @media (max-width: 1024px) {
+      .page { grid-template-columns: 190px 1fr; }
+      main { padding: 32px 28px 64px; }
+      .flow[style] { padding-left: 0 !important; }
+    }
+
+    @media (max-width: 860px) {
       .page { grid-template-columns: 1fr; }
-      nav { display: none; }
-      main { padding: 24px 18px 60px; }
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        height: auto;
+        overflow: hidden;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 10px 12px;
+        background: var(--bg);
+      }
+      .nav-toggle {
+        display: flex;
+      }
+      nav .nav-links {
+        display: none;
+        margin-top: 10px;
+        width: 100%;
+      }
+      nav.open .nav-links {
+        display: block;
+      }
+      nav .nav-links .nav-title {
+        display: block;
+        margin: 0 0 6px 0;
+        padding-left: 0;
+      }
+      nav .nav-links a {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 4px;
+        padding: 6px 10px;
+      }
+      nav .nav-links a.cmd {
+        padding-left: 14px;
+        font-size: 12.5px;
+      }
+      main { padding: 24px 18px 56px; }
+      section { margin-bottom: 44px; }
+      header { padding: 38px 18px 28px; }
+      header h1 { font-size: 2rem; }
+      .cmd-card { padding: 16px; }
+      .contact-card {
+        align-items: flex-start;
+        gap: 14px;
+        padding: 16px;
+      }
+      .flow-step {
+        white-space: normal;
+        line-height: 1.35;
+      }
+      .flow[style] { padding-left: 0 !important; }
+    }
+
+    @media (max-width: 700px) {
+      body { font-size: 14px; }
+      h2 { font-size: 1.2rem; }
+      h3 { font-size: 1rem; }
+      .preview {
+        font-size: 11.5px;
+        padding: 12px;
+      }
+      .cmd-card .syntax {
+        font-size: 0.92rem;
+        padding: 6px 10px;
+      }
+      table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .spec-grid,
+      .arch-grid { grid-template-columns: 1fr; }
+      .contact-card .cc-value {
+        font-size: 14px;
+        word-break: break-word;
+      }
+      footer { padding: 24px 14px; }
+    }
+
+    @media (max-width: 420px) {
+      header h1 { font-size: 1.75rem; }
+      .badge { font-size: 10px; }
+      .cmd-card { padding: 14px; }
+      .callout { padding: 12px; }
     }
   </style>
 </head>
@@ -353,18 +478,24 @@
 <div class="page">
 
   <!-- SIDEBAR -->
-  <nav>
-    <div class="nav-title">Contenido</div>
-    <a href="#intro">¿Qué es GsChecker?</a>
-    <a href="#comandos">Comandos</a>
-    <a class="cmd" href="#cmd-personaje">/personaje</a>
-    <a class="cmd" href="#cmd-dps">/dps</a>
-    <a class="cmd" href="#cmd-ptoc">/ptoc</a>
-    <a class="cmd" href="#cmd-ping">/ping</a>
-    <a href="#specs">Filtro por spec (dps)</a>
-    <a href="#notas">Notas y limitaciones</a>
-    <a href="#dev">Para desarrolladores</a>
-    <a href="#contacto">Contacto</a>
+  <nav id="site-nav">
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav-links">
+      <span>Contenido</span>
+      <span class="chev">▾</span>
+    </button>
+    <div class="nav-links" id="site-nav-links">
+      <div class="nav-title">Contenido</div>
+      <a href="#intro">¿Qué es GsChecker?</a>
+      <a href="#comandos">Comandos</a>
+      <a class="cmd" href="#cmd-personaje">/personaje</a>
+      <a class="cmd" href="#cmd-dps">/dps</a>
+      <a class="cmd" href="#cmd-ptoc">/ptoc</a>
+      <a class="cmd" href="#cmd-ping">/ping</a>
+      <a href="#specs">Filtro por spec (dps)</a>
+      <a href="#notas">Notas y limitaciones</a>
+      <a href="#dev">Para desarrolladores</a>
+      <a href="#contacto">Contacto</a>
+    </div>
   </nav>
 
   <!-- MAIN -->
@@ -762,6 +893,41 @@ python main.py</div>
   GsChecker · Warmane Lordaeron ·
   <a href="https://github.com/joaquinmuzzi/GsChecker" target="_blank" style="color:var(--muted); text-decoration:none">GitHub</a>
 </footer>
+
+<script>
+  (function () {
+    const nav = document.getElementById("site-nav");
+    if (!nav) return;
+
+    const toggle = nav.querySelector(".nav-toggle");
+    const linkItems = nav.querySelectorAll(".nav-links a");
+    if (!toggle) return;
+
+    const closeMenu = () => {
+      nav.classList.remove("open");
+      toggle.setAttribute("aria-expanded", "false");
+    };
+
+    toggle.addEventListener("click", () => {
+      const isOpen = nav.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+
+    linkItems.forEach((link) => {
+      link.addEventListener("click", () => {
+        if (window.matchMedia("(max-width: 860px)").matches) {
+          closeMenu();
+        }
+      });
+    });
+
+    window.addEventListener("resize", () => {
+      if (!window.matchMedia("(max-width: 860px)").matches) {
+        closeMenu();
+      }
+    });
+  })();
+</script>
 
 </body>
 </html>
