@@ -206,7 +206,7 @@ def _fetch_summary(nombre: str, server: str):
     resp_summary = SESSION.get(url_summary, headers=headers, timeout=HTTP_TIMEOUT)
     if resp_summary.status_code != 200:
         return {
-            "__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Código {resp_summary.status_code}"
+            "__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Inténtelo de vuelta en unos segundos ({resp_summary.status_code})"
         }
     try:
         summary = resp_summary.json()
@@ -464,7 +464,7 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
 
 
 def _fetch_uwu_top(server: str, boss: str, mode: str, class_i: int, spec_i: int):
-    cache_key = (server, boss, mode, class_i, spec_i)
+    cache_key = ("v2", server, boss, mode, class_i, spec_i)
     cached = _cache_get(UWU_TOP_CACHE, cache_key, UWU_TOP_TTL)
     if cached is not None:
         return cached
@@ -475,9 +475,9 @@ def _fetch_uwu_top(server: str, boss: str, mode: str, class_i: int, spec_i: int)
         "mode": mode,
         "class_i": class_i,
         "spec_i": spec_i,
-        "sort_by": "head-date",
-        "limit": 50000,
-        "best_only": False,
+        "sort_by": "head-useful-dps",
+        "limit": 1000,
+        "best_only": True,
         "externals": True,
     }
     try:
@@ -527,6 +527,9 @@ def _uwu_profiles(nombre: str, server: str):
     for spec_i in (1, 2, 3):
         data = _fetch_uwu_character(nombre, server, spec_i)
         if not isinstance(data, dict) or data.get("__error__"):
+            continue
+        profile_name = str(data.get("name") or "")
+        if profile_name.startswith("Unknown-"):
             continue
         class_i = int(data.get("class_i", -1))
         profiles.append((spec_i, class_i, data))
@@ -613,6 +616,8 @@ def _build_uwu_dps_summary(nombre: str, server: str, selected_bosses=None, spec_
             elif profiles:
                 class_i_fallback = profiles[0][1]
                 spec_class_pairs = [(s, class_i_fallback) for s in allowed_spec_ids]
+            else:
+                spec_class_pairs = [(s, -1) for s in allowed_spec_ids]
 
     if selected_bosses:
         boss_names = [boss for boss in selected_bosses if isinstance(boss, str) and boss]
@@ -1319,14 +1324,27 @@ async def dps(ctx, nombre: str, spec: str | None = None):
         for row in uwu_rows:
             row.pop("_boss", None)
 
+        has_any_logs = any(
+            row.get("Raids") not in {"0", "--"}
+            for row in uwu_rows
+            if not row.get("_sep")
+        )
+
         uwu_table = _format_uwu_dps_table(uwu_rows)
         table_block = f"```\n{uwu_table}\n```"
         if len(table_block) > 3900:
             table_block = f"```\n{uwu_table[:3880]}\n...\n```"
 
+        warning_note = ""
+        if not has_any_logs:
+            warning_note = (
+                "\n⚠️ No se encontraron logs para este personaje"
+                f"{' con esa spec' if spec else ''} en UwU Logs."
+            )
+
         embed = discord.Embed(
             title=f"{nombre} - Uwulogs DPS{spec_display}",
-            description=table_block,
+            description=table_block + warning_note,
             color=0x2B2D31,
         )
         embed.add_field(

@@ -6,15 +6,11 @@
 - ICC 10/25 progression per boss (Normal and Heroic) using Armory statistics.
 - Ruby Sanctum (Halion) progression via The Twilight Destroyer achievements (10/25, Normal/Heroic).
 - Trial of the Crusader (TOC) 10/25 Normal/Heroic via Call of the Crusade / Grand Crusade achievements.
+- DPS preview using [uwulogs](https://uwu-logs.xyz/) API
 
 ## Example
 
 ![Ejemplo del bot](docs/ejemplo.png)
-
-## Requirements
-
-- Python 3.10+
-- Discord bot token
 
 ## Installation
 
@@ -55,17 +51,14 @@ poetry install
 poetry run python main.py
 ```
 
-#### Usage
-
-Prefix: `/`
-
-##### Commands
+#### Usage Commands
 
 `/p <name>`: general summary (GS, ICC, RS, enchants/gems, and links).
 
-`/pdps <name>`: UwU Logs DPS by boss (max and average).
-
 `/ptoc <name>`: shows only TOC 10/25 NM/HC achievements.
+
+`/dps <name>`: UwU Logs DPS by boss (max and average).
+
 
 ### Code Reuse
 
