@@ -54,7 +54,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN no encontrado en .env")
 
-PREFIX = ["/"]
+PREFIX = commands.when_mentioned
 
 SESSION = requests.Session()
 HTTP_TIMEOUT = 8
@@ -1110,6 +1110,13 @@ bot = GsCheckerBot(command_prefix=PREFIX, intents=intents)
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        return
+    raise error
 
 
 @bot.tree.command(name="ping", description="Muestra la latencia actual del bot.")
