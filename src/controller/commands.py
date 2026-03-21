@@ -67,29 +67,38 @@ def _get_known_gs_by_spec(nombre: str, spec_names: list[str], current_gs=None, a
     return result
 
 
-def _append_gs_by_spec_field(
-    embed: discord.Embed,
+def _build_spec_gs_entries(
     spec_names: list[str],
     gs_by_spec: dict,
     active_specs: list[str] | None = None,
 ):
     active_spec_names = set(active_specs or [])
-    lines = []
+    entries = []
     seen = set()
     for spec_name in spec_names:
         clean_name = str(spec_name or "").strip()
         if not clean_name or clean_name == "N/A" or clean_name in seen:
             continue
         seen.add(clean_name)
-        label = f"{clean_name} *" if clean_name in active_spec_names else clean_name
-        value = gs_by_spec.get(clean_name, "?")
-        lines.append(f"{label}: {value}")
-    if lines:
-        embed.add_field(
-            name="GearScore por spec",
-            value="```\n" + "\n".join(lines) + "\n```",
-            inline=False,
+        entries.append(
+            {
+                "name": clean_name,
+                "main": clean_name in active_spec_names,
+                "gearscore": gs_by_spec.get(clean_name, "?"),
+            }
         )
+    return entries
+
+
+def _format_spec_gs_value(spec_gs_entries: list[dict]) -> str:
+    lines = []
+    for entry in spec_gs_entries:
+        name = str(entry.get("name") or "").strip()
+        if not name:
+            continue
+        suffix = "(Main)" if entry.get("main") else "(Off-spec)"
+        lines.append(f"{name} {suffix}:\n{entry.get('gearscore', '?')}")
+    return "\n".join(lines) if lines else "?"
 
 
 def _serialize_personaje_payload(
@@ -109,9 +118,7 @@ def _serialize_personaje_payload(
     missing_enchants,
     missing_gems,
     uwu_icc_kills,
-    active_specs,
-    inactive_specs,
-    gs_by_spec,
+    spec_gs_entries,
 ):
     return {
         "nombre_char": nombre_char,
@@ -130,14 +137,12 @@ def _serialize_personaje_payload(
         "missing_enchants": missing_enchants,
         "missing_gems": missing_gems,
         "uwu_icc_kills": uwu_icc_kills,
-        "active_specs": active_specs,
-        "inactive_specs": inactive_specs,
-        "gs_by_spec": gs_by_spec,
+        "spec_gs_entries": spec_gs_entries,
     }
 
 
 def _build_personaje_embed_from_cache(payload: dict):
-    embed = _build_personaje_embed(
+    return _build_personaje_embed(
         payload["nombre_char"],
         payload["gs"],
         payload["nivel"],
@@ -154,14 +159,8 @@ def _build_personaje_embed_from_cache(payload: dict):
         payload["missing_enchants"],
         payload["missing_gems"],
         payload.get("uwu_icc_kills"),
+        spec_gs_value=_format_spec_gs_value(payload.get("spec_gs_entries", [])),
     )
-    _append_gs_by_spec_field(
-        embed,
-        payload.get("active_specs", []) + payload.get("inactive_specs", []),
-        payload.get("gs_by_spec", {}),
-        payload.get("active_specs", []),
-    )
-    return embed
 
 
 def _build_dps_embed_from_cache(payload: dict):
@@ -420,6 +419,11 @@ async def _personaje_impl(
             gs,
             active_specs,
         )
+        spec_gs_entries = _build_spec_gs_entries(
+            active_specs + inactive_specs,
+            gs_by_spec,
+            active_specs,
+        )
 
         halion_10n_achieved = achi_payload["halion_10n_achieved"]
         halion_10h_achieved = achi_payload["halion_10h_achieved"]
@@ -451,12 +455,7 @@ async def _personaje_impl(
             missing_gems,
             uwu_icc_kills=None,
             loading_symbol=LOADING_FRAMES[0],
-        )
-        _append_gs_by_spec_field(
-            embed_initial,
-            active_specs + inactive_specs,
-            gs_by_spec,
-            active_specs,
+            spec_gs_value=_format_spec_gs_value(spec_gs_entries),
         )
         await _safe_edit_original_response(interaction, content=None, embed=embed_initial)
 
@@ -483,14 +482,9 @@ async def _personaje_impl(
                 missing_gems,
                 uwu_icc_kills=None,
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
+                spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             )
             frame_idx += 1
-            _append_gs_by_spec_field(
-                embed_loading,
-                active_specs + inactive_specs,
-                gs_by_spec,
-                active_specs,
-            )
             await _safe_edit_original_response(interaction, content=None, embed=embed_loading)
 
         try:
@@ -515,12 +509,7 @@ async def _personaje_impl(
             missing_enchants,
             missing_gems,
             uwu_icc_kills=uwu_icc_kills,
-        )
-        _append_gs_by_spec_field(
-            embed_final,
-            active_specs + inactive_specs,
-            gs_by_spec,
-            active_specs,
+            spec_gs_value=_format_spec_gs_value(spec_gs_entries),
         )
         set_external_cache(
             "command_personaje",
@@ -543,9 +532,7 @@ async def _personaje_impl(
                 missing_enchants,
                 missing_gems,
                 uwu_icc_kills,
-                active_specs,
-                inactive_specs,
-                gs_by_spec,
+                spec_gs_entries,
             ),
             {"character": nombre_char, "command": command_name},
         )
