@@ -41,10 +41,21 @@ def _collect_names_from_file(file_path: str) -> list[str]:
 
 def _collect_names_from_uwu(server: str, limit: int, best_only: bool) -> list[str]:
     names = set()
+    total_queries = len(UWU_PDPS_BOSS_ORDER) * len(UWU_MODES_ALL) * 10 * 3
+    query_idx = 0
+    seed_start = time.time()
+    print(
+        "[INFO] Seed UwU iniciado "
+        f"(consultas={total_queries}, best_only={best_only}, limit={limit})"
+    )
+
     for boss in UWU_PDPS_BOSS_ORDER:
+        boss_start = time.time()
+        print(f"[UWU] Boss: {boss}")
         for mode in UWU_MODES_ALL:
             for class_i in range(10):
                 for spec_i in (1, 2, 3):
+                    query_idx += 1
                     rows = _fetch_uwu_top(
                         server,
                         boss,
@@ -61,6 +72,33 @@ def _collect_names_from_uwu(server: str, limit: int, best_only: bool) -> list[st
                         row_name = str(row[3] or "").strip()
                         if row_name:
                             names.add(_normalize_name(row_name))
+
+                    if query_idx % 40 == 0 or query_idx == total_queries:
+                        elapsed = max(time.time() - seed_start, 0.001)
+                        qps = query_idx / elapsed
+                        remaining = max(total_queries - query_idx, 0)
+                        eta_sec = int(remaining / qps) if qps > 0 else 0
+                        pct = (query_idx / total_queries) * 100 if total_queries else 100
+                        print(
+                            "[UWU] "
+                            f"{query_idx}/{total_queries} ({pct:.1f}%) | "
+                            f"nombres={len(names)} | eta={eta_sec}s"
+                        )
+
+            print(
+                f"[UWU] Boss {boss} mode {mode} listo | "
+                f"nombres={len(names)}"
+            )
+
+        print(
+            f"[UWU] Boss {boss} finalizado en "
+            f"{int(time.time() - boss_start)}s | nombres={len(names)}"
+        )
+
+    print(
+        f"[INFO] Seed UwU finalizado en {int(time.time() - seed_start)}s "
+        f"| nombres_unicos={len(names)}"
+    )
     return sorted(names)
 
 
@@ -201,9 +239,18 @@ def main():
     ok = 0
     skipped = 0
     stored_specs = 0
+    run_start = time.time()
 
     for idx, nombre in enumerate(names, start=1):
-        print(f"[{idx}/{len(names)}] {nombre}...")
+        elapsed = max(time.time() - run_start, 0.001)
+        speed = (idx - 1) / elapsed if idx > 1 else 0
+        remaining = max(len(names) - (idx - 1), 0)
+        eta_sec = int(remaining / speed) if speed > 0 else 0
+        pct = (idx / len(names)) * 100 if names else 100
+        print(
+            f"[{idx}/{len(names)}] ({pct:.1f}%) {nombre} "
+            f"| ok={ok} skip={skipped} specs={stored_specs} | eta={eta_sec}s"
+        )
         payload = _calculate_character_gs(nombre, args.server)
         if not payload:
             skipped += 1
@@ -225,6 +272,7 @@ def main():
     print(f"  Personajes OK: {ok}")
     print(f"  Personajes omitidos: {skipped}")
     print(f"  Specs guardadas: {stored_specs}")
+    print(f"  Duración total: {int(time.time() - run_start)}s")
 
 
 if __name__ == "__main__":

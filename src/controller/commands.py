@@ -38,7 +38,7 @@ def _build_personaje_cache_key(nombre: str) -> str:
 
 
 def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
-    return f"command:dps:{nombre.strip().lower()}:{(spec or '').strip().lower()}"
+    return f"command:dps:v2:{nombre.strip().lower()}:{(spec or '').strip().lower()}"
 
 
 def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:

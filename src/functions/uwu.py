@@ -68,13 +68,13 @@ def _fetch_uwu_top(
     spec_i: int,
     best_only: bool = True,
 ):
-    cache_key = ("v3", server, boss, mode, class_i, spec_i, best_only)
+    cache_key = ("v4", server, boss, mode, class_i, spec_i, best_only)
     cached = _cache_get(UWU_TOP_CACHE, cache_key, UWU_TOP_TTL)
     if cached is not None:
         return cached
 
     persistent_cache_key = (
-        f"uwu:top:{server}:{boss}:{mode}:{class_i}:{spec_i}:{int(best_only)}"
+        f"uwu:v4:top:{server}:{boss}:{mode}:{class_i}:{spec_i}:{int(best_only)}"
     )
     cached = get_external_cache("uwu_top", persistent_cache_key, UWU_TOP_TTL)
     if cached is not None:
@@ -88,7 +88,7 @@ def _fetch_uwu_top(
         "class_i": class_i,
         "spec_i": spec_i,
         "sort_by": "head-useful-dps",
-        "limit": 1000,
+        "limit": "1000",
         "best_only": best_only,
         "externals": True,
     }
