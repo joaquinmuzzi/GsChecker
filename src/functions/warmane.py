@@ -146,7 +146,7 @@ def _summary_from_profile_html(nombre: str, server: str):
             k: (" ".join(v.split()) if isinstance(v, str) else v)
             for k, v in match.groupdict().items()
         }
-        if data.get("server", "").lower() != target_server:
+        if data.get("server", "").lower() != target_server_lower:
             continue
         if data.get("name", "").lower() != nombre.lower():
             continue

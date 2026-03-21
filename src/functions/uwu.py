@@ -100,6 +100,37 @@ def _uwu_profiles(nombre: str, server: str):
     return profiles
 
 
+def _discover_uwu_spec_class_pairs(nombre: str, server: str, boss_names, modes):
+    lower_name = nombre.lower()
+    discovered_pairs = []
+    seen = set()
+
+    for boss_name in boss_names:
+        for mode in modes:
+            for class_i in range(10):
+                for spec_i in (1, 2, 3):
+                    top_rows = _fetch_uwu_top(server, boss_name, mode, class_i, spec_i)
+                    if not isinstance(top_rows, list):
+                        continue
+                    has_player = any(
+                        isinstance(row, list)
+                        and len(row) > 3
+                        and str(row[3]).lower() == lower_name
+                        and _uwu_row_dps(row) is not None
+                        for row in top_rows
+                    )
+                    if not has_player:
+                        continue
+                    pair = (spec_i, class_i)
+                    if pair not in seen:
+                        seen.add(pair)
+                        discovered_pairs.append(pair)
+            if discovered_pairs:
+                return discovered_pairs
+
+    return discovered_pairs
+
+
 def _pick_uwu_spec(nombre: str, server: str):
     payloads = []
     for spec_i in (1, 2, 3):
@@ -140,35 +171,12 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
     probe_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
 
     if not probe_pairs:
-        probe_targets = (
-            ("Lord Marrowgar", "10H"),
-            ("Lord Marrowgar", "25N"),
-            ("Lord Marrowgar", "25H"),
-            ("Lady Deathwhisper", "10H"),
-            ("Lady Deathwhisper", "25N"),
-            ("Lady Deathwhisper", "25H"),
+        probe_pairs = _discover_uwu_spec_class_pairs(
+            nombre,
+            server,
+            ["Lord Marrowgar", "Lady Deathwhisper"],
+            ("10H", "25N", "25H"),
         )
-        discovered_pairs = []
-        for full_boss_name, mode in probe_targets:
-            if discovered_pairs:
-                break
-            for class_i in range(10):
-                for spec_i in (1, 2, 3):
-                    top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
-                    if not isinstance(top_rows, list):
-                        continue
-                    has_player = any(
-                        isinstance(row, list)
-                        and len(row) > 3
-                        and str(row[3]).lower() == lower_name
-                        and _uwu_row_dps(row) is not None
-                        for row in top_rows
-                    )
-                    if has_player:
-                        discovered_pairs.append((spec_i, class_i))
-                if discovered_pairs:
-                    break
-        probe_pairs = discovered_pairs
 
     for short_name, full_boss_name in target.items():
         for mode in modes:
@@ -204,22 +212,7 @@ def _build_uwu_dps_summary(
         return cached
 
     profiles = _uwu_profiles(nombre, server)
-    spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles] or [
-        (-1, -1)
-    ]
-
-    if spec_filter:
-        kw = spec_filter.strip().lower()
-        allowed_spec_ids = UWU_SPEC_KEYWORDS.get(kw)
-        if allowed_spec_ids:
-            filtered = [(s, c) for s, c in spec_class_pairs if s in allowed_spec_ids]
-            if filtered:
-                spec_class_pairs = filtered
-            elif profiles:
-                class_i_fallback = profiles[0][1]
-                spec_class_pairs = [(s, class_i_fallback) for s in allowed_spec_ids]
-            else:
-                spec_class_pairs = [(s, -1) for s in allowed_spec_ids]
+    spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
 
     if selected_bosses:
         boss_names = [
@@ -234,6 +227,31 @@ def _build_uwu_dps_summary(
         if not bosses:
             bosses = {boss_name: {} for boss_name in UWU_BOSS_SHORT}
         boss_names = sorted(bosses.keys(), key=lambda x: UWU_BOSS_SHORT.get(x, x))
+
+    if not spec_class_pairs:
+        discovered_pairs = _discover_uwu_spec_class_pairs(
+            nombre,
+            server,
+            boss_names,
+            ("10H", "25N", "10N", "25H"),
+        )
+        if discovered_pairs:
+            spec_class_pairs = discovered_pairs
+        else:
+            spec_class_pairs = [(-1, -1)]
+
+    if spec_filter:
+        kw = spec_filter.strip().lower()
+        allowed_spec_ids = UWU_SPEC_KEYWORDS.get(kw)
+        if allowed_spec_ids:
+            filtered = [(s, c) for s, c in spec_class_pairs if s in allowed_spec_ids]
+            if filtered:
+                spec_class_pairs = filtered
+            elif profiles:
+                class_i_fallback = profiles[0][1]
+                spec_class_pairs = [(s, class_i_fallback) for s in allowed_spec_ids]
+            else:
+                spec_class_pairs = [(s, -1) for s in allowed_spec_ids]
 
     rows = []
     lower_name = nombre.lower()
