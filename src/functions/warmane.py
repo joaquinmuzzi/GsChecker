@@ -44,7 +44,7 @@ def _summary_from_profile_html(nombre: str, server: str):
 
     exact_name_pattern = re.compile(
         rf"\b{re.escape(nombre)}\b\s+"
-        r"(?:(?P<guild>.*?)\s+)?"
+        r"(?:\[(?P<guild_bracket>[^\]]{1,80})\]\s+|(?P<guild_plain>[A-Za-zÀ-ÿ0-9'&\- ]{2,80})\s+)?"
         r"Level\s+(?P<level>\d+)\s+"
         r"(?P<race>[A-Za-zÀ-ÿ'\- ]+?)\s+"
         r"(?P<class>[A-Za-zÀ-ÿ'\- ]+?),\s*"
@@ -60,12 +60,14 @@ def _summary_from_profile_html(nombre: str, server: str):
         if data.get("server", "").lower() != target_server:
             continue
 
+        guild_name = (data.get("guild_bracket") or data.get("guild_plain") or "").strip()
+
         return {
             "name": nombre,
             "level": int(data.get("level") or 0),
             "race": data.get("race") or "N/A",
             "class": data.get("class") or "N/A",
-            "guild": (data.get("guild") or "").strip() or "Sin guild",
+            "guild": guild_name or "Sin guild",
             "gearScore": "N/A",
         }
 
