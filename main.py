@@ -152,6 +152,7 @@ UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
     "prot": [2],
     "protection": [2],
     "ret": [3],
+    "retri": [3],
     "retribution": [3],
     # Hunter
     "bm": [1],
