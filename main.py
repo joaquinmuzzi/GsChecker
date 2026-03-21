@@ -1096,7 +1096,15 @@ def _build_personaje_embed(
 # Crear el bot
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+
+class GsCheckerBot(commands.Bot):
+    async def setup_hook(self):
+        synced = await self.tree.sync()
+        print(f"✅ Slash commands sincronizados: {len(synced)}")
+
+
+bot = GsCheckerBot(command_prefix=PREFIX, intents=intents)
 
 
 @bot.event
@@ -1104,19 +1112,43 @@ async def on_ready():
     print(f"✅ Bot conectado como {bot.user}")
 
 
-@bot.command()
-async def ping(ctx):
-    await ctx.send(f"Pong! Latencia: {round(bot.latency * 1000)}ms")
+@bot.tree.command(name="ping", description="Muestra la latencia actual del bot.")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        f"Pong! Latencia: {round(bot.latency * 1000)}ms"
+    )
 
 
-@bot.command(aliases=["p"])
-async def personaje(ctx, nombre: str):
+@bot.tree.command(
+    name="personaje",
+    description="Muestra información del personaje desde la API de Warmane.",
+)
+@discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
+async def personaje(interaction: discord.Interaction, nombre: str):
+    await _personaje_impl(interaction, nombre, "personaje")
+
+
+@bot.tree.command(
+    name="p",
+    description="Alias corto de /personaje para consultar un personaje.",
+)
+@discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
+async def p(interaction: discord.Interaction, nombre: str):
+    await _personaje_impl(interaction, nombre, "p")
+
+
+async def _personaje_impl(
+    interaction: discord.Interaction, nombre: str, command_name: str
+):
     """Muestra información del personaje desde la API de Warmane."""
-    started_at = time.perf_counter()
-    print(f"[LOG] Comando 'personaje' usado por {ctx.author} para personaje: {nombre}")
+    server_name = interaction.guild.name if interaction.guild else "DM"
+    print(
+        f"[LOG] Comando '{command_name}' usado por {interaction.user} para personaje: {nombre} DESDE SERVIDOR: {server_name}"
+    )
     # Normalizar nombre: primera letra mayúscula
     nombre = nombre.capitalize()
-    progress_msg = await ctx.send(f"⏳ Calculando perfil de {nombre}...")
+    await interaction.response.send_message(f"⏳ Calculando perfil de {nombre}...")
+    progress_msg = await interaction.original_response()
     try:
         loop = asyncio.get_running_loop()
 
@@ -1286,21 +1318,28 @@ async def personaje(ctx, nombre: str):
 
     except Exception as e:
         await progress_msg.edit(content=f"❌ Error al obtener datos: {e}", embed=None)
-    finally:
-        elapsed = time.perf_counter() - started_at
-        print(f"[LOG] Comando 'personaje' finalizado en {elapsed:.2f}s")
 
 
-@bot.command()
-async def dps(ctx, nombre: str, spec: str | None = None):
+@bot.tree.command(
+    name="dps",
+    description="Muestra DPS máximo/promedio por boss desde UwU Logs.",
+)
+@discord.app_commands.describe(
+    nombre="Nombre del personaje en Lordaeron.",
+    spec="Filtro opcional por spec (ej: fury, udk, frost).",
+)
+async def dps(interaction: discord.Interaction, nombre: str, spec: str | None = None):
     """Muestra DPS max/avg por boss desde UwU Logs."""
-    started_at = time.perf_counter()
-    print(f"[LOG] Comando 'dps' usado por {ctx.author} para personaje: {nombre}")
+    server_name = interaction.guild.name if interaction.guild else "DM"
+    print(
+        f"[LOG] Comando 'dps' usado por {interaction.user} para personaje: {nombre} DESDE SERVIDOR: {server_name}"
+    )
     nombre = nombre.capitalize()
     spec_display = f" [{spec.upper()}]" if spec else ""
-    progress_msg = await ctx.send(
+    await interaction.response.send_message(
         f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos"
     )
+    progress_msg = await interaction.original_response()
     try:
         loop = asyncio.get_running_loop()
         uwu_dps_summary = await loop.run_in_executor(
@@ -1394,16 +1433,19 @@ async def dps(ctx, nombre: str, spec: str | None = None):
 
     except Exception as e:
         await progress_msg.edit(content=f"❌ Error al obtener DPS: {e}", embed=None)
-    finally:
-        elapsed = time.perf_counter() - started_at
-        print(f"[LOG] Comando 'dps' finalizado en {elapsed:.2f}s")
 
 
-@bot.command()
-async def ptoc(ctx, nombre: str):
+@bot.tree.command(
+    name="ptoc",
+    description="Muestra logros de Trial of the Crusader (TOC) en formato tabla.",
+)
+@discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
+async def ptoc(interaction: discord.Interaction, nombre: str):
     """Muestra logros de Trial of the Crusader (TOC) con formato de tabla."""
-    started_at = time.perf_counter()
-    print(f"[LOG] Comando 'ptoc' usado por {ctx.author} para personaje: {nombre}")
+    server_name = interaction.guild.name if interaction.guild else "DM"
+    print(
+        f"[LOG] Comando 'ptoc' usado por {interaction.user} para personaje: {nombre} DESDE SERVIDOR: {server_name}"
+    )
     nombre = nombre.capitalize()
     try:
         loop = asyncio.get_running_loop()
@@ -1452,13 +1494,13 @@ async def ptoc(ctx, nombre: str):
             inline=False,
         )
 
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
     except Exception as e:
-        await ctx.send(f"❌ Error al obtener datos: {e}")
-    finally:
-        elapsed = time.perf_counter() - started_at
-        print(f"[LOG] Comando 'ptoc' finalizado en {elapsed:.2f}s")
+        if interaction.response.is_done():
+            await interaction.followup.send(f"❌ Error al obtener datos: {e}")
+        else:
+            await interaction.response.send_message(f"❌ Error al obtener datos: {e}")
 
 
 bot.run(TOKEN)
