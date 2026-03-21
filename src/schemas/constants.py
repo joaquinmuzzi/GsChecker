@@ -1,5 +1,8 @@
 import requests
 from concurrent.futures import ThreadPoolExecutor
+from discord.ext import commands
+
+PREFIX = commands.when_mentioned
 
 HTTP_TIMEOUT = 8
 UWU_BASE = "https://uwu-logs.xyz"
