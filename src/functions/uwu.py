@@ -164,7 +164,9 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
         "Deathwhisper": "Lady Deathwhisper",
     }
     modes = ("10H", "25N", "25H")
-    result = {short_name: {mode: "❌" for mode in modes} for short_name in target}
+    result: dict[str, dict[str, str | None]] = {
+        short_name: {mode: None for mode in modes} for short_name in target
+    }
 
     profiles = _uwu_profiles(nombre, server)
     lower_name = nombre.lower()
@@ -207,13 +209,16 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
         )
 
     for short_name, full_boss_name in target.items():
+        any_mode_checked = False
         for mode in modes:
             found = character_mode_presence.get(short_name, {}).get(mode, False)
+            checked = found
             mode_pairs = list(probe_pairs)
             for spec_i, class_i in mode_pairs:
                 top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
                 if not isinstance(top_rows, list):
                     continue
+                checked = True
                 for row in top_rows:
                     if not isinstance(row, list) or len(row) < 6:
                         continue
@@ -240,6 +245,7 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
                     top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
                     if not isinstance(top_rows, list):
                         continue
+                    checked = True
                     for row in top_rows:
                         if not isinstance(row, list) or len(row) < 6:
                             continue
@@ -251,7 +257,13 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
                             break
                     if found:
                         break
-            result[short_name][mode] = "✅" if found else "❌"
+            any_mode_checked = any_mode_checked or checked
+            result[short_name][mode] = "✅" if found else ("❌" if checked else None)
+
+        if not any_mode_checked:
+            print(
+                f"[WARN] UwU ICC checks unavailable for '{nombre}'/{server} boss='{full_boss_name}'"
+            )
 
     _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
     return result

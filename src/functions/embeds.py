@@ -193,7 +193,11 @@ def _format_boss_rows(
 
             def special_cell(mode, _special=special):
                 value = _special.get(mode)
-                return value if value in {"✅", "❌"} else "❌"
+                if value in {"✅", "❌"}:
+                    return value
+                if value is None:
+                    return "?"
+                return "?"
 
             row["10H"] = special_cell("10H")
             row["25N"] = special_cell("25N")
