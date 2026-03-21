@@ -181,7 +181,8 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
     for short_name, full_boss_name in target.items():
         for mode in modes:
             found = False
-            for spec_i, class_i in probe_pairs:
+            mode_pairs = list(probe_pairs)
+            for spec_i, class_i in mode_pairs:
                 top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
                 if not isinstance(top_rows, list):
                     continue
@@ -196,6 +197,32 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
                         break
                 if found:
                     break
+
+            if not found:
+                discovered_mode_pairs = _discover_uwu_spec_class_pairs(
+                    nombre,
+                    server,
+                    [full_boss_name],
+                    (mode,),
+                )
+                for pair in discovered_mode_pairs:
+                    if pair not in probe_pairs:
+                        probe_pairs.append(pair)
+                for spec_i, class_i in discovered_mode_pairs:
+                    top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
+                    if not isinstance(top_rows, list):
+                        continue
+                    for row in top_rows:
+                        if not isinstance(row, list) or len(row) < 6:
+                            continue
+                        row_name = str(row[3]).lower() if len(row) > 3 else ""
+                        if row_name != lower_name:
+                            continue
+                        if _uwu_row_dps(row) is not None:
+                            found = True
+                            break
+                    if found:
+                        break
             result[short_name][mode] = "✅" if found else "❌"
 
     _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)

@@ -39,6 +39,59 @@ async def _safe_defer(interaction: discord.Interaction) -> None:
             raise
 
 
+def _http_retry_after(exc: discord.HTTPException) -> float:
+    retry_after = 0.0
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            header_val = response.headers.get("Retry-After")
+            if header_val:
+                retry_after = float(header_val)
+        except Exception:
+            retry_after = 0.0
+    return max(retry_after, 0.0)
+
+
+async def _safe_edit_original_response(
+    interaction: discord.Interaction, *, content=None, embed=None
+) -> None:
+    last_exc = None
+    for attempt in range(4):
+        try:
+            await interaction.edit_original_response(content=content, embed=embed)
+            return
+        except discord.HTTPException as exc:
+            if getattr(exc, "status", None) != 429:
+                raise
+            last_exc = exc
+            wait_for = _http_retry_after(exc) or min(2**attempt, 8)
+            print(f"[WARN] Discord rate limit on edit_original_response, retry in {wait_for:.2f}s")
+            await asyncio.sleep(wait_for)
+    if last_exc:
+        raise last_exc
+
+
+async def _safe_send_error(interaction: discord.Interaction, message: str) -> None:
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message)
+        else:
+            await interaction.response.send_message(message)
+    except discord.HTTPException as exc:
+        if getattr(exc, "status", None) != 429:
+            raise
+        wait_for = _http_retry_after(exc) or 3
+        print(f"[WARN] Discord rate limit on error message send, retry in {wait_for:.2f}s")
+        await asyncio.sleep(wait_for)
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(message)
+            else:
+                await interaction.response.send_message(message)
+        except Exception:
+            print("[WARN] Failed to send error message after retry.")
+
+
 async def _personaje_impl(
     interaction: discord.Interaction, nombre: str, command_name: str
 ):
@@ -50,7 +103,8 @@ async def _personaje_impl(
     try:
         nombre = nombre.capitalize()
         await _safe_defer(interaction)
-        await interaction.edit_original_response(
+        await _safe_edit_original_response(
+            interaction,
             content=f"⏳ Calculando perfil de {nombre}...", embed=None
         )
 
@@ -77,13 +131,15 @@ async def _personaje_impl(
         )
 
         if isinstance(summary, dict) and summary.get("__error__"):
-            await interaction.edit_original_response(
+            await _safe_edit_original_response(
+                interaction,
                 content=summary["__error__"], embed=None
             )
             return
 
         if not isinstance(summary, dict):
-            await interaction.edit_original_response(
+            await _safe_edit_original_response(
+                interaction,
                 content="⚠️ Formato inesperado en 'summary'. Revisa la consola.",
                 embed=None,
             )
@@ -160,11 +216,11 @@ async def _personaje_impl(
             uwu_icc_kills=None,
             loading_symbol=LOADING_FRAMES[0],
         )
-        await interaction.edit_original_response(content=None, embed=embed_initial)
+        await _safe_edit_original_response(interaction, content=None, embed=embed_initial)
 
         frame_idx = 1
         while not uwu_icc_task.done():
-            await asyncio.sleep(0.8)
+            await asyncio.sleep(2.0)
             if uwu_icc_task.done():
                 break
             embed_loading = _build_personaje_embed(
@@ -187,7 +243,7 @@ async def _personaje_impl(
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
             )
             frame_idx += 1
-            await interaction.edit_original_response(content=None, embed=embed_loading)
+            await _safe_edit_original_response(interaction, content=None, embed=embed_loading)
 
         try:
             uwu_icc_kills = await uwu_icc_task
@@ -212,15 +268,12 @@ async def _personaje_impl(
             missing_gems,
             uwu_icc_kills=uwu_icc_kills,
         )
-        await interaction.edit_original_response(content=None, embed=embed_final)
+        await _safe_edit_original_response(interaction, content=None, embed=embed_final)
 
     except discord.NotFound:
         return
     except Exception as e:
-        if interaction.response.is_done():
-            await interaction.followup.send(f"❌ Error al obtener datos: {e}")
-        else:
-            await interaction.response.send_message(f"❌ Error al obtener datos: {e}")
+        await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
 
 
 def register_commands(bot):
@@ -266,7 +319,8 @@ def register_commands(bot):
             nombre = nombre.capitalize()
             spec_display = f" [{spec.upper()}]" if spec else ""
             await _safe_defer(interaction)
-            await interaction.edit_original_response(
+            await _safe_edit_original_response(
+                interaction,
                 content=f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos",
                 embed=None,
             )
@@ -282,14 +336,16 @@ def register_commands(bot):
             )
 
             if not isinstance(uwu_dps_summary, dict):
-                await interaction.edit_original_response(
+                await _safe_edit_original_response(
+                    interaction,
                     content="⚠️ No se pudo leer respuesta de UwU Logs.", embed=None
                 )
                 return
 
             uwu_rows = uwu_dps_summary.get("rows", [])
             if not uwu_rows:
-                await interaction.edit_original_response(
+                await _safe_edit_original_response(
+                    interaction,
                     content=f"⚠️ No hay datos DPS en UwU Logs para {nombre}.",
                     embed=None,
                 )
@@ -360,15 +416,12 @@ def register_commands(bot):
                 value=DOCS_NOTAS_URL,
                 inline=True,
             )
-            await interaction.edit_original_response(content=None, embed=embed)
+            await _safe_edit_original_response(interaction, content=None, embed=embed)
 
         except discord.NotFound:
             return
         except Exception as e:
-            if interaction.response.is_done():
-                await interaction.followup.send(f"❌ Error al obtener DPS: {e}")
-            else:
-                await interaction.response.send_message(f"❌ Error al obtener DPS: {e}")
+            await _safe_send_error(interaction, f"❌ Error al obtener DPS: {e}")
 
     @bot.tree.command(
         name="ptoc",
@@ -429,14 +482,9 @@ def register_commands(bot):
                 inline=False,
             )
 
-            await interaction.edit_original_response(content=None, embed=embed)
+            await _safe_edit_original_response(interaction, content=None, embed=embed)
 
         except discord.NotFound:
             return
         except Exception as e:
-            if interaction.response.is_done():
-                await interaction.followup.send(f"❌ Error al obtener datos: {e}")
-            else:
-                await interaction.response.send_message(
-                    f"❌ Error al obtener datos: {e}"
-                )
+            await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")

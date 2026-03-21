@@ -173,12 +173,16 @@ def _format_boss_rows(
     bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, loading_symbol="?"
 ):
     rows = []
+    uwu_dependent_bosses = {"Marrowgar", "Deathwhisper"}
+    if isinstance(uwu_icc_kills, dict):
+        uwu_dependent_bosses.update(uwu_icc_kills.keys())
+
     for name in bosses_10.keys():
         c10 = bosses_10[name]
         c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
         row = {"Boss": name}
         row["10N"] = _cell(c10["nm"])
-        if name in ("Marrowgar", "Deathwhisper"):
+        if name in uwu_dependent_bosses:
             if uwu_icc_kills is None:
                 row["10H"] = loading_symbol
                 row["25N"] = loading_symbol
