@@ -137,10 +137,43 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
     profiles = _uwu_profiles(nombre, server)
     lower_name = nombre.lower()
 
+    probe_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
+
+    if not probe_pairs:
+        probe_targets = (
+            ("Lord Marrowgar", "10H"),
+            ("Lord Marrowgar", "25N"),
+            ("Lord Marrowgar", "25H"),
+            ("Lady Deathwhisper", "10H"),
+            ("Lady Deathwhisper", "25N"),
+            ("Lady Deathwhisper", "25H"),
+        )
+        discovered_pairs = []
+        for full_boss_name, mode in probe_targets:
+            if discovered_pairs:
+                break
+            for class_i in range(10):
+                for spec_i in (1, 2, 3):
+                    top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
+                    if not isinstance(top_rows, list):
+                        continue
+                    has_player = any(
+                        isinstance(row, list)
+                        and len(row) > 3
+                        and str(row[3]).lower() == lower_name
+                        and _uwu_row_dps(row) is not None
+                        for row in top_rows
+                    )
+                    if has_player:
+                        discovered_pairs.append((spec_i, class_i))
+                if discovered_pairs:
+                    break
+        probe_pairs = discovered_pairs
+
     for short_name, full_boss_name in target.items():
         for mode in modes:
             found = False
-            for spec_i, class_i, _ in profiles:
+            for spec_i, class_i in probe_pairs:
                 top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
                 if not isinstance(top_rows, list):
                     continue
