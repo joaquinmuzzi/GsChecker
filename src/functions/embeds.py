@@ -255,7 +255,7 @@ def _build_personaje_embed(
     spec_gs_value: str | None = None,
 ):
     embed = discord.Embed(title=nombre_char, color=0x2B2D31)
-    embed.add_field(name="GearScore", value=spec_gs_value or str(gs), inline=True)
+    embed.add_field(name="Spec | GS", value=spec_gs_value or str(gs), inline=True)
     embed.add_field(
         name="Level | Race | Class",
         value=f"{nivel} {raza} {clase}",
