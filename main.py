@@ -279,50 +279,12 @@ def _fetch_summary(nombre: str, server: str):
     if cached is not None:
         return cached
 
-    url_summary = f"https://armory.warmane.com/api/character/{nombre}/{server}/summary"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "application/json,text/plain,*/*",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        "Referer": f"https://armory.warmane.com/character/{nombre}/{server}",
-    }
-
-    transient_statuses = {403, 429, 500, 502, 503, 504}
-    resp_summary = None
-
-    for attempt in range(3):
-        try:
-            resp_summary = SESSION.get(
-                url_summary, headers=headers, timeout=HTTP_TIMEOUT
-            )
-        except Exception:
-            resp_summary = None
-
-        if resp_summary is not None and resp_summary.status_code == 200:
-            break
-
-        if attempt < 2:
-            status_code = resp_summary.status_code if resp_summary is not None else None
-            if status_code is None or status_code in transient_statuses:
-                time.sleep(0.8 * (2**attempt))
-
-    if resp_summary is not None and resp_summary.status_code == 200:
-        try:
-            summary = resp_summary.json()
-        except Exception as e:
-            return {"__error__": f"⚠️ Error al leer JSON de Warmane: {e}"}
+    summary = _summary_from_profile_html(nombre, server)
+    if summary is not None:
         _cache_set(SUMMARY_CACHE, cache_key, summary)
         return summary
 
-    fallback_summary = _summary_from_profile_html(nombre, server)
-    if fallback_summary is not None:
-        _cache_set(SUMMARY_CACHE, cache_key, fallback_summary)
-        return fallback_summary
-
-    status = resp_summary.status_code if resp_summary is not None else "sin respuesta"
-    return {
-        "__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Inténtelo de vuelta en unos segundos ({status})"
-    }
+    return {"__error__": f"⚠️ No se encontró el personaje '{nombre}' en {server}."}
 
 
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
