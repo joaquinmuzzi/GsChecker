@@ -40,60 +40,95 @@ def _summary_from_profile_html(nombre: str, server: str):
     soup = BeautifulSoup(resp.text, "html.parser")
     page_text = soup.get_text(" ", strip=True)
 
-    target_server = (server or "").strip().lower()
+    target_server = (server or "").strip()
+    target_server_lower = target_server.lower()
     target_name = (nombre or "").strip()
-    lower_text = page_text.lower()
     lower_name = target_name.lower()
 
-    guild_name = "Sin guild"
-    summary_name = target_name
+    character_sheet = soup.select_one("#character-sheet")
+    if character_sheet:
+        guild_name = "Sin guild"
 
+        guild_link = character_sheet.select_one(
+            ".information .information-left .name .guild-name a"
+        )
+        if guild_link:
+            guild_text = guild_link.get_text(" ", strip=True)
+            if guild_text:
+                guild_name = " ".join(guild_text.split())
+
+        name_node = character_sheet.select_one(".information .information-left .name")
+        parsed_name = target_name
+        if name_node:
+            for span in name_node.select(".guild-name"):
+                span.extract()
+            raw_name = name_node.get_text(" ", strip=True)
+            if raw_name:
+                parsed_name = " ".join(raw_name.split())
+
+        level_node = character_sheet.select_one(
+            ".information .information-left .level-race-class"
+        )
+        if level_node:
+            level_text = " ".join(level_node.get_text(" ", strip=True).split())
+            level_pattern = re.compile(
+                r"Level\s+(?P<level>\d+)\s+(?P<race>.+?)\s+(?P<class>[^,]+),\s*(?P<server>.+)$",
+                re.IGNORECASE,
+            )
+            level_match = level_pattern.search(level_text)
+            if level_match:
+                level_data = {
+                    key: " ".join(value.split())
+                    for key, value in level_match.groupdict().items()
+                }
+                if level_data.get("server", "").lower() == target_server_lower:
+                    return {
+                        "name": parsed_name or target_name,
+                        "level": int(level_data.get("level") or 0),
+                        "race": level_data.get("race") or "N/A",
+                        "class": level_data.get("class") or "N/A",
+                        "guild": guild_name,
+                        "gearScore": "N/A",
+                    }
+
+    guild_name = "Sin guild"
     for anchor in soup.find_all("a", href=True):
         href = str(anchor.get("href") or "")
-        if "/guild/" not in href or "/summary/" not in href:
+        href_lower = href.lower()
+        if "/guild/" not in href_lower or "/summary/" not in href_lower:
             continue
-        if f"/{target_server}/" not in href.lower():
+        if f"/{target_server_lower}/" not in href_lower:
             continue
-        if f"/summary/{lower_name}" not in href.lower():
+        if f"/summary/{lower_name}" not in href_lower:
             continue
-
         text = anchor.get_text(" ", strip=True)
         if text:
             guild_name = " ".join(text.split())
         break
 
-    header_pattern = re.compile(
+    strict_pattern = re.compile(
+        rf"\b{re.escape(target_name)}\b\s+"
+        r"(?:\[(?P<guild_bracket>[^\]]{1,80})\]\s+|(?P<guild_plain>[A-Za-zÀ-ÿ0-9'&\- ]{2,80})\s+)?"
         r"Level\s+(?P<level>\d+)\s+"
         r"(?P<race>[A-Za-zÀ-ÿ'\- ]+?)\s+"
         r"(?P<class>[A-Za-zÀ-ÿ'\- ]+?),\s*"
-        r"(?P<server>[A-Za-zÀ-ÿ'\-]+)",
+        rf"{re.escape(target_server)}\b",
         re.IGNORECASE,
     )
 
-    for match in header_pattern.finditer(page_text):
+    match = strict_pattern.search(page_text)
+    if match:
         data = {
             k: (" ".join(v.split()) if isinstance(v, str) else v)
             for k, v in match.groupdict().items()
         }
-        if data.get("server", "").lower() != target_server:
-            continue
-
-        start = match.start()
-        window_start = max(0, start - 200)
-        left_window = page_text[window_start:start]
-        left_window_lower = left_window.lower()
-
-        idx = left_window_lower.rfind(lower_name)
-        if idx == -1:
-            continue
-
-        summary_name = left_window[idx : idx + len(target_name)]
+        parsed_guild = (data.get("guild_bracket") or data.get("guild_plain") or "").strip()
         return {
-            "name": summary_name or target_name,
+            "name": target_name,
             "level": int(data.get("level") or 0),
             "race": data.get("race") or "N/A",
             "class": data.get("class") or "N/A",
-            "guild": guild_name,
+            "guild": parsed_guild or guild_name,
             "gearScore": "N/A",
         }
 
@@ -125,16 +160,71 @@ def _summary_from_profile_html(nombre: str, server: str):
             "gearScore": "N/A",
         }
 
+    page_title = soup.title.get_text(" ", strip=True) if soup.title else ""
+    not_found_hint = "Character does not exist" in page_text
+    print(
+        f"[WARN] summary scrape miss for '{nombre}'/{server} "
+        f"(status=200, character_sheet={'yes' if character_sheet else 'no'}, "
+        f"title='{page_title}', not_found_hint={not_found_hint})"
+    )
     return None
 
 
+def _summary_from_api(nombre: str, server: str):
+    api_url = f"https://armory.warmane.com/api/character/{nombre}/{server}/summary"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json,text/plain,*/*",
+        "Referer": "https://armory.warmane.com/",
+    }
+    try:
+        resp = SESSION.get(api_url, headers=headers, timeout=HTTP_TIMEOUT)
+    except Exception:
+        return None
+
+    if resp.status_code != 200:
+        return None
+
+    try:
+        payload = resp.json()
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("error"):
+        return None
+
+    server_name = str(payload.get("realmName") or payload.get("realm") or "").strip()
+    if server_name and server_name.lower() != (server or "").strip().lower():
+        return None
+
+    char_name = str(payload.get("name") or "").strip()
+    if not char_name:
+        return None
+
+    return {
+        "name": char_name,
+        "level": int(payload.get("level") or 0),
+        "race": payload.get("race") or "N/A",
+        "class": payload.get("class") or "N/A",
+        "guild": payload.get("guild") or "Sin guild",
+        "gearScore": payload.get("gearScore") or "N/A",
+    }
+
+
 def _fetch_summary(nombre: str, server: str):
-    cache_key = (nombre, server)
+    nombre = (nombre or "").strip()
+    server = (server or "").strip()
+    cache_key = (nombre.lower(), server.lower())
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
     if cached is not None:
         return cached
 
     summary = _summary_from_profile_html(nombre, server)
+    if summary is None:
+        print(f"[WARN] Falling back to API summary for '{nombre}'/{server}")
+        summary = _summary_from_api(nombre, server)
     if summary is not None:
         _cache_set(SUMMARY_CACHE, cache_key, summary)
         return summary
@@ -210,12 +300,23 @@ def _fetch_achievements(nombre: str, server: str):
             return []
         soup = BeautifulSoup(achi_json["content"], "html.parser")
         all_achievements = soup.find_all("div", class_="achievement")
-        completed_achievements = [
-            ach for ach in all_achievements if "locked" not in ach.get("class", [])
-        ]
+        completed_achievements = []
+        for ach in all_achievements:
+            classes = ach.get("class") or []
+            if isinstance(classes, str):
+                class_list = classes.split()
+            elif isinstance(classes, list):
+                class_list = [str(value) for value in classes]
+            else:
+                class_list = []
+            if "locked" not in class_list:
+                completed_achievements.append(ach)
         ids = []
         for ach_div in completed_achievements:
-            ach_id_full = ach_div.get("id", "")
+            ach_id_raw = ach_div.get("id")
+            if isinstance(ach_id_raw, list):
+                ach_id_raw = ach_id_raw[0] if ach_id_raw else ""
+            ach_id_full = str(ach_id_raw or "")
             if ach_id_full.startswith("ach"):
                 ids.append(ach_id_full.replace("ach", ""))
         return ids
@@ -314,7 +415,14 @@ def _fetch_toc_achievements(nombre: str, server: str):
             key = target_titles.get(title)
             if not key:
                 continue
-            achieved = "locked" not in ach_div.get("class", [])
+            classes = ach_div.get("class") or []
+            if isinstance(classes, str):
+                class_list = classes.split()
+            elif isinstance(classes, list):
+                class_list = [str(value) for value in classes]
+            else:
+                class_list = []
+            achieved = "locked" not in class_list
             payload[key] = achieved
 
     _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
