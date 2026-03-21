@@ -20,6 +20,13 @@ from src.schemas.constants import (
 from src.functions.cache import _cache_get, _cache_set
 
 
+def _cache_get_stale(cache: dict, key):
+    entry = cache.get(key)
+    if not entry:
+        return None
+    return entry[1]
+
+
 def _warmane_get_with_scheme_fallback(path: str, headers: dict):
     last_status = None
     last_error = None
@@ -35,6 +42,34 @@ def _warmane_get_with_scheme_fallback(path: str, headers: dict):
             return resp
     print(
         f"[WARN] Warmane request failed for path='{path}' "
+        f"(last_status={last_status}, last_error={last_error})"
+    )
+    return None
+
+
+def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict):
+    last_status = None
+    last_error = None
+    for _ in range(2):
+        for scheme in ("https", "http"):
+            url = f"{scheme}://armory.warmane.com{path}"
+            try:
+                resp = SESSION.post(url, headers=headers, data=data, timeout=HTTP_TIMEOUT)
+            except Exception as exc:
+                last_error = str(exc)
+                continue
+            last_status = resp.status_code
+            if resp.status_code != 200:
+                continue
+            try:
+                payload = resp.json()
+            except Exception as exc:
+                last_error = f"json error: {exc}"
+                continue
+            if isinstance(payload, dict):
+                return payload
+    print(
+        f"[WARN] Warmane POST request failed for path='{path}' "
         f"(last_status={last_status}, last_error={last_error})"
     )
     return None
@@ -298,15 +333,12 @@ def _fetch_achievements(nombre: str, server: str):
     halion_25h_achieved = False
 
     def fetch_category(category_id: int):
-        url = f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
-        resp_achi = SESSION.post(
-            url, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT
+        achi_json = _warmane_post_json_with_scheme_fallback(
+            f"/character/{nombre}/{server}/achievements",
+            headers,
+            {"category": category_id},
         )
-        if resp_achi.status_code != 200:
-            return []
-        try:
-            achi_json = resp_achi.json()
-        except Exception:
+        if not isinstance(achi_json, dict):
             return []
         if "content" not in achi_json:
             return []
@@ -383,9 +415,7 @@ def _fetch_toc_achievements(nombre: str, server: str):
         return cached
 
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    url_achi_post = (
-        f"https://armory.warmane.com/character/{nombre}/{server}/achievements"
-    )
+    achi_path = f"/character/{nombre}/{server}/achievements"
 
     target_titles = {
         "Call of the Crusade (10 player)": "toc_10n",
@@ -402,17 +432,12 @@ def _fetch_toc_achievements(nombre: str, server: str):
     }
 
     for category_id in [15001, 15002]:
-        resp_achi = SESSION.post(
-            url_achi_post,
+        achi_json = _warmane_post_json_with_scheme_fallback(
+            achi_path,
             headers=headers,
             data={"category": category_id},
-            timeout=HTTP_TIMEOUT,
         )
-        if resp_achi.status_code != 200:
-            continue
-        try:
-            achi_json = resp_achi.json()
-        except Exception:
+        if not isinstance(achi_json, dict):
             continue
         content = achi_json.get("content", "")
         if not content:
@@ -457,17 +482,29 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
     if cached is not None:
         return cached
 
-    url_stats = f"https://armory.warmane.com/character/{nombre}/{server}/statistics"
+    stats_path = f"/character/{nombre}/{server}/statistics"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    resp = SESSION.post(
-        url_stats, headers=headers, data={"category": category_id}, timeout=HTTP_TIMEOUT
+    js = _warmane_post_json_with_scheme_fallback(
+        stats_path,
+        headers,
+        {"category": category_id},
     )
-    if resp.status_code != 200:
+    if not isinstance(js, dict):
+        stale = _cache_get_stale(STATS_CACHE, cache_key)
+        if stale is not None:
+            print(
+                f"[WARN] Using stale statistics cache for '{nombre}'/{server} category={category_id}"
+            )
+            return stale
         return []
-    try:
-        js = resp.json()
-        content = js.get("content", "")
-    except Exception:
+    content = js.get("content", "")
+    if not content:
+        stale = _cache_get_stale(STATS_CACHE, cache_key)
+        if stale is not None:
+            print(
+                f"[WARN] Empty statistics content, using stale cache for '{nombre}'/{server} category={category_id}"
+            )
+            return stale
         return []
 
     soup = BeautifulSoup(content, "html.parser")
@@ -476,6 +513,14 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
         tds = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
         if tds:
             rows.append(tds)
+
+    if not rows:
+        stale = _cache_get_stale(STATS_CACHE, cache_key)
+        if stale is not None:
+            print(
+                f"[WARN] No statistics rows parsed, using stale cache for '{nombre}'/{server} category={category_id}"
+            )
+            return stale
 
     _cache_set(STATS_CACHE, cache_key, rows)
     return rows

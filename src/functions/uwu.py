@@ -2,6 +2,7 @@ from src.schemas.constants import (
     SESSION,
     HTTP_TIMEOUT,
     UWU_BASE,
+    UWU_BOSS_MODE,
     UWU_BOSS_SHORT,
     UWU_MODES_ALL,
     UWU_SPEC_KEYWORDS,
@@ -153,7 +154,7 @@ def _pick_uwu_spec(nombre: str, server: str):
 
 
 def _uwu_icc_bugfix_kills(nombre: str, server: str):
-    cache_key = (nombre.lower(), server)
+    cache_key = ("v2", nombre.lower(), server)
     cached = _cache_get(UWU_ICC_KILLS_CACHE, cache_key, UWU_ICC_KILLS_TTL)
     if cached is not None:
         return cached
@@ -168,6 +169,33 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
     profiles = _uwu_profiles(nombre, server)
     lower_name = nombre.lower()
 
+    character_mode_presence = {
+        short_name: {mode: False for mode in modes} for short_name in target
+    }
+    for spec_i in (1, 2, 3):
+        data = _fetch_uwu_character(nombre, server, spec_i)
+        if not isinstance(data, dict) or data.get("__error__"):
+            continue
+        profile_name = str(data.get("name") or "")
+        if profile_name.startswith("Unknown-"):
+            continue
+        bosses = data.get("bosses")
+        if not isinstance(bosses, dict):
+            continue
+        for short_name, full_boss_name in target.items():
+            boss_info = bosses.get(full_boss_name)
+            if not isinstance(boss_info, dict) or not boss_info:
+                continue
+            has_report = any(
+                boss_info.get(key)
+                for key in ("report_id", "raid_id", "raids", "dps_max")
+            )
+            if not has_report:
+                continue
+            default_mode = UWU_BOSS_MODE.get(full_boss_name)
+            if default_mode in character_mode_presence[short_name]:
+                character_mode_presence[short_name][default_mode] = True
+
     probe_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
 
     if not probe_pairs:
@@ -180,7 +208,7 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
 
     for short_name, full_boss_name in target.items():
         for mode in modes:
-            found = False
+            found = character_mode_presence.get(short_name, {}).get(mode, False)
             mode_pairs = list(probe_pairs)
             for spec_i, class_i in mode_pairs:
                 top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
