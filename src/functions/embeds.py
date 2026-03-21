@@ -264,7 +264,7 @@ def _build_personaje_embed(
     embed.add_field(name="Spec", value=spec_display, inline=True)
     embed.add_field(name="Guild", value=guild_display, inline=True)
     if spec_gs_value:
-        embed.add_field(name="GearScores", value=spec_gs_value, inline=True)
+        embed.add_field(name="GearScore", value=spec_gs_value, inline=True)
     embed.add_field(
         name="Armory",
         value=f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile",

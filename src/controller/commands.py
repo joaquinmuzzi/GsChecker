@@ -91,13 +91,41 @@ def _build_spec_gs_entries(
 
 
 def _format_spec_gs_value(spec_gs_entries: list[dict]) -> str:
+    label_map = {
+        "Retribution": "retri",
+        "Protection": "prot",
+        "Holy": "holy",
+        "Feral Combat": "feral",
+        "Balance": "balance",
+        "Restoration": "resto",
+        "Discipline": "disc",
+        "Shadow": "shadow",
+        "Affliction": "affli",
+        "Demonology": "demo",
+        "Destruction": "destro",
+        "Marksmanship": "mm",
+        "Beast Mastery": "bm",
+        "Survival": "sv",
+        "Assassination": "assa",
+        "Combat": "combat",
+        "Subtlety": "sub",
+        "Arcane": "arcane",
+        "Fire": "fire",
+        "Frost": "frost",
+        "Arms": "arms",
+        "Fury": "fury",
+        "Blood": "blood",
+        "Unholy": "unholy",
+        "Elemental": "ele",
+        "Enhancement": "enh",
+    }
     lines = []
     for entry in spec_gs_entries:
         name = str(entry.get("name") or "").strip()
         if not name:
             continue
-        suffix = "(Main)" if entry.get("main") else "(Off-spec)"
-        lines.append(f"{name} {suffix}:\n{entry.get('gearscore', '?')}")
+        label = label_map.get(name, name.lower())
+        lines.append(f"{label}: {entry.get('gearscore', '?')}")
     return "\n".join(lines) if lines else "?"
 
 
