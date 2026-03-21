@@ -40,7 +40,36 @@ def _summary_from_profile_html(nombre: str, server: str):
     soup = BeautifulSoup(resp.text, "html.parser")
     page_text = soup.get_text(" ", strip=True)
 
-    pattern = re.compile(
+    target_server = (server or "").strip().lower()
+
+    exact_name_pattern = re.compile(
+        rf"\b{re.escape(nombre)}\b\s+"
+        r"(?:(?P<guild>.*?)\s+)?"
+        r"Level\s+(?P<level>\d+)\s+"
+        r"(?P<race>[A-Za-zÀ-ÿ'\- ]+?)\s+"
+        r"(?P<class>[A-Za-zÀ-ÿ'\- ]+?),\s*"
+        r"(?P<server>[A-Za-zÀ-ÿ'\-]+)",
+        re.IGNORECASE,
+    )
+
+    for match in exact_name_pattern.finditer(page_text):
+        data = {
+            k: (" ".join(v.split()) if isinstance(v, str) else v)
+            for k, v in match.groupdict().items()
+        }
+        if data.get("server", "").lower() != target_server:
+            continue
+
+        return {
+            "name": nombre,
+            "level": int(data.get("level") or 0),
+            "race": data.get("race") or "N/A",
+            "class": data.get("class") or "N/A",
+            "guild": (data.get("guild") or "").strip() or "Sin guild",
+            "gearScore": "N/A",
+        }
+
+    legacy_pattern = re.compile(
         r"(?P<name>[A-Za-zÀ-ÿ'\- ]+)\s+"
         r"(?:\[(?P<guild>[^\]]+)\]\s+)?"
         r"Level\s+(?P<level>\d+)\s+"
@@ -49,10 +78,9 @@ def _summary_from_profile_html(nombre: str, server: str):
         r"(?P<server>[A-Za-zÀ-ÿ'\-]+)"
     )
 
-    target_server = (server or "").strip().lower()
-    for match in pattern.finditer(page_text):
+    for match in legacy_pattern.finditer(page_text):
         data = {
-            k: (v.strip() if isinstance(v, str) else v)
+            k: (" ".join(v.split()) if isinstance(v, str) else v)
             for k, v in match.groupdict().items()
         }
         if data.get("server", "").lower() != target_server:
