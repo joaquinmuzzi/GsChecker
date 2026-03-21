@@ -258,7 +258,7 @@ def _build_personaje_embed(
     embed.add_field(name="GearScore", value=spec_gs_value or str(gs), inline=True)
     embed.add_field(
         name="Level | Race | Class",
-        value=f"Level {nivel} {raza} {clase}",
+        value=f"{nivel} {raza} {clase}",
         inline=True,
     )
     embed.add_field(name="Guild", value=guild_display, inline=True)
