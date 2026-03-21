@@ -98,7 +98,7 @@ async def _personaje_impl(
     server_name = interaction.guild.name if interaction.guild else "DM"
     print(
         f"[LOG] Comando '{command_name}' usado por {interaction.user} "
-        f"para personaje: {nombre} DESDE SERVIDOR: {server_name}"
+        f"para personaje: {nombre} desde servidor: {server_name}"
     )
     try:
         nombre = nombre.capitalize()
@@ -326,10 +326,31 @@ def register_commands(bot):
             )
 
             loop = asyncio.get_running_loop()
+
+            summary = await loop.run_in_executor(
+                EXECUTOR, _fetch_summary, nombre, "Lordaeron"
+            )
+            if isinstance(summary, dict) and summary.get("__error__"):
+                await _safe_edit_original_response(
+                    interaction,
+                    content=summary["__error__"],
+                    embed=None,
+                )
+                return
+            if not isinstance(summary, dict):
+                await _safe_edit_original_response(
+                    interaction,
+                    content="⚠️ No se pudo validar el personaje en Armory.",
+                    embed=None,
+                )
+                return
+
+            nombre_char = str(summary.get("name") or nombre)
+
             uwu_dps_summary = await loop.run_in_executor(
                 EXECUTOR,
                 _build_uwu_dps_summary,
-                nombre,
+                nombre_char,
                 UWU_SERVER,
                 UWU_PDPS_BOSS_ORDER,
                 spec,
@@ -346,7 +367,7 @@ def register_commands(bot):
             if not uwu_rows:
                 await _safe_edit_original_response(
                     interaction,
-                    content=f"⚠️ No hay datos DPS en UwU Logs para {nombre}.",
+                    content=f"⚠️ No hay datos DPS en UwU Logs para {nombre_char}.",
                     embed=None,
                 )
                 return
@@ -407,7 +428,7 @@ def register_commands(bot):
                 )
 
             embed = discord.Embed(
-                title=f"{nombre} - Uwulogs DPS{spec_display}",
+                title=f"{nombre_char} - Uwulogs DPS{spec_display}",
                 description=table_block + warning_note,
                 color=0x2B2D31,
             )

@@ -42,8 +42,15 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
     return payload
 
 
-def _fetch_uwu_top(server: str, boss: str, mode: str, class_i: int, spec_i: int):
-    cache_key = ("v2", server, boss, mode, class_i, spec_i)
+def _fetch_uwu_top(
+    server: str,
+    boss: str,
+    mode: str,
+    class_i: int,
+    spec_i: int,
+    best_only: bool = True,
+):
+    cache_key = ("v3", server, boss, mode, class_i, spec_i, best_only)
     cached = _cache_get(UWU_TOP_CACHE, cache_key, UWU_TOP_TTL)
     if cached is not None:
         return cached
@@ -56,7 +63,7 @@ def _fetch_uwu_top(server: str, boss: str, mode: str, class_i: int, spec_i: int)
         "spec_i": spec_i,
         "sort_by": "head-useful-dps",
         "limit": 1000,
-        "best_only": True,
+        "best_only": best_only,
         "externals": True,
     }
     try:
@@ -329,7 +336,14 @@ def _build_uwu_dps_summary(
             player_rows = []
             any_fetch_ok = False
             for spec_i, class_i in spec_class_pairs:
-                top_rows = _fetch_uwu_top(server, boss_name, mode, class_i, spec_i)
+                top_rows = _fetch_uwu_top(
+                    server,
+                    boss_name,
+                    mode,
+                    class_i,
+                    spec_i,
+                    best_only=False,
+                )
                 if not isinstance(top_rows, list):
                     continue
                 any_fetch_ok = True
