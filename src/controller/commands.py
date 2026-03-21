@@ -37,10 +37,14 @@ async def _personaje_impl(
         f"[LOG] Comando '{command_name}' usado por {interaction.user} "
         f"para personaje: {nombre} DESDE SERVIDOR: {server_name}"
     )
-    nombre = nombre.capitalize()
-    await interaction.response.send_message(f"⏳ Calculando perfil de {nombre}...")
-    progress_msg = await interaction.original_response()
     try:
+        nombre = nombre.capitalize()
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True)
+        await interaction.edit_original_response(
+            content=f"⏳ Calculando perfil de {nombre}...", embed=None
+        )
+
         loop = asyncio.get_running_loop()
 
         uwu_icc_task = loop.run_in_executor(
@@ -64,11 +68,13 @@ async def _personaje_impl(
         )
 
         if isinstance(summary, dict) and summary.get("__error__"):
-            await progress_msg.edit(content=summary["__error__"], embed=None)
+            await interaction.edit_original_response(
+                content=summary["__error__"], embed=None
+            )
             return
 
         if not isinstance(summary, dict):
-            await progress_msg.edit(
+            await interaction.edit_original_response(
                 content="⚠️ Formato inesperado en 'summary'. Revisa la consola.",
                 embed=None,
             )
@@ -145,7 +151,7 @@ async def _personaje_impl(
             uwu_icc_kills=None,
             loading_symbol=LOADING_FRAMES[0],
         )
-        await progress_msg.edit(content=None, embed=embed_initial)
+        await interaction.edit_original_response(content=None, embed=embed_initial)
 
         frame_idx = 1
         while not uwu_icc_task.done():
@@ -172,7 +178,7 @@ async def _personaje_impl(
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
             )
             frame_idx += 1
-            await progress_msg.edit(content=None, embed=embed_loading)
+            await interaction.edit_original_response(content=None, embed=embed_loading)
 
         try:
             uwu_icc_kills = await uwu_icc_task
@@ -197,10 +203,15 @@ async def _personaje_impl(
             missing_gems,
             uwu_icc_kills=uwu_icc_kills,
         )
-        await progress_msg.edit(content=None, embed=embed_final)
+        await interaction.edit_original_response(content=None, embed=embed_final)
 
+    except discord.NotFound:
+        return
     except Exception as e:
-        await progress_msg.edit(content=f"❌ Error al obtener datos: {e}", embed=None)
+        if interaction.response.is_done():
+            await interaction.followup.send(f"❌ Error al obtener datos: {e}")
+        else:
+            await interaction.response.send_message(f"❌ Error al obtener datos: {e}")
 
 
 def register_commands(bot):
@@ -242,13 +253,16 @@ def register_commands(bot):
             f"[LOG] Comando 'dps' usado por {interaction.user} "
             f"para personaje: {nombre} DESDE SERVIDOR: {server_name}"
         )
-        nombre = nombre.capitalize()
-        spec_display = f" [{spec.upper()}]" if spec else ""
-        await interaction.response.send_message(
-            f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos"
-        )
-        progress_msg = await interaction.original_response()
         try:
+            nombre = nombre.capitalize()
+            spec_display = f" [{spec.upper()}]" if spec else ""
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True)
+            await interaction.edit_original_response(
+                content=f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos",
+                embed=None,
+            )
+
             loop = asyncio.get_running_loop()
             uwu_dps_summary = await loop.run_in_executor(
                 EXECUTOR,
@@ -260,14 +274,14 @@ def register_commands(bot):
             )
 
             if not isinstance(uwu_dps_summary, dict):
-                await progress_msg.edit(
+                await interaction.edit_original_response(
                     content="⚠️ No se pudo leer respuesta de UwU Logs.", embed=None
                 )
                 return
 
             uwu_rows = uwu_dps_summary.get("rows", [])
             if not uwu_rows:
-                await progress_msg.edit(
+                await interaction.edit_original_response(
                     content=f"⚠️ No hay datos DPS en UwU Logs para {nombre}.",
                     embed=None,
                 )
@@ -338,10 +352,15 @@ def register_commands(bot):
                 value=DOCS_NOTAS_URL,
                 inline=True,
             )
-            await progress_msg.edit(content=None, embed=embed)
+            await interaction.edit_original_response(content=None, embed=embed)
 
+        except discord.NotFound:
+            return
         except Exception as e:
-            await progress_msg.edit(content=f"❌ Error al obtener DPS: {e}", embed=None)
+            if interaction.response.is_done():
+                await interaction.followup.send(f"❌ Error al obtener DPS: {e}")
+            else:
+                await interaction.response.send_message(f"❌ Error al obtener DPS: {e}")
 
     @bot.tree.command(
         name="ptoc",
@@ -354,8 +373,11 @@ def register_commands(bot):
             f"[LOG] Comando 'ptoc' usado por {interaction.user} "
             f"para personaje: {nombre} DESDE SERVIDOR: {server_name}"
         )
-        nombre = nombre.capitalize()
         try:
+            nombre = nombre.capitalize()
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=True)
+
             loop = asyncio.get_running_loop()
             toc_payload = await loop.run_in_executor(
                 EXECUTOR, _fetch_toc_achievements, nombre, "Lordaeron"
@@ -400,8 +422,10 @@ def register_commands(bot):
                 inline=False,
             )
 
-            await interaction.response.send_message(embed=embed)
+            await interaction.edit_original_response(content=None, embed=embed)
 
+        except discord.NotFound:
+            return
         except Exception as e:
             if interaction.response.is_done():
                 await interaction.followup.send(f"❌ Error al obtener datos: {e}")
