@@ -20,8 +20,28 @@ from src.schemas.constants import (
 from src.functions.cache import _cache_get, _cache_set
 
 
+def _warmane_get_with_scheme_fallback(path: str, headers: dict):
+    last_status = None
+    last_error = None
+    for scheme in ("https", "http"):
+        url = f"{scheme}://armory.warmane.com{path}"
+        try:
+            resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+        last_status = resp.status_code
+        if resp.status_code == 200:
+            return resp
+    print(
+        f"[WARN] Warmane request failed for path='{path}' "
+        f"(last_status={last_status}, last_error={last_error})"
+    )
+    return None
+
+
 def _summary_from_profile_html(nombre: str, server: str):
-    profile_url = f"https://armory.warmane.com/character/{nombre}/{server}/profile"
+    profile_path = f"/character/{nombre}/{server}/profile"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -29,12 +49,8 @@ def _summary_from_profile_html(nombre: str, server: str):
         "Referer": "https://armory.warmane.com/",
     }
 
-    try:
-        resp = SESSION.get(profile_url, headers=headers, timeout=HTTP_TIMEOUT)
-    except Exception:
-        return None
-
-    if resp.status_code != 200:
+    resp = _warmane_get_with_scheme_fallback(profile_path, headers)
+    if resp is None:
         return None
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -171,18 +187,14 @@ def _summary_from_profile_html(nombre: str, server: str):
 
 
 def _summary_from_api(nombre: str, server: str):
-    api_url = f"https://armory.warmane.com/api/character/{nombre}/{server}/summary"
+    api_path = f"/api/character/{nombre}/{server}/summary"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "application/json,text/plain,*/*",
         "Referer": "https://armory.warmane.com/",
     }
-    try:
-        resp = SESSION.get(api_url, headers=headers, timeout=HTTP_TIMEOUT)
-    except Exception:
-        return None
-
-    if resp.status_code != 200:
+    resp = _warmane_get_with_scheme_fallback(api_path, headers)
+    if resp is None:
         return None
 
     try:
