@@ -6,6 +6,7 @@ import sys
 import atexit
 import time
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
 import unicodedata
 from bs4 import BeautifulSoup
@@ -145,6 +146,7 @@ UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
     # Warrior
     "arms": [1],
     "fury": [2],
+    "prot": [3],
     # Paladin
     "holy": [1],
     "prot": [2],
@@ -218,6 +220,58 @@ def _cache_set(cache: dict, key, value):
     cache[key] = (time.time(), value)
 
 
+def _summary_from_profile_html(nombre: str, server: str):
+    profile_url = f"https://armory.warmane.com/character/{nombre}/{server}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Referer": "https://armory.warmane.com/",
+    }
+
+    try:
+        resp = SESSION.get(profile_url, headers=headers, timeout=HTTP_TIMEOUT)
+    except Exception:
+        return None
+
+    if resp.status_code != 200:
+        return None
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    page_text = soup.get_text(" ", strip=True)
+
+    pattern = re.compile(
+        r"(?P<name>[A-Za-zÀ-ÿ'\- ]+)\s+"
+        r"(?:\[(?P<guild>[^\]]+)\]\s+)?"
+        r"Level\s+(?P<level>\d+)\s+"
+        r"(?P<race>[A-Za-zÀ-ÿ'\- ]+?)\s+"
+        r"(?P<class>[A-Za-zÀ-ÿ'\- ]+?),\s*"
+        r"(?P<server>[A-Za-zÀ-ÿ'\-]+)"
+    )
+
+    target_server = (server or "").strip().lower()
+    for match in pattern.finditer(page_text):
+        data = {
+            k: (v.strip() if isinstance(v, str) else v)
+            for k, v in match.groupdict().items()
+        }
+        if data.get("server", "").lower() != target_server:
+            continue
+        if data.get("name", "").lower() != nombre.lower():
+            continue
+
+        return {
+            "name": data.get("name") or nombre,
+            "level": int(data.get("level") or 0),
+            "race": data.get("race") or "N/A",
+            "class": data.get("class") or "N/A",
+            "guild": data.get("guild") or "Sin guild",
+            "gearScore": "N/A",
+        }
+
+    return None
+
+
 def _fetch_summary(nombre: str, server: str):
     cache_key = (nombre, server)
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
@@ -225,18 +279,49 @@ def _fetch_summary(nombre: str, server: str):
         return cached
 
     url_summary = f"https://armory.warmane.com/api/character/{nombre}/{server}/summary"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    resp_summary = SESSION.get(url_summary, headers=headers, timeout=HTTP_TIMEOUT)
-    if resp_summary.status_code != 200:
-        return {
-            "__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Inténtelo de vuelta en unos segundos ({resp_summary.status_code})"
-        }
-    try:
-        summary = resp_summary.json()
-    except Exception as e:
-        return {"__error__": f"⚠️ Error al leer JSON de Warmane: {e}"}
-    _cache_set(SUMMARY_CACHE, cache_key, summary)
-    return summary
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json,text/plain,*/*",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Referer": f"https://armory.warmane.com/character/{nombre}/{server}",
+    }
+
+    transient_statuses = {403, 429, 500, 502, 503, 504}
+    resp_summary = None
+
+    for attempt in range(3):
+        try:
+            resp_summary = SESSION.get(
+                url_summary, headers=headers, timeout=HTTP_TIMEOUT
+            )
+        except Exception:
+            resp_summary = None
+
+        if resp_summary is not None and resp_summary.status_code == 200:
+            break
+
+        if attempt < 2:
+            status_code = resp_summary.status_code if resp_summary is not None else None
+            if status_code is None or status_code in transient_statuses:
+                time.sleep(0.8 * (2**attempt))
+
+    if resp_summary is not None and resp_summary.status_code == 200:
+        try:
+            summary = resp_summary.json()
+        except Exception as e:
+            return {"__error__": f"⚠️ Error al leer JSON de Warmane: {e}"}
+        _cache_set(SUMMARY_CACHE, cache_key, summary)
+        return summary
+
+    fallback_summary = _summary_from_profile_html(nombre, server)
+    if fallback_summary is not None:
+        _cache_set(SUMMARY_CACHE, cache_key, fallback_summary)
+        return fallback_summary
+
+    status = resp_summary.status_code if resp_summary is not None else "sin respuesta"
+    return {
+        "__error__": f"⚠️ No se pudo acceder a la API de Warmane (summary). Inténtelo de vuelta en unos segundos ({status})"
+    }
 
 
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
