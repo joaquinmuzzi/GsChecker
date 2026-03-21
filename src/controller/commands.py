@@ -364,6 +364,7 @@ def register_commands(bot):
                 return
 
             uwu_rows = uwu_dps_summary.get("rows", [])
+            failed_by_mode = uwu_dps_summary.get("failed_by_mode", {})
             if not uwu_rows:
                 await _safe_edit_original_response(
                     interaction,
@@ -427,9 +428,23 @@ def register_commands(bot):
                     f"{' con esa spec' if spec else ''} en UwU Logs."
                 )
 
+            failed_parts = []
+            if isinstance(failed_by_mode, dict):
+                for mode in UWU_MODES_ALL:
+                    value = failed_by_mode.get(mode, 0)
+                    if isinstance(value, int) and value > 0:
+                        failed_parts.append(f"{mode}:{value}")
+            failed_note = ""
+            if failed_parts:
+                failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
+                print(
+                    f"[WARN] UwU consultas fallidas para {nombre_char}: "
+                    + " | ".join(failed_parts)
+                )
+
             embed = discord.Embed(
                 title=f"{nombre_char} - Uwulogs DPS{spec_display}",
-                description=table_block + warning_note,
+                description=table_block + warning_note + failed_note,
                 color=0x2B2D31,
             )
             embed.add_field(

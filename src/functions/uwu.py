@@ -66,21 +66,28 @@ def _fetch_uwu_top(
         "best_only": best_only,
         "externals": True,
     }
-    try:
-        resp = SESSION.post(f"{UWU_BASE}/top", json=payload, timeout=HTTP_TIMEOUT)
-    except Exception as e:
-        return {"__error__": f"uwu top error: {e}"}
+    last_error = None
+    for _ in range(2):
+        try:
+            resp = SESSION.post(f"{UWU_BASE}/top", json=payload, timeout=HTTP_TIMEOUT)
+        except Exception as e:
+            last_error = f"uwu top error: {e}"
+            continue
 
-    if resp.status_code != 200:
-        return {"__error__": f"uwu top status: {resp.status_code}"}
+        if resp.status_code != 200:
+            last_error = f"uwu top status: {resp.status_code}"
+            continue
 
-    try:
-        rows = resp.json()
-    except Exception as e:
-        return {"__error__": f"uwu top json error: {e}"}
+        try:
+            rows = resp.json()
+        except Exception as e:
+            last_error = f"uwu top json error: {e}"
+            continue
 
-    _cache_set(UWU_TOP_CACHE, cache_key, rows)
-    return rows
+        _cache_set(UWU_TOP_CACHE, cache_key, rows)
+        return rows
+
+    return {"__error__": last_error or "uwu top unknown error"}
 
 
 def _uwu_row_dps(entry):
@@ -133,8 +140,6 @@ def _discover_uwu_spec_class_pairs(nombre: str, server: str, boss_names, modes):
                     if pair not in seen:
                         seen.add(pair)
                         discovered_pairs.append(pair)
-            if discovered_pairs:
-                return discovered_pairs
 
     return discovered_pairs
 
@@ -329,6 +334,7 @@ def _build_uwu_dps_summary(
 
     rows = []
     lower_name = nombre.lower()
+    failed_by_mode = {mode: 0 for mode in UWU_MODES_ALL}
 
     for boss_name in boss_names:
         boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
@@ -345,6 +351,7 @@ def _build_uwu_dps_summary(
                     best_only=False,
                 )
                 if not isinstance(top_rows, list):
+                    failed_by_mode[mode] += 1
                     continue
                 any_fetch_ok = True
                 for row in top_rows:
@@ -400,10 +407,11 @@ def _build_uwu_dps_summary(
         payload = {
             "rows": [],
             "__error__": "No hay datos de uwu-logs para el personaje.",
+            "failed_by_mode": failed_by_mode,
         }
         _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
         return payload
 
-    payload = {"rows": rows, "spec_i": "all"}
+    payload = {"rows": rows, "spec_i": "all", "failed_by_mode": failed_by_mode}
     _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
     return payload
