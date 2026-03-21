@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidad – GsChecker</title>
+  <style>
+    :root {
+      --bg: #1a1b1e;
+      --surface: #25262b;
+      --surface2: #2c2e33;
+      --border: #373a40;
+      --accent: #5865f2;
+      --accent2: #7289da;
+      --gold: #f0b232;
+      --green: #57f287;
+      --red: #ed4245;
+      --text: #dcddde;
+      --muted: #8b8fa8;
+      --code-bg: #111214;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #23244a 0%, #1a1b1e 60%);
+      border-bottom: 1px solid var(--border);
+      padding: 48px 24px 36px;
+      text-align: center;
+    }
+    header .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    header h1 span { color: var(--accent2); }
+    header p {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 540px;
+      margin-inline: auto;
+    }
+
+    /* ── LAYOUT ── */
+    .page {
+      display: grid;
+      grid-template-columns: 1fr;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      gap: 0;
+    }
+
+    /* ── MAIN ── */
+    main {
+      padding: 48px 64px 64px;
+    }
+
+    section {
+      margin-bottom: 48px;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--accent2);
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 12px;
+      line-height: 1.75;
+    }
+
+    ul {
+      padding-left: 24px;
+      margin-bottom: 12px;
+      line-height: 1.9;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    strong {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* ── BUTTON ── */
+    .btn-back {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 24px;
+      transition: background 0.2s;
+    }
+    .btn-back:hover {
+      background: var(--accent2);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover {
+      color: var(--accent2);
+    }
+
+    @media (max-width: 1024px) {
+      main { padding: 32px 28px 64px; }
+    }
+
+    @media (max-width: 700px) {
+      body { font-size: 14px; }
+      h2 { font-size: 1.3rem; }
+      h3 { font-size: 1rem; }
+      main { padding: 24px 18px 56px; }
+      section { margin-bottom: 36px; }
+      header { padding: 38px 18px 28px; }
+      header h1 { font-size: 2rem; }
+      footer { padding: 24px 14px; }
+    }
+
+    @media (max-width: 420px) {
+      header h1 { font-size: 1.75rem; }
+      .badge { font-size: 10px; }
+      main { padding: 18px 14px 44px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Política de Privacidad</div>
+  <h1>Gs<span>Checker</span></h1>
+  <p>Protección de tu información personal</p>
+</header>
+
+<div class="page">
+  <!-- MAIN -->
+  <main>
+    <a href="index.html" class="btn-back">← Volver al Manual</a>
+
+    <section>
+      <h2>Política de Privacidad</h2>
+      <p>
+        Esta Política de Privacidad rige la recopilación, uso y divulgación de información personal 
+        por <strong>GsChecker</strong>, un bot de Discord desarrollado por 
+        <strong>Muzzi Joaquín</strong>. Al usar <strong>GsChecker</strong>, aceptas los términos 
+        de esta Política de Privacidad.
+      </p>
+    </section>
+
+    <section>
+      <h3>Información que recopilamos</h3>
+      <p>
+        Recopilamos información que proporcionas a través del uso del bot, como tu ID de usuario de Discord 
+        y nombre de usuario, información del servidor y canal, y contenido de mensajes. También podemos 
+        recopilar datos de uso, como la frecuencia y duración de tu uso del bot.
+      </p>
+    </section>
+
+    <section>
+      <h3>Cómo usamos tu información</h3>
+      <p>
+        Utilizamos tu información para operar y mejorar <strong>GsChecker</strong>, incluyendo proporcionar 
+        soporte y responder a tus solicitudes. También podemos usar tu información para desarrollar nuevas 
+        funciones o servicios, realizar investigaciones y análisis, y cumplir con obligaciones legales.
+      </p>
+    </section>
+
+    <section>
+      <h3>Intercambio de tu información</h3>
+      <p>
+        No vendemos ni compartimos tu información personal con terceros. Sin embargo, podemos revelar tu 
+        información en respuesta a procesos legales o solicitudes de una agencia de cumplimiento de la ley 
+        o autoridad reguladora.
+      </p>
+    </section>
+
+    <section>
+      <h3>Retención de datos</h3>
+      <p>
+        Retenemos tu información durante el tiempo necesario para proporcionar los servicios de 
+        <strong>GsChecker</strong> o según lo requerido por la ley. Eliminaremos tu información 
+        previa solicitud tuya o cuando ya no sea necesaria.
+      </p>
+    </section>
+
+    <section>
+      <h3>Seguridad de datos</h3>
+      <p>
+        Tomamos medidas razonables para proteger tu información contra acceso, alteración o destrucción no 
+        autorizados. Sin embargo, ninguna medida de seguridad es perfecta y no podemos garantizar la 
+        seguridad de tu información.
+      </p>
+    </section>
+
+    <section>
+      <h3>Cambios en esta política</h3>
+      <p>
+        Podemos actualizar esta Política de Privacidad de vez en cuando, y publicaremos la política 
+        actualizada en nuestro sitio web. Tu uso continuado de <strong>GsChecker</strong> después de que 
+        realizamos cambios en esta política indica tu aceptación de la política revisada.
+      </p>
+    </section>
+
+    <section>
+      <h3>Contáctanos</h3>
+      <p>
+        Si tienes preguntas o inquietudes sobre esta Política de Privacidad, ponte en contacto 
+        con el desarrollador del bot.
+      </p>
+    </section>
+
+    <section>
+      <h3>Fecha efectiva</h3>
+      <p>
+        Esta Política de Privacidad es efectiva a partir del 21 de marzo de 2026.
+      </p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <span>GsChecker · Warmane Lordaeron</span>
+  <a href="index.html">← Volver al Manual</a>
+  <a href="terms-of-service.html">Términos de Servicio</a>
+  <a href="https://github.com/joaquinmuzzi/GsChecker" target="_blank">GitHub</a>
+</footer>
+
+</body>
+</html>
