@@ -29,6 +29,16 @@ from src.functions.embeds import (
 )
 
 
+async def _safe_defer(interaction: discord.Interaction) -> None:
+    if interaction.response.is_done():
+        return
+    try:
+        await interaction.response.defer(thinking=True)
+    except discord.HTTPException as exc:
+        if getattr(exc, "code", None) != 40060:
+            raise
+
+
 async def _personaje_impl(
     interaction: discord.Interaction, nombre: str, command_name: str
 ):
@@ -39,8 +49,7 @@ async def _personaje_impl(
     )
     try:
         nombre = nombre.capitalize()
-        if not interaction.response.is_done():
-            await interaction.response.defer(thinking=True)
+        await _safe_defer(interaction)
         await interaction.edit_original_response(
             content=f"⏳ Calculando perfil de {nombre}...", embed=None
         )
@@ -256,8 +265,7 @@ def register_commands(bot):
         try:
             nombre = nombre.capitalize()
             spec_display = f" [{spec.upper()}]" if spec else ""
-            if not interaction.response.is_done():
-                await interaction.response.defer(thinking=True)
+            await _safe_defer(interaction)
             await interaction.edit_original_response(
                 content=f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos",
                 embed=None,
@@ -375,8 +383,7 @@ def register_commands(bot):
         )
         try:
             nombre = nombre.capitalize()
-            if not interaction.response.is_done():
-                await interaction.response.defer(thinking=True)
+            await _safe_defer(interaction)
 
             loop = asyncio.get_running_loop()
             toc_payload = await loop.run_in_executor(
