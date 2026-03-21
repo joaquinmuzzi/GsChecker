@@ -6,6 +6,7 @@ import gearscore
 import profile_scraper
 from src.db.postgres import get_external_cache, set_external_cache
 from src.schemas.constants import (
+    CHARACTER_SPEC_GS_TTL,
     COMMAND_DPS_TTL,
     COMMAND_PERSONAJE_TTL,
     EXECUTOR,
@@ -40,6 +41,57 @@ def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
     return f"command:dps:{nombre.strip().lower()}:{(spec or '').strip().lower()}"
 
 
+def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:
+    return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
+
+
+def _get_known_gs_by_spec(nombre: str, spec_names: list[str], current_gs=None, active_specs=None):
+    active_specs = set(active_specs or [])
+    result = {}
+    seen = set()
+    for spec_name in spec_names:
+        clean_name = str(spec_name or "").strip()
+        if not clean_name or clean_name == "N/A" or clean_name in seen:
+            continue
+        seen.add(clean_name)
+        if clean_name in active_specs and current_gs not in {None, "N/A"}:
+            result[clean_name] = current_gs
+            continue
+        cached = get_external_cache(
+            "character_spec_gs",
+            _build_character_spec_gs_key(nombre, clean_name),
+            CHARACTER_SPEC_GS_TTL,
+        )
+        if isinstance(cached, dict) and cached.get("gs") not in {None, "N/A"}:
+            result[clean_name] = cached.get("gs")
+    return result
+
+
+def _append_gs_by_spec_field(
+    embed: discord.Embed,
+    spec_names: list[str],
+    gs_by_spec: dict,
+    active_specs: list[str] | None = None,
+):
+    active_spec_names = set(active_specs or [])
+    lines = []
+    seen = set()
+    for spec_name in spec_names:
+        clean_name = str(spec_name or "").strip()
+        if not clean_name or clean_name == "N/A" or clean_name in seen:
+            continue
+        seen.add(clean_name)
+        label = f"{clean_name} *" if clean_name in active_spec_names else clean_name
+        value = gs_by_spec.get(clean_name, "?")
+        lines.append(f"{label}: {value}")
+    if lines:
+        embed.add_field(
+            name="GearScore por spec",
+            value="```\n" + "\n".join(lines) + "\n```",
+            inline=False,
+        )
+
+
 def _serialize_personaje_payload(
     nombre_char,
     gs,
@@ -57,6 +109,9 @@ def _serialize_personaje_payload(
     missing_enchants,
     missing_gems,
     uwu_icc_kills,
+    active_specs,
+    inactive_specs,
+    gs_by_spec,
 ):
     return {
         "nombre_char": nombre_char,
@@ -75,11 +130,14 @@ def _serialize_personaje_payload(
         "missing_enchants": missing_enchants,
         "missing_gems": missing_gems,
         "uwu_icc_kills": uwu_icc_kills,
+        "active_specs": active_specs,
+        "inactive_specs": inactive_specs,
+        "gs_by_spec": gs_by_spec,
     }
 
 
 def _build_personaje_embed_from_cache(payload: dict):
-    return _build_personaje_embed(
+    embed = _build_personaje_embed(
         payload["nombre_char"],
         payload["gs"],
         payload["nivel"],
@@ -97,6 +155,13 @@ def _build_personaje_embed_from_cache(payload: dict):
         payload["missing_gems"],
         payload.get("uwu_icc_kills"),
     )
+    _append_gs_by_spec_field(
+        embed,
+        payload.get("active_specs", []) + payload.get("inactive_specs", []),
+        payload.get("gs_by_spec", {}),
+        payload.get("active_specs", []),
+    )
+    return embed
 
 
 def _build_dps_embed_from_cache(payload: dict):
@@ -337,6 +402,25 @@ async def _personaje_impl(
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
 
+        for active_spec in active_specs:
+            clean_active_spec = str(active_spec or "").strip()
+            if not clean_active_spec or clean_active_spec == "N/A":
+                continue
+            set_external_cache(
+                "character_spec_gs",
+                "/personaje",
+                _build_character_spec_gs_key(nombre_char, clean_active_spec),
+                {"character": nombre_char, "spec": clean_active_spec, "gs": gs},
+                {"character": nombre_char, "spec": clean_active_spec},
+            )
+
+        gs_by_spec = _get_known_gs_by_spec(
+            nombre_char,
+            active_specs + inactive_specs,
+            gs,
+            active_specs,
+        )
+
         halion_10n_achieved = achi_payload["halion_10n_achieved"]
         halion_10h_achieved = achi_payload["halion_10h_achieved"]
         halion_25n_achieved = achi_payload["halion_25n_achieved"]
@@ -368,6 +452,12 @@ async def _personaje_impl(
             uwu_icc_kills=None,
             loading_symbol=LOADING_FRAMES[0],
         )
+        _append_gs_by_spec_field(
+            embed_initial,
+            active_specs + inactive_specs,
+            gs_by_spec,
+            active_specs,
+        )
         await _safe_edit_original_response(interaction, content=None, embed=embed_initial)
 
         frame_idx = 1
@@ -395,6 +485,12 @@ async def _personaje_impl(
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
             )
             frame_idx += 1
+            _append_gs_by_spec_field(
+                embed_loading,
+                active_specs + inactive_specs,
+                gs_by_spec,
+                active_specs,
+            )
             await _safe_edit_original_response(interaction, content=None, embed=embed_loading)
 
         try:
@@ -420,6 +516,12 @@ async def _personaje_impl(
             missing_gems,
             uwu_icc_kills=uwu_icc_kills,
         )
+        _append_gs_by_spec_field(
+            embed_final,
+            active_specs + inactive_specs,
+            gs_by_spec,
+            active_specs,
+        )
         set_external_cache(
             "command_personaje",
             f"/{command_name}",
@@ -441,6 +543,9 @@ async def _personaje_impl(
                 missing_enchants,
                 missing_gems,
                 uwu_icc_kills,
+                active_specs,
+                inactive_specs,
+                gs_by_spec,
             ),
             {"character": nombre_char, "command": command_name},
         )
