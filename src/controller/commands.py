@@ -4,7 +4,10 @@ import discord
 
 import gearscore
 import profile_scraper
+from src.db.postgres import get_external_cache, set_external_cache
 from src.schemas.constants import (
+    COMMAND_DPS_TTL,
+    COMMAND_PERSONAJE_TTL,
     EXECUTOR,
     UWU_SERVER,
     UWU_MODES_ALL,
@@ -27,6 +30,144 @@ from src.functions.embeds import (
     _extract_icc_boss_kills,
     _render_table,
 )
+
+
+def _build_personaje_cache_key(nombre: str) -> str:
+    return f"command:personaje:{nombre.strip().lower()}"
+
+
+def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
+    return f"command:dps:{nombre.strip().lower()}:{(spec or '').strip().lower()}"
+
+
+def _serialize_personaje_payload(
+    nombre_char,
+    gs,
+    nivel,
+    raza,
+    clase,
+    spec_display,
+    guild_display,
+    halion_10n_achieved,
+    halion_10h_achieved,
+    halion_25n_achieved,
+    halion_25h_achieved,
+    icc_10,
+    icc_25,
+    missing_enchants,
+    missing_gems,
+    uwu_icc_kills,
+):
+    return {
+        "nombre_char": nombre_char,
+        "gs": gs,
+        "nivel": nivel,
+        "raza": raza,
+        "clase": clase,
+        "spec_display": spec_display,
+        "guild_display": guild_display,
+        "halion_10n_achieved": halion_10n_achieved,
+        "halion_10h_achieved": halion_10h_achieved,
+        "halion_25n_achieved": halion_25n_achieved,
+        "halion_25h_achieved": halion_25h_achieved,
+        "icc_10": icc_10,
+        "icc_25": icc_25,
+        "missing_enchants": missing_enchants,
+        "missing_gems": missing_gems,
+        "uwu_icc_kills": uwu_icc_kills,
+    }
+
+
+def _build_personaje_embed_from_cache(payload: dict):
+    return _build_personaje_embed(
+        payload["nombre_char"],
+        payload["gs"],
+        payload["nivel"],
+        payload["raza"],
+        payload["clase"],
+        payload["spec_display"],
+        payload["guild_display"],
+        payload["halion_10n_achieved"],
+        payload["halion_10h_achieved"],
+        payload["halion_25n_achieved"],
+        payload["halion_25h_achieved"],
+        payload["icc_10"],
+        payload["icc_25"],
+        payload["missing_enchants"],
+        payload["missing_gems"],
+        payload.get("uwu_icc_kills"),
+    )
+
+
+def _build_dps_embed_from_cache(payload: dict):
+    nombre_char = payload["nombre_char"]
+    spec_display = payload.get("spec_display", "")
+    uwu_rows = payload.get("uwu_rows", [])
+    failed_by_mode = payload.get("failed_by_mode", {})
+
+    grouped_rows = []
+    for i, row in enumerate(uwu_rows):
+        grouped_rows.append(dict(row))
+        is_last = i == len(uwu_rows) - 1
+        if is_last:
+            continue
+        current_boss = row.get("_boss")
+        next_boss = uwu_rows[i + 1].get("_boss")
+        if current_boss != next_boss:
+            grouped_rows.append(
+                {
+                    "Boss": "---------",
+                    "Mode": "--",
+                    "Raids": "--",
+                    "Max DPS": "---------",
+                    "Avg DPS": "---------",
+                    "_boss": "__sep__",
+                    "_sep": True,
+                }
+            )
+
+    for row in grouped_rows:
+        row.pop("_boss", None)
+
+    has_any_logs = any(
+        row.get("Raids") not in {"0", "--"}
+        for row in grouped_rows
+        if not row.get("_sep")
+    )
+
+    uwu_table = _format_uwu_dps_table(grouped_rows)
+    table_block = f"```\n{uwu_table}\n```"
+    if len(table_block) > 3900:
+        table_block = f"```\n{uwu_table[:3880]}\n...\n```"
+
+    warning_note = ""
+    if not has_any_logs:
+        warning_note = (
+            "\n⚠️ No se encontraron logs para este personaje"
+            f"{' con esa spec' if payload.get('spec') else ''} en UwU Logs."
+        )
+
+    failed_parts = []
+    if isinstance(failed_by_mode, dict):
+        for mode in UWU_MODES_ALL:
+            value = failed_by_mode.get(mode, 0)
+            if isinstance(value, int) and value > 0:
+                failed_parts.append(f"{mode}:{value}")
+    failed_note = ""
+    if failed_parts:
+        failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
+
+    embed = discord.Embed(
+        title=f"{nombre_char} - Uwulogs DPS{spec_display}",
+        description=table_block + warning_note + failed_note,
+        color=0x2B2D31,
+    )
+    embed.add_field(
+        name="Si ves datos vacíos, consulte:",
+        value=DOCS_NOTAS_URL,
+        inline=True,
+    )
+    return embed
 
 
 async def _safe_defer(interaction: discord.Interaction) -> None:
@@ -103,6 +244,17 @@ async def _personaje_impl(
     try:
         nombre = nombre.capitalize()
         await _safe_defer(interaction)
+
+        personaje_cache_key = _build_personaje_cache_key(nombre)
+        cached_payload = get_external_cache(
+            "command_personaje", personaje_cache_key, COMMAND_PERSONAJE_TTL
+        )
+        if isinstance(cached_payload, dict):
+            embed_cached = _build_personaje_embed_from_cache(cached_payload)
+            await _safe_edit_original_response(interaction, content=None, embed=embed_cached)
+            print(f"[INFO] Cache hit /{command_name} para '{nombre}'")
+            return
+
         await _safe_edit_original_response(
             interaction,
             content=f"⏳ Calculando perfil de {nombre}...", embed=None
@@ -268,6 +420,30 @@ async def _personaje_impl(
             missing_gems,
             uwu_icc_kills=uwu_icc_kills,
         )
+        set_external_cache(
+            "command_personaje",
+            f"/{command_name}",
+            personaje_cache_key,
+            _serialize_personaje_payload(
+                nombre_char,
+                gs,
+                nivel,
+                raza,
+                clase,
+                spec_display,
+                guild_display,
+                halion_10n_achieved,
+                halion_10h_achieved,
+                halion_25n_achieved,
+                halion_25h_achieved,
+                icc_10,
+                icc_25,
+                missing_enchants,
+                missing_gems,
+                uwu_icc_kills,
+            ),
+            {"character": nombre_char, "command": command_name},
+        )
         await _safe_edit_original_response(interaction, content=None, embed=embed_final)
 
     except discord.NotFound:
@@ -319,6 +495,17 @@ def register_commands(bot):
             nombre = nombre.capitalize()
             spec_display = f" [{spec.upper()}]" if spec else ""
             await _safe_defer(interaction)
+
+            dps_cache_key = _build_dps_cache_key(nombre, spec)
+            cached_payload = get_external_cache(
+                "command_dps", dps_cache_key, COMMAND_DPS_TTL
+            )
+            if isinstance(cached_payload, dict):
+                embed_cached = _build_dps_embed_from_cache(cached_payload)
+                await _safe_edit_original_response(interaction, content=None, embed=embed_cached)
+                print(f"[INFO] Cache hit /dps para '{nombre}' spec='{spec or ''}'")
+                return
+
             await _safe_edit_original_response(
                 interaction,
                 content=f"⏳ Calculando DPS de {nombre}{spec_display}... esto puede tardar unos segundos",
@@ -451,6 +638,19 @@ def register_commands(bot):
                 name="Si ves datos vacíos, consulte:",
                 value=DOCS_NOTAS_URL,
                 inline=True,
+            )
+            set_external_cache(
+                "command_dps",
+                "/dps",
+                dps_cache_key,
+                {
+                    "nombre_char": nombre_char,
+                    "spec": spec,
+                    "spec_display": spec_display,
+                    "uwu_rows": uwu_dps_summary.get("rows", []),
+                    "failed_by_mode": failed_by_mode,
+                },
+                {"character": nombre_char, "spec": spec or ""},
             )
             await _safe_edit_original_response(interaction, content=None, embed=embed)
 

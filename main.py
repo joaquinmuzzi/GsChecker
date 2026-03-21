@@ -6,10 +6,12 @@ import atexit
 
 from dotenv import load_dotenv
 
+from src.db.postgres import init_database
 from src.schemas.constants import PREFIX
 from src.controller.commands import register_commands
 
 load_dotenv()
+init_database()
 
 LOCK_PATH = "/tmp/gschecker.lock"
 

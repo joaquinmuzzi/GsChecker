@@ -15,6 +15,7 @@ from src.schemas.constants import (
     UWU_ICC_KILLS_CACHE,
     UWU_ICC_KILLS_TTL,
 )
+from src.db.postgres import get_external_cache, set_external_cache
 from src.functions.cache import _cache_get, _cache_set
 
 
@@ -22,6 +23,12 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
     cache_key = (nombre, server, spec_i)
     cached = _cache_get(UWU_CHARACTER_CACHE, cache_key, UWU_CHARACTER_TTL)
     if cached is not None:
+        return cached
+
+    persistent_cache_key = f"uwu:character:{server}:{nombre.lower()}:{spec_i}"
+    cached = get_external_cache("uwu_character", persistent_cache_key, UWU_CHARACTER_TTL)
+    if cached is not None:
+        _cache_set(UWU_CHARACTER_CACHE, cache_key, cached)
         return cached
 
     url = f"{UWU_BASE}/character/{server}/{nombre}/{spec_i}"
@@ -39,6 +46,17 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
         return {"__error__": f"uwu character json error: {e}"}
 
     _cache_set(UWU_CHARACTER_CACHE, cache_key, payload)
+    set_external_cache(
+        "uwu_character",
+        url,
+        persistent_cache_key,
+        payload,
+        {
+            "server": server,
+            "name": nombre,
+            "spec_i": spec_i,
+        },
+    )
     return payload
 
 
@@ -53,6 +71,14 @@ def _fetch_uwu_top(
     cache_key = ("v3", server, boss, mode, class_i, spec_i, best_only)
     cached = _cache_get(UWU_TOP_CACHE, cache_key, UWU_TOP_TTL)
     if cached is not None:
+        return cached
+
+    persistent_cache_key = (
+        f"uwu:top:{server}:{boss}:{mode}:{class_i}:{spec_i}:{int(best_only)}"
+    )
+    cached = get_external_cache("uwu_top", persistent_cache_key, UWU_TOP_TTL)
+    if cached is not None:
+        _cache_set(UWU_TOP_CACHE, cache_key, cached)
         return cached
 
     payload = {
@@ -85,6 +111,20 @@ def _fetch_uwu_top(
             continue
 
         _cache_set(UWU_TOP_CACHE, cache_key, rows)
+        set_external_cache(
+            "uwu_top",
+            f"{UWU_BASE}/top",
+            persistent_cache_key,
+            rows,
+            {
+                "server": server,
+                "boss": boss,
+                "mode": mode,
+                "class_i": class_i,
+                "spec_i": spec_i,
+                "best_only": best_only,
+            },
+        )
         return rows
 
     return {"__error__": last_error or "uwu top unknown error"}
