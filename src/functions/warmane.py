@@ -21,7 +21,7 @@ from src.functions.cache import _cache_get, _cache_set
 
 
 def _summary_from_profile_html(nombre: str, server: str):
-    profile_url = f"https://armory.warmane.com/character/{nombre}/{server}"
+    profile_url = f"https://armory.warmane.com/character/{nombre}/{server}/profile"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -41,10 +41,28 @@ def _summary_from_profile_html(nombre: str, server: str):
     page_text = soup.get_text(" ", strip=True)
 
     target_server = (server or "").strip().lower()
+    target_name = (nombre or "").strip()
+    lower_text = page_text.lower()
+    lower_name = target_name.lower()
 
-    exact_name_pattern = re.compile(
-        rf"\b{re.escape(nombre)}\b\s+"
-        r"(?:\[(?P<guild_bracket>[^\]]{1,80})\]\s+|(?P<guild_plain>[A-Za-zÀ-ÿ0-9'&\- ]{2,80})\s+)?"
+    guild_name = "Sin guild"
+    summary_name = target_name
+
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor.get("href") or "")
+        if "/guild/" not in href or "/summary/" not in href:
+            continue
+        if f"/{target_server}/" not in href.lower():
+            continue
+        if f"/summary/{lower_name}" not in href.lower():
+            continue
+
+        text = anchor.get_text(" ", strip=True)
+        if text:
+            guild_name = " ".join(text.split())
+        break
+
+    header_pattern = re.compile(
         r"Level\s+(?P<level>\d+)\s+"
         r"(?P<race>[A-Za-zÀ-ÿ'\- ]+?)\s+"
         r"(?P<class>[A-Za-zÀ-ÿ'\- ]+?),\s*"
@@ -52,7 +70,7 @@ def _summary_from_profile_html(nombre: str, server: str):
         re.IGNORECASE,
     )
 
-    for match in exact_name_pattern.finditer(page_text):
+    for match in header_pattern.finditer(page_text):
         data = {
             k: (" ".join(v.split()) if isinstance(v, str) else v)
             for k, v in match.groupdict().items()
@@ -60,14 +78,22 @@ def _summary_from_profile_html(nombre: str, server: str):
         if data.get("server", "").lower() != target_server:
             continue
 
-        guild_name = (data.get("guild_bracket") or data.get("guild_plain") or "").strip()
+        start = match.start()
+        window_start = max(0, start - 200)
+        left_window = page_text[window_start:start]
+        left_window_lower = left_window.lower()
 
+        idx = left_window_lower.rfind(lower_name)
+        if idx == -1:
+            continue
+
+        summary_name = left_window[idx : idx + len(target_name)]
         return {
-            "name": nombre,
+            "name": summary_name or target_name,
             "level": int(data.get("level") or 0),
             "race": data.get("race") or "N/A",
             "class": data.get("class") or "N/A",
-            "guild": guild_name or "Sin guild",
+            "guild": guild_name,
             "gearScore": "N/A",
         }
 
@@ -95,7 +121,7 @@ def _summary_from_profile_html(nombre: str, server: str):
             "level": int(data.get("level") or 0),
             "race": data.get("race") or "N/A",
             "class": data.get("class") or "N/A",
-            "guild": data.get("guild") or "Sin guild",
+            "guild": data.get("guild") or guild_name,
             "gearScore": "N/A",
         }
 
