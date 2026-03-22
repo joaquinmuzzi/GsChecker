@@ -28,6 +28,7 @@ from src.functions.warmane import (
 from src.functions.uwu import _uwu_icc_bugfix_kills, _build_uwu_dps_summary
 from src.functions.embeds import (
     _build_personaje_embed,
+    _build_personaje_view,
     _format_uwu_dps_table,
     _extract_icc_boss_kills,
     _render_table,
@@ -473,19 +474,21 @@ def _http_retry_after(exc: discord.HTTPException) -> float:
 
 
 async def _safe_edit_original_response(
-    interaction: discord.Interaction, *, content=None, embed=None
+    interaction: discord.Interaction, *, content=None, embed=None, view=None
 ) -> None:
     last_exc = None
     for attempt in range(4):
         try:
-            await interaction.edit_original_response(content=content, embed=embed)
+            kwargs = {"content": content, "embed": embed}
+            if view is not None:
+                kwargs["view"] = view
+            await interaction.edit_original_response(**kwargs)
             return
         except discord.HTTPException as exc:
             if getattr(exc, "status", None) != 429:
                 raise
             last_exc = exc
             wait_for = _http_retry_after(exc) or min(2**attempt, 8)
-            print(f"[WARN] Discord rate limit on edit_original_response, retry in {wait_for:.2f}s")
             await asyncio.sleep(wait_for)
     if last_exc:
         raise last_exc
@@ -501,7 +504,6 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
         if getattr(exc, "status", None) != 429:
             raise
         wait_for = _http_retry_after(exc) or 3
-        print(f"[WARN] Discord rate limit on error message send, retry in {wait_for:.2f}s")
         await asyncio.sleep(wait_for)
         try:
             if interaction.response.is_done():
@@ -509,7 +511,7 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
             else:
                 await interaction.response.send_message(message)
         except Exception:
-            print("[WARN] Failed to send error message after retry.")
+            pass
 
 
 async def _personaje_impl(
@@ -530,8 +532,8 @@ async def _personaje_impl(
         )
         if isinstance(cached_payload, dict):
             embed_cached = _build_personaje_embed_from_cache(cached_payload)
-            await _safe_edit_original_response(interaction, content=None, embed=embed_cached)
-            print(f"[INFO] Cache hit /{command_name} para '{nombre}'")
+            view_cached = _build_personaje_view(cached_payload["nombre_char"])
+            await _safe_edit_original_response(interaction, content=None, embed=embed_cached, view=view_cached)
             return
 
         await _safe_edit_original_response(
@@ -685,7 +687,8 @@ async def _personaje_impl(
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             guild_rank=guild_rank,
         )
-        await _safe_edit_original_response(interaction, content=None, embed=embed_initial)
+        personaje_view = _build_personaje_view(nombre_char)
+        await _safe_edit_original_response(interaction, content=None, embed=embed_initial, view=personaje_view)
 
         frame_idx = 1
         while not uwu_icc_task.done():
@@ -714,7 +717,7 @@ async def _personaje_impl(
                 guild_rank=guild_rank,
             )
             frame_idx += 1
-            await _safe_edit_original_response(interaction, content=None, embed=embed_loading)
+            await _safe_edit_original_response(interaction, content=None, embed=embed_loading, view=personaje_view)
 
         try:
             uwu_icc_kills = await uwu_icc_task
@@ -787,7 +790,7 @@ async def _personaje_impl(
             ),
             {"character": nombre_char, "command": command_name},
         )
-        await _safe_edit_original_response(interaction, content=None, embed=embed_final)
+        await _safe_edit_original_response(interaction, content=None, embed=embed_final, view=personaje_view)
 
     except discord.NotFound:
         return
@@ -846,7 +849,6 @@ def register_commands(bot):
             if isinstance(cached_payload, dict):
                 embed_cached = _build_dps_embed_from_cache(cached_payload)
                 await _safe_edit_original_response(interaction, content=None, embed=embed_cached)
-                print(f"[INFO] Cache hit /dps para '{nombre}' spec='{spec or ''}'")
                 return
 
             await _safe_edit_original_response(
@@ -986,15 +988,10 @@ def register_commands(bot):
             failed_note = ""
             if failed_parts:
                 failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
-                print(
-                    f"[WARN] UwU consultas fallidas para {nombre_char}: "
-                    + " | ".join(failed_parts)
-                )
 
             timeout_note = ""
             if timed_out:
                 timeout_note = "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
-                print(f"[WARN] UwU DPS timeout parcial para {nombre_char}")
 
             embed = discord.Embed(
                 title=f"{nombre_char} - Uwulogs DPS{spec_display}",

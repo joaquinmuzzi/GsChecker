@@ -267,16 +267,6 @@ def _build_personaje_embed(
     if clean_rank:
         guild_value = f"{guild_display}\n{clean_rank}"
     embed.add_field(name="Guild", value=guild_value, inline=True)
-    embed.add_field(
-        name="Armory",
-        value=f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile",
-        inline=False,
-    )
-    embed.add_field(
-        name="Uwulogs",
-        value=f"https://uwu-logs.xyz/character?name={nombre_char}&server=Lordaeron",
-        inline=False,
-    )
 
     icc_table, icc_widths = _format_boss_rows(
         icc_10, icc_25, uwu_icc_kills, loading_symbol
@@ -332,3 +322,22 @@ def _build_personaje_embed(
         )
 
     return embed
+
+
+def _build_personaje_view(nombre_char: str, server: str = "Lordaeron") -> discord.ui.View:
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Armory",
+            url=f"https://armory.warmane.com/character/{nombre_char}/{server}/profile",
+            style=discord.ButtonStyle.link,
+        )
+    )
+    view.add_item(
+        discord.ui.Button(
+            label="Uwulogs",
+            url=f"https://uwu-logs.xyz/character?name={nombre_char}&server={server}",
+            style=discord.ButtonStyle.link,
+        )
+    )
+    return view
