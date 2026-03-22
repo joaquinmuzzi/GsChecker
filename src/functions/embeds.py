@@ -206,13 +206,13 @@ def _format_boss_rows(
                 continue
             special = (uwu_icc_kills or {}).get(name, {})
 
-            def special_cell(mode, _special=special):
+            def special_cell(mode, _special=special, _loading=loading_symbol):
                 value = _special.get(mode)
                 if value in {"✅", "❌"}:
                     return f"{value} #"
                 if value is None:
-                    return "?"
-                return "?"
+                    return _loading
+                return _loading
 
             row["10H"] = special_cell("10H")
             row["25N"] = special_cell("25N")
