@@ -590,6 +590,14 @@ async def _personaje_impl(
         raza = summary.get("race", "N/A")
         clase = summary.get("class", "N/A")
 
+        if nivel != 80:
+            await _safe_edit_original_response(
+                interaction,
+                content=f"⚠️ **{nombre_char}** no es nivel 80.",
+                embed=None,
+            )
+            return
+
         talents = _fetch_specs(nombre, "Lordaeron")
         if isinstance(talents, list) and len(talents) > 0:
             sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))

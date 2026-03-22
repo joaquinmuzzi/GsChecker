@@ -234,6 +234,32 @@ def _format_boss_rows(
     return table, widths
 
 
+_PROF_ABBREV = {
+    "alchemy": "Alch.",
+    "blacksmithing": "BS.",
+    "enchanting": "Ench.",
+    "engineering": "Eng.",
+    "herbalism": "Herb.",
+    "inscription": "Inscr.",
+    "jewelcrafting": "JC.",
+    "leatherworking": "LW.",
+    "mining": "Mining",
+    "skinning": "Skin.",
+    "tailoring": "Tailor.",
+}
+
+
+def _format_professions_short(professions: list[str]) -> str:
+    parts = []
+    for prof in professions:
+        tokens = prof.split(" ", 1)
+        name = tokens[0]
+        value = tokens[1] if len(tokens) > 1 else ""
+        abbrev = _PROF_ABBREV.get(name.lower(), name)
+        parts.append(f"{abbrev} {value}".strip())
+    return " · ".join(parts)
+
+
 def _build_personaje_embed(
     nombre_char,
     gs,
@@ -258,13 +284,11 @@ def _build_personaje_embed(
 ):
     embed = discord.Embed(title=nombre_char, color=0x2B2D31)
     embed.add_field(name="Spec | GS", value=spec_gs_value or str(gs), inline=True)
-    embed.add_field(
-        name="Level | Race | Class",
-        value=f"{nivel} {raza} {clase}" + (
-            ("\n" + " · ".join(professions)) if professions else ""
-        ),
-        inline=True,
-    )
+    prof_line = _format_professions_short(professions) if professions else ""
+    race_class_value = f"{raza} {clase}"
+    if prof_line:
+        race_class_value += f"\n{prof_line}"
+    embed.add_field(name="Race | Class", value=race_class_value, inline=True)
     guild_value = guild_display
     clean_rank = str(guild_rank or "").strip()
     if clean_rank:
