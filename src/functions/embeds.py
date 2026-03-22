@@ -2,11 +2,26 @@ import unicodedata
 
 import discord
 
+# Emoji usados en la tabla — forzamos ancho 2 independientemente de lo que
+# devuelva unicodedata (varía según versión de Python / UCD).
+_EMOJI_W2 = {
+    "\u2705",  # ✅
+    "\u274c",  # ❌
+    "\u26a0",  # ⚠
+    "\u23f3",  # ⏳
+    "\u231b",  # ⌛
+}
+
 
 def _display_width(text: str) -> int:
     width = 0
     for ch in str(text):
-        width += 2 if unicodedata.east_asian_width(ch) in {"W", "F"} else 1
+        if ch == "\ufe0f":  # variation selector, no imprime
+            continue
+        if ch in _EMOJI_W2 or unicodedata.east_asian_width(ch) in {"W", "F"}:
+            width += 2
+        else:
+            width += 1
     return width
 
 
@@ -194,7 +209,7 @@ def _format_boss_rows(
             def special_cell(mode, _special=special):
                 value = _special.get(mode)
                 if value in {"✅", "❌"}:
-                    return value
+                    return f"{value} #"
                 if value is None:
                     return "?"
                 return "?"
