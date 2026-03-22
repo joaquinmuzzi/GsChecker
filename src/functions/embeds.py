@@ -255,6 +255,7 @@ def _format_professions_short(professions: list[str]) -> str:
         tokens = prof.split(" ", 1)
         name = tokens[0]
         value = tokens[1] if len(tokens) > 1 else ""
+        value = value.split("/")[0].strip()
         abbrev = _PROF_ABBREV.get(name.lower(), name)
         parts.append(f"{abbrev} {value}".strip())
     return " · ".join(parts)
