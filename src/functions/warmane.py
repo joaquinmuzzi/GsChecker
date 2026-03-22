@@ -403,6 +403,10 @@ def _fetch_achievements(nombre: str, server: str):
         "halion_10h_achieved": halion_10h_achieved,
         "halion_25n_achieved": halion_25n_achieved,
         "halion_25h_achieved": halion_25h_achieved,
+        "storming_10n_achieved": "4531" in completed_ids,
+        "storming_10h_achieved": "4628" in completed_ids,
+        "storming_25n_achieved": "4604" in completed_ids,
+        "storming_25h_achieved": "4632" in completed_ids,
     }
     _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
     return payload

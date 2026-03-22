@@ -48,6 +48,31 @@ def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:
     return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
 
 
+def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
+    if not isinstance(uwu_icc_kills, dict):
+        uwu_icc_kills = {}
+
+    if not isinstance(achi_payload, dict):
+        return uwu_icc_kills
+
+    mode_to_achievement = {
+        "10H": "storming_10h_achieved",
+        "25N": "storming_25n_achieved",
+        "25H": "storming_25h_achieved",
+    }
+
+    for boss_name in ("Marrowgar", "Deathwhisper"):
+        boss_modes = uwu_icc_kills.setdefault(boss_name, {})
+        if not isinstance(boss_modes, dict):
+            boss_modes = {}
+            uwu_icc_kills[boss_name] = boss_modes
+        for mode, achievement_key in mode_to_achievement.items():
+            if boss_modes.get(mode) is None and achi_payload.get(achievement_key):
+                boss_modes[mode] = "✅"
+
+    return uwu_icc_kills
+
+
 def _get_known_gs_by_spec(nombre: str, spec_names: list[str], current_gs=None, active_specs=None):
     active_specs = set(active_specs or [])
     result = {}
@@ -499,6 +524,8 @@ async def _personaje_impl(
             uwu_icc_kills = await uwu_icc_task
         except Exception:
             uwu_icc_kills = {}
+
+        uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
 
         embed_final = _build_personaje_embed(
             nombre_char,
