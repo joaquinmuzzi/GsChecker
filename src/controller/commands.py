@@ -33,6 +33,9 @@ from src.functions.embeds import (
 )
 
 
+DPS_COMMAND_TIMEOUT_SECONDS = 45
+
+
 def _build_personaje_cache_key(nombre: str) -> str:
     return f"command:personaje:{nombre.strip().lower()}"
 
@@ -168,6 +171,7 @@ def _build_dps_embed_from_cache(payload: dict):
     spec_display = payload.get("spec_display", "")
     uwu_rows = payload.get("uwu_rows", [])
     failed_by_mode = payload.get("failed_by_mode", {})
+    timed_out = bool(payload.get("timed_out", False))
 
     grouped_rows = []
     for i, row in enumerate(uwu_rows):
@@ -221,9 +225,13 @@ def _build_dps_embed_from_cache(payload: dict):
     if failed_parts:
         failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
 
+    timeout_note = ""
+    if timed_out:
+        timeout_note = "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
+
     embed = discord.Embed(
         title=f"{nombre_char} - Uwulogs DPS{spec_display}",
-        description=table_block + warning_note + failed_note,
+        description=table_block + warning_note + failed_note + timeout_note,
         color=0x2B2D31,
     )
     embed.add_field(
@@ -626,7 +634,7 @@ def register_commands(bot):
 
             nombre_char = str(summary.get("name") or nombre)
 
-            uwu_dps_summary = await loop.run_in_executor(
+            uwu_dps_future = loop.run_in_executor(
                 EXECUTOR,
                 _build_uwu_dps_summary,
                 nombre_char,
@@ -634,6 +642,21 @@ def register_commands(bot):
                 UWU_PDPS_BOSS_ORDER,
                 spec,
             )
+            try:
+                uwu_dps_summary = await asyncio.wait_for(
+                    uwu_dps_future,
+                    timeout=DPS_COMMAND_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                await _safe_edit_original_response(
+                    interaction,
+                    content=(
+                        "⚠️ UwU Logs está respondiendo lento y el cálculo excedió el tiempo límite. "
+                        "Intenta de nuevo en unos segundos."
+                    ),
+                    embed=None,
+                )
+                return
 
             if not isinstance(uwu_dps_summary, dict):
                 await _safe_edit_original_response(
@@ -644,10 +667,14 @@ def register_commands(bot):
 
             uwu_rows = uwu_dps_summary.get("rows", [])
             failed_by_mode = uwu_dps_summary.get("failed_by_mode", {})
+            timed_out = bool(uwu_dps_summary.get("timed_out", False))
             if not uwu_rows:
+                timeout_note = (
+                    " (cálculo parcial por timeout)" if timed_out else ""
+                )
                 await _safe_edit_original_response(
                     interaction,
-                    content=f"⚠️ No hay datos DPS en UwU Logs para {nombre_char}.",
+                    content=f"⚠️ No hay datos DPS en UwU Logs para {nombre_char}{timeout_note}.",
                     embed=None,
                 )
                 return
@@ -721,9 +748,14 @@ def register_commands(bot):
                     + " | ".join(failed_parts)
                 )
 
+            timeout_note = ""
+            if timed_out:
+                timeout_note = "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
+                print(f"[WARN] UwU DPS timeout parcial para {nombre_char}")
+
             embed = discord.Embed(
                 title=f"{nombre_char} - Uwulogs DPS{spec_display}",
-                description=table_block + warning_note + failed_note,
+                description=table_block + warning_note + failed_note + timeout_note,
                 color=0x2B2D31,
             )
             embed.add_field(
@@ -741,6 +773,7 @@ def register_commands(bot):
                     "spec_display": spec_display,
                     "uwu_rows": uwu_dps_summary.get("rows", []),
                     "failed_by_mode": failed_by_mode,
+                    "timed_out": timed_out,
                 },
                 {"character": nombre_char, "spec": spec or ""},
             )

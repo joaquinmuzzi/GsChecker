@@ -1,3 +1,5 @@
+import time
+
 from src.schemas.constants import (
     SESSION,
     HTTP_TIMEOUT,
@@ -67,6 +69,8 @@ def _fetch_uwu_top(
     class_i: int,
     spec_i: int,
     best_only: bool = True,
+    timeout_override: float | None = None,
+    max_attempts: int = 2,
 ):
     cache_key = ("v4", server, boss, mode, class_i, spec_i, best_only)
     cached = _cache_get(UWU_TOP_CACHE, cache_key, UWU_TOP_TTL)
@@ -93,9 +97,10 @@ def _fetch_uwu_top(
         "externals": True,
     }
     last_error = None
-    for _ in range(2):
+    timeout_value = timeout_override if timeout_override is not None else HTTP_TIMEOUT
+    for _ in range(max_attempts):
         try:
-            resp = SESSION.post(f"{UWU_BASE}/top", json=payload, timeout=HTTP_TIMEOUT)
+            resp = SESSION.post(f"{UWU_BASE}/top", json=payload, timeout=timeout_value)
         except Exception as e:
             last_error = f"uwu top error: {e}"
             continue
@@ -155,7 +160,13 @@ def _uwu_profiles(nombre: str, server: str):
     return profiles
 
 
-def _discover_uwu_spec_class_pairs(nombre: str, server: str, boss_names, modes):
+def _discover_uwu_spec_class_pairs(
+    nombre: str,
+    server: str,
+    boss_names,
+    modes,
+    deadline_ts: float | None = None,
+):
     lower_name = nombre.lower()
     discovered_pairs = []
     seen = set()
@@ -164,7 +175,24 @@ def _discover_uwu_spec_class_pairs(nombre: str, server: str, boss_names, modes):
         for mode in modes:
             for class_i in range(10):
                 for spec_i in (1, 2, 3):
-                    top_rows = _fetch_uwu_top(server, boss_name, mode, class_i, spec_i)
+                    if deadline_ts is not None and time.monotonic() >= deadline_ts:
+                        return discovered_pairs
+                    remaining = None
+                    if deadline_ts is not None:
+                        remaining = max(deadline_ts - time.monotonic(), 0.5)
+                    top_rows = _fetch_uwu_top(
+                        server,
+                        boss_name,
+                        mode,
+                        class_i,
+                        spec_i,
+                        timeout_override=(
+                            min(HTTP_TIMEOUT, remaining)
+                            if remaining is not None
+                            else None
+                        ),
+                        max_attempts=1,
+                    )
                     if not isinstance(top_rows, list):
                         continue
                     has_player = any(
@@ -322,7 +350,11 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
 
 
 def _build_uwu_dps_summary(
-    nombre: str, server: str, selected_bosses=None, spec_filter: str | None = None
+    nombre: str,
+    server: str,
+    selected_bosses=None,
+    spec_filter: str | None = None,
+    time_budget_s: float = 30.0,
 ):
     selected_bosses_key = tuple(selected_bosses) if selected_bosses else None
     cache_key = (nombre.lower(), server, selected_bosses_key, spec_filter)
@@ -332,6 +364,8 @@ def _build_uwu_dps_summary(
 
     profiles = _uwu_profiles(nombre, server)
     spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
+    deadline_ts = time.monotonic() + max(time_budget_s, 1.0)
+    timed_out = False
 
     if selected_bosses:
         boss_names = [
@@ -353,6 +387,7 @@ def _build_uwu_dps_summary(
             server,
             boss_names,
             ("10H", "25N", "10N", "25H"),
+            deadline_ts=deadline_ts,
         )
         if discovered_pairs:
             spec_class_pairs = discovered_pairs
@@ -377,11 +412,21 @@ def _build_uwu_dps_summary(
     failed_by_mode = {mode: 0 for mode in UWU_MODES_ALL}
 
     for boss_name in boss_names:
+        if time.monotonic() >= deadline_ts:
+            timed_out = True
+            break
         boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
         for mode in UWU_MODES_ALL:
+            if time.monotonic() >= deadline_ts:
+                timed_out = True
+                break
             player_rows = []
             any_fetch_ok = False
             for spec_i, class_i in spec_class_pairs:
+                remaining = deadline_ts - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                    break
                 top_rows = _fetch_uwu_top(
                     server,
                     boss_name,
@@ -389,6 +434,8 @@ def _build_uwu_dps_summary(
                     class_i,
                     spec_i,
                     best_only=False,
+                    timeout_override=min(HTTP_TIMEOUT, max(1.0, remaining)),
+                    max_attempts=1,
                 )
                 if not isinstance(top_rows, list):
                     failed_by_mode[mode] += 1
@@ -400,6 +447,9 @@ def _build_uwu_dps_summary(
                     row_name = str(row[3]).lower() if len(row) > 3 else ""
                     if row_name == lower_name:
                         player_rows.append(row)
+
+            if timed_out:
+                break
 
             if not any_fetch_ok:
                 rows.append(
@@ -443,15 +493,24 @@ def _build_uwu_dps_summary(
                 }
             )
 
+        if timed_out:
+            break
+
     if not rows:
         payload = {
             "rows": [],
             "__error__": "No hay datos de uwu-logs para el personaje.",
             "failed_by_mode": failed_by_mode,
+            "timed_out": timed_out,
         }
         _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
         return payload
 
-    payload = {"rows": rows, "spec_i": "all", "failed_by_mode": failed_by_mode}
+    payload = {
+        "rows": rows,
+        "spec_i": "all",
+        "failed_by_mode": failed_by_mode,
+        "timed_out": timed_out,
+    }
     _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
     return payload
