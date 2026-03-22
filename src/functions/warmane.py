@@ -320,6 +320,14 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
     try:
         soup = BeautifulSoup(resp.text, "html.parser")
         target_name = clean_name.lower()
+        rank_index = None
+        header_cells = soup.select("table thead th")
+        for idx, header in enumerate(header_cells):
+            header_text = " ".join(header.get_text(" ", strip=True).split()).lower()
+            if header_text == "rank":
+                rank_index = idx
+                break
+
         for row in soup.select("#data-table-list tr"):
             link = row.select_one("td a[href*='/character/'][href*='/profile']")
             if not link:
@@ -330,7 +338,21 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
             cells = row.find_all("td")
             if not cells:
                 break
-            rank_text = cells[-1].get_text(" ", strip=True)
+
+            candidate_indexes = []
+            if rank_index is not None:
+                candidate_indexes.append(rank_index)
+            candidate_indexes.extend([5, len(cells) - 1])
+
+            rank_text = ""
+            for idx in candidate_indexes:
+                if idx < 0 or idx >= len(cells):
+                    continue
+                candidate = " ".join(cells[idx].get_text(" ", strip=True).split())
+                if candidate and not candidate.isdigit():
+                    rank_text = candidate
+                    break
+
             rank_text = " ".join(rank_text.split())
             if rank_text:
                 _cache_set(GUILD_RANK_CACHE, cache_key, rank_text)
@@ -342,25 +364,6 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
     except Exception:
         print(
             f"[WARN] Guild rank BeautifulSoup parsing failed for '{clean_name}' guild='{clean_guild}'"
-        )
-
-    try:
-        pattern = re.compile(
-            rf'<a href="/character/{re.escape(clean_name)}/{re.escape(clean_server)}/profile">{re.escape(clean_name)}</a>.*?<td class="dt-center">([^<]+)</td>',
-            re.IGNORECASE | re.DOTALL,
-        )
-        match = pattern.search(resp.text)
-        if match:
-            rank_text = " ".join(match.group(1).split())
-            if rank_text:
-                _cache_set(GUILD_RANK_CACHE, cache_key, rank_text)
-                print(
-                    f"[INFO] Guild rank regex fallback for '{clean_name}' guild='{clean_guild}' => {rank_text!r}"
-                )
-                return rank_text
-    except Exception:
-        print(
-            f"[WARN] Guild rank regex fallback failed for '{clean_name}' guild='{clean_guild}'"
         )
 
     _cache_set(GUILD_RANK_CACHE, cache_key, "")

@@ -265,7 +265,7 @@ def _build_personaje_embed(
     guild_value = guild_display
     clean_rank = str(guild_rank or "").strip()
     if clean_rank:
-        guild_value = f"{guild_display}\nRank: {clean_rank}"
+        guild_value = f"{guild_display}\n{clean_rank}"
     embed.add_field(name="Guild", value=guild_value, inline=True)
     embed.add_field(
         name="Armory",
