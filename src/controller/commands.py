@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import discord
 
@@ -34,6 +35,7 @@ from src.functions.embeds import (
 
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
+ITEM_SOURCE_TTL = 86400
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
@@ -46,6 +48,95 @@ def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
 
 def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:
     return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
+
+
+def _fetch_item_source_hint(item_id: str) -> dict:
+    clean_item_id = str(item_id or "").strip()
+    if not clean_item_id.isdigit():
+        return {"ilvl": 0, "marrowgar": False, "deathwhisper": False}
+
+    cache_key = f"wowhead:item-source:{clean_item_id}"
+    cached = get_external_cache("wowhead_item_source", cache_key, ITEM_SOURCE_TTL)
+    if isinstance(cached, dict):
+        return cached
+
+    url = f"https://www.wowhead.com/wotlk/item={clean_item_id}&xml"
+    payload = {"ilvl": 0, "marrowgar": False, "deathwhisper": False}
+
+    try:
+        from src.schemas.constants import SESSION, HTTP_TIMEOUT
+
+        resp = SESSION.get(url, timeout=min(HTTP_TIMEOUT, 5))
+        if resp.status_code == 200:
+            text = resp.text
+            lowered = text.lower()
+            match = re.search(r"<level>(\\d+)</level>", text)
+            ilvl = int(match.group(1)) if match else 0
+            payload = {
+                "ilvl": ilvl,
+                "marrowgar": "lord marrowgar" in lowered,
+                "deathwhisper": "lady deathwhisper" in lowered,
+            }
+    except Exception:
+        payload = {"ilvl": 0, "marrowgar": False, "deathwhisper": False}
+
+    set_external_cache(
+        "wowhead_item_source",
+        url,
+        cache_key,
+        payload,
+        {"item_id": clean_item_id},
+    )
+    return payload
+
+
+def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
+    if not isinstance(uwu_icc_kills, dict):
+        uwu_icc_kills = {}
+
+    if not isinstance(gear_data, list) or not gear_data:
+        return uwu_icc_kills
+
+    unresolved = False
+    for boss_name in ("Marrowgar", "Deathwhisper"):
+        boss_modes = uwu_icc_kills.get(boss_name, {})
+        if not isinstance(boss_modes, dict):
+            continue
+        if boss_modes.get("25H") is None:
+            unresolved = True
+            break
+
+    if not unresolved:
+        return uwu_icc_kills
+
+    item_ids = {
+        str(item.get("item"))
+        for item in gear_data
+        if isinstance(item, dict) and str(item.get("item") or "").isdigit()
+    }
+
+    found_25h = {"Marrowgar": False, "Deathwhisper": False}
+    for item_id in item_ids:
+        hint = _fetch_item_source_hint(item_id)
+        if not isinstance(hint, dict):
+            continue
+        ilvl = int(hint.get("ilvl") or 0)
+        if ilvl < 277:
+            continue
+        if hint.get("marrowgar"):
+            found_25h["Marrowgar"] = True
+        if hint.get("deathwhisper"):
+            found_25h["Deathwhisper"] = True
+
+    for boss_name in ("Marrowgar", "Deathwhisper"):
+        boss_modes = uwu_icc_kills.setdefault(boss_name, {})
+        if not isinstance(boss_modes, dict):
+            boss_modes = {}
+            uwu_icc_kills[boss_name] = boss_modes
+        if boss_modes.get("25H") is None and found_25h.get(boss_name):
+            boss_modes["25H"] = "✅"
+
+    return uwu_icc_kills
 
 
 def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
@@ -526,6 +617,7 @@ async def _personaje_impl(
             uwu_icc_kills = {}
 
         uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
+        uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
 
         embed_final = _build_personaje_embed(
             nombre_char,
