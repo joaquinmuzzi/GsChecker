@@ -681,6 +681,12 @@ async def _personaje_impl(
             for spec in active_specs + inactive_specs
         )
 
+        # Cargar kills confirmadas del DB antes del embed inicial,
+        # así los ✅ ya guardados aparecen de inmediato sin loading.
+        persistent_confirmed = _load_confirmed_icc_kills(nombre_char)
+        initial_uwu_kills = _normalize_special_uwu_kills(dict(persistent_confirmed))
+
+        personaje_view = _build_personaje_view(nombre_char)
         embed_initial = _build_personaje_embed(
             nombre_char,
             gs,
@@ -697,13 +703,12 @@ async def _personaje_impl(
             icc_25,
             missing_enchants,
             missing_gems,
-            uwu_icc_kills=None,
+            uwu_icc_kills=initial_uwu_kills,
             loading_symbol=LOADING_FRAMES[0],
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             guild_rank=guild_rank,
             professions=professions,
         )
-        personaje_view = _build_personaje_view(nombre_char)
         await _safe_edit_original_response(interaction, content=None, embed=embed_initial, view=personaje_view)
 
         frame_idx = 1
@@ -727,7 +732,7 @@ async def _personaje_impl(
                 icc_25,
                 missing_enchants,
                 missing_gems,
-                uwu_icc_kills=None,
+                uwu_icc_kills=initial_uwu_kills,
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
                 spec_gs_value=_format_spec_gs_value(spec_gs_entries),
                 guild_rank=guild_rank,
@@ -742,7 +747,6 @@ async def _personaje_impl(
             uwu_icc_kills = {}
 
         uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
-        persistent_confirmed = _load_confirmed_icc_kills(nombre_char)
         uwu_icc_kills = _overlay_persistent_confirmed_kills(
             uwu_icc_kills,
             persistent_confirmed,
