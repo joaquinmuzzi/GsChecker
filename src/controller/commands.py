@@ -1,5 +1,4 @@
 import asyncio
-import re
 
 import discord
 
@@ -39,6 +38,11 @@ ITEM_SOURCE_TTL = 86400
 CONFIRMED_KILLS_TTL = 315360000
 ICC_SPECIAL_BOSSES = ("Marrowgar", "Deathwhisper")
 ICC_SPECIAL_MODES = ("10H", "25N", "25H")
+
+# Mapeo hardcodeado por ID de objeto (sin inferencia por ilvl en runtime).
+# Puedes ampliar estas listas con más IDs de Wowhead/Cavern of Time.
+ICC_ITEM_IDS_10H_25N = {str(item_id) for item_id in range(50604, 50618)}
+ICC_ITEM_IDS_25H = {str(item_id) for item_id in range(51928, 51939)}
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
@@ -117,7 +121,7 @@ def _persist_new_confirmed_icc_kills(nombre: str, uwu_icc_kills):
 def _fetch_item_source_hint(item_id: str) -> dict:
     clean_item_id = str(item_id or "").strip()
     if not clean_item_id.isdigit():
-        return {"ilvl": 0, "marrowgar": False, "deathwhisper": False}
+        return {"marrowgar": False, "deathwhisper": False}
 
     cache_key = f"wowhead:item-source:{clean_item_id}"
     cached = get_external_cache("wowhead_item_source", cache_key, ITEM_SOURCE_TTL)
@@ -125,7 +129,7 @@ def _fetch_item_source_hint(item_id: str) -> dict:
         return cached
 
     url = f"https://www.wowhead.com/wotlk/item={clean_item_id}&xml"
-    payload = {"ilvl": 0, "marrowgar": False, "deathwhisper": False}
+    payload = {"marrowgar": False, "deathwhisper": False}
 
     try:
         from src.schemas.constants import SESSION, HTTP_TIMEOUT
@@ -134,15 +138,12 @@ def _fetch_item_source_hint(item_id: str) -> dict:
         if resp.status_code == 200:
             text = resp.text
             lowered = text.lower()
-            match = re.search(r"<level>(\\d+)</level>", text)
-            ilvl = int(match.group(1)) if match else 0
             payload = {
-                "ilvl": ilvl,
                 "marrowgar": "lord marrowgar" in lowered,
                 "deathwhisper": "lady deathwhisper" in lowered,
             }
     except Exception:
-        payload = {"ilvl": 0, "marrowgar": False, "deathwhisper": False}
+        payload = {"marrowgar": False, "deathwhisper": False}
 
     set_external_cache(
         "wowhead_item_source",
@@ -165,7 +166,7 @@ def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
         boss_modes = uwu_icc_kills.get(boss_name, {})
         if not isinstance(boss_modes, dict):
             continue
-        if boss_modes.get("25H") != "✅":
+        if any(boss_modes.get(mode) != "✅" for mode in ICC_SPECIAL_MODES):
             unresolved = True
             break
 
@@ -178,26 +179,42 @@ def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
         if isinstance(item, dict) and str(item.get("item") or "").isdigit()
     }
 
-    found_25h = {"Marrowgar": False, "Deathwhisper": False}
+    found_modes = {
+        "Marrowgar": {"10H": False, "25N": False, "25H": False},
+        "Deathwhisper": {"10H": False, "25N": False, "25H": False},
+    }
+
+    def infer_modes_from_item_id(item_id: str):
+        if item_id in ICC_ITEM_IDS_25H:
+            return ("25H",)
+        if item_id in ICC_ITEM_IDS_10H_25N:
+            return ("10H", "25N")
+        return ()
+
     for item_id in item_ids:
+        inferred_modes = infer_modes_from_item_id(item_id)
+        if not inferred_modes:
+            continue
+
         hint = _fetch_item_source_hint(item_id)
         if not isinstance(hint, dict):
             continue
-        ilvl = int(hint.get("ilvl") or 0)
-        if ilvl < 277:
-            continue
+
         if hint.get("marrowgar"):
-            found_25h["Marrowgar"] = True
+            for mode in inferred_modes:
+                found_modes["Marrowgar"][mode] = True
         if hint.get("deathwhisper"):
-            found_25h["Deathwhisper"] = True
+            for mode in inferred_modes:
+                found_modes["Deathwhisper"][mode] = True
 
     for boss_name in ICC_SPECIAL_BOSSES:
         boss_modes = uwu_icc_kills.setdefault(boss_name, {})
         if not isinstance(boss_modes, dict):
             boss_modes = {}
             uwu_icc_kills[boss_name] = boss_modes
-        if boss_modes.get("25H") != "✅" and found_25h.get(boss_name):
-            boss_modes["25H"] = "✅"
+        for mode in ICC_SPECIAL_MODES:
+            if boss_modes.get(mode) != "✅" and found_modes.get(boss_name, {}).get(mode):
+                boss_modes[mode] = "✅"
 
     return uwu_icc_kills
 
