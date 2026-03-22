@@ -23,6 +23,7 @@ from src.functions.warmane import (
     _fetch_toc_achievements,
     _fetch_gear_data,
     _fetch_statistics,
+    _fetch_guild_rank,
 )
 from src.functions.uwu import _uwu_icc_bugfix_kills, _build_uwu_dps_summary
 from src.functions.embeds import (
@@ -46,7 +47,7 @@ ICC_ITEM_IDS_25H = {str(item_id) for item_id in range(51928, 51939)}
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
-    return f"command:personaje:v3:{nombre.strip().lower()}"
+    return f"command:personaje:v4:{nombre.strip().lower()}"
 
 
 def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
@@ -315,6 +316,7 @@ def _serialize_personaje_payload(
     clase,
     spec_display,
     guild_display,
+    guild_rank,
     halion_10n_achieved,
     halion_10h_achieved,
     halion_25n_achieved,
@@ -334,6 +336,7 @@ def _serialize_personaje_payload(
         "clase": clase,
         "spec_display": spec_display,
         "guild_display": guild_display,
+        "guild_rank": guild_rank,
         "halion_10n_achieved": halion_10n_achieved,
         "halion_10h_achieved": halion_10h_achieved,
         "halion_25n_achieved": halion_25n_achieved,
@@ -366,6 +369,7 @@ def _build_personaje_embed_from_cache(payload: dict):
         payload["missing_gems"],
         payload.get("uwu_icc_kills"),
         spec_gs_value=_format_spec_gs_value(payload.get("spec_gs_entries", [])),
+        guild_rank=payload.get("guild_rank"),
     )
 
 
@@ -611,6 +615,18 @@ async def _personaje_impl(
 
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
+        guild_rank = None
+        if guild and guild != "Sin guild":
+            try:
+                guild_rank = await loop.run_in_executor(
+                    EXECUTOR,
+                    _fetch_guild_rank,
+                    nombre_char,
+                    guild,
+                    "Lordaeron",
+                )
+            except Exception:
+                guild_rank = None
 
         for active_spec in active_specs:
             clean_active_spec = str(active_spec or "").strip()
@@ -667,6 +683,7 @@ async def _personaje_impl(
             uwu_icc_kills=None,
             loading_symbol=LOADING_FRAMES[0],
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
+            guild_rank=guild_rank,
         )
         await _safe_edit_original_response(interaction, content=None, embed=embed_initial)
 
@@ -694,6 +711,7 @@ async def _personaje_impl(
                 uwu_icc_kills=None,
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
                 spec_gs_value=_format_spec_gs_value(spec_gs_entries),
+                guild_rank=guild_rank,
             )
             frame_idx += 1
             await _safe_edit_original_response(interaction, content=None, embed=embed_loading)
@@ -741,6 +759,7 @@ async def _personaje_impl(
             missing_gems,
             uwu_icc_kills=uwu_icc_kills,
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
+            guild_rank=guild_rank,
         )
         set_external_cache(
             "command_personaje",
@@ -754,6 +773,7 @@ async def _personaje_impl(
                 clase,
                 spec_display,
                 guild_display,
+                guild_rank,
                 halion_10n_achieved,
                 halion_10h_achieved,
                 halion_25n_achieved,

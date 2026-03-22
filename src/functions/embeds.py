@@ -253,6 +253,7 @@ def _build_personaje_embed(
     uwu_icc_kills=None,
     loading_symbol="?",
     spec_gs_value: str | None = None,
+    guild_rank: str | None = None,
 ):
     embed = discord.Embed(title=nombre_char, color=0x2B2D31)
     embed.add_field(name="Spec | GS", value=spec_gs_value or str(gs), inline=True)
@@ -261,7 +262,11 @@ def _build_personaje_embed(
         value=f"{nivel} {raza} {clase}",
         inline=True,
     )
-    embed.add_field(name="Guild", value=guild_display, inline=True)
+    guild_value = guild_display
+    clean_rank = str(guild_rank or "").strip()
+    if clean_rank:
+        guild_value = f"{guild_display}\nRank: {clean_rank}"
+    embed.add_field(name="Guild", value=guild_value, inline=True)
     embed.add_field(
         name="Armory",
         value=f"https://armory.warmane.com/character/{nombre_char}/Lordaeron/profile",

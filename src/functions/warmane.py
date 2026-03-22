@@ -1,5 +1,6 @@
 import re
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
@@ -16,6 +17,8 @@ from src.schemas.constants import (
     GEAR_TTL,
     STATS_CACHE,
     STATS_TTL,
+    GUILD_RANK_CACHE,
+    GUILD_RANK_TTL,
 )
 from src.functions.cache import _cache_get, _cache_set
 
@@ -281,6 +284,57 @@ def _fetch_summary(nombre: str, server: str):
 
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
     return profile_scraper.get_specs(nombre, server)
+
+
+def _fetch_guild_rank(nombre: str, guild: str, server: str):
+    clean_name = str(nombre or "").strip()
+    clean_guild = str(guild or "").strip()
+    clean_server = str(server or "").strip()
+    if not clean_name or not clean_guild or clean_guild == "Sin guild":
+        return None
+
+    cache_key = (clean_name.lower(), clean_guild.lower(), clean_server.lower())
+    cached = _cache_get(GUILD_RANK_CACHE, cache_key, GUILD_RANK_TTL)
+    if cached is not None:
+        return cached or None
+
+    guild_slug = quote_plus(clean_guild)
+    guild_path = f"/guild/{guild_slug}/{clean_server}/summary/{clean_name}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Referer": "https://armory.warmane.com/",
+    }
+
+    resp = _warmane_get_with_scheme_fallback(guild_path, headers)
+    if resp is None:
+        return None
+
+    try:
+        soup = BeautifulSoup(resp.text, "html.parser")
+        target_name = clean_name.lower()
+        for row in soup.select("#data-table-list tr"):
+            link = row.select_one("td a[href*='/character/'][href*='/profile']")
+            if not link:
+                continue
+            row_name = link.get_text(" ", strip=True).lower()
+            if row_name != target_name:
+                continue
+            cells = row.find_all("td")
+            if not cells:
+                break
+            rank_text = cells[-1].get_text(" ", strip=True)
+            rank_text = " ".join(rank_text.split())
+            if rank_text:
+                _cache_set(GUILD_RANK_CACHE, cache_key, rank_text)
+                return rank_text
+            break
+    except Exception:
+        return None
+
+    _cache_set(GUILD_RANK_CACHE, cache_key, "")
+    return None
 
 
 def _fetch_achievements(nombre: str, server: str):
