@@ -296,6 +296,9 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
     cache_key = (clean_name.lower(), clean_guild.lower(), clean_server.lower())
     cached = _cache_get(GUILD_RANK_CACHE, cache_key, GUILD_RANK_TTL)
     if cached is not None:
+        print(
+            f"[INFO] Guild rank cache hit for '{clean_name}' guild='{clean_guild}' => {cached!r}"
+        )
         return cached or None
 
     guild_slug = quote_plus(clean_guild)
@@ -309,6 +312,9 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
 
     resp = _warmane_get_with_scheme_fallback(guild_path, headers)
     if resp is None:
+        print(
+            f"[WARN] Guild rank request failed for '{clean_name}' guild='{clean_guild}'"
+        )
         return None
 
     try:
@@ -328,12 +334,39 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
             rank_text = " ".join(rank_text.split())
             if rank_text:
                 _cache_set(GUILD_RANK_CACHE, cache_key, rank_text)
+                print(
+                    f"[INFO] Guild rank parsed for '{clean_name}' guild='{clean_guild}' => {rank_text!r}"
+                )
                 return rank_text
             break
     except Exception:
-        return None
+        print(
+            f"[WARN] Guild rank BeautifulSoup parsing failed for '{clean_name}' guild='{clean_guild}'"
+        )
+
+    try:
+        pattern = re.compile(
+            rf'<a href="/character/{re.escape(clean_name)}/{re.escape(clean_server)}/profile">{re.escape(clean_name)}</a>.*?<td class="dt-center">([^<]+)</td>',
+            re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.search(resp.text)
+        if match:
+            rank_text = " ".join(match.group(1).split())
+            if rank_text:
+                _cache_set(GUILD_RANK_CACHE, cache_key, rank_text)
+                print(
+                    f"[INFO] Guild rank regex fallback for '{clean_name}' guild='{clean_guild}' => {rank_text!r}"
+                )
+                return rank_text
+    except Exception:
+        print(
+            f"[WARN] Guild rank regex fallback failed for '{clean_name}' guild='{clean_guild}'"
+        )
 
     _cache_set(GUILD_RANK_CACHE, cache_key, "")
+    print(
+        f"[WARN] Guild rank not found for '{clean_name}' guild='{clean_guild}'"
+    )
     return None
 
 
