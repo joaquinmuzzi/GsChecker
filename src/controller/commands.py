@@ -36,10 +36,13 @@ from src.functions.embeds import (
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
 ITEM_SOURCE_TTL = 86400
+CONFIRMED_KILLS_TTL = 315360000
+ICC_SPECIAL_BOSSES = ("Marrowgar", "Deathwhisper")
+ICC_SPECIAL_MODES = ("10H", "25N", "25H")
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
-    return f"command:personaje:{nombre.strip().lower()}"
+    return f"command:personaje:v3:{nombre.strip().lower()}"
 
 
 def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
@@ -48,6 +51,67 @@ def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
 
 def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:
     return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
+
+
+def _build_confirmed_icc_kills_key(nombre: str) -> str:
+    return f"character:icc-confirmed-kills:{nombre.strip().lower()}"
+
+
+def _normalize_special_uwu_kills(uwu_icc_kills):
+    base = uwu_icc_kills if isinstance(uwu_icc_kills, dict) else {}
+    for boss_name in ICC_SPECIAL_BOSSES:
+        boss_modes = base.setdefault(boss_name, {})
+        if not isinstance(boss_modes, dict):
+            boss_modes = {}
+            base[boss_name] = boss_modes
+        for mode in ICC_SPECIAL_MODES:
+            boss_modes.setdefault(mode, None)
+    return base
+
+
+def _load_confirmed_icc_kills(nombre: str) -> dict:
+    cached = get_external_cache(
+        "character_icc_confirmed_kills",
+        _build_confirmed_icc_kills_key(nombre),
+        CONFIRMED_KILLS_TTL,
+    )
+    return _normalize_special_uwu_kills(cached if isinstance(cached, dict) else {})
+
+
+def _overlay_persistent_confirmed_kills(uwu_icc_kills, persistent_confirmed: dict):
+    uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
+    persistent_confirmed = _normalize_special_uwu_kills(persistent_confirmed)
+    for boss_name in ICC_SPECIAL_BOSSES:
+        for mode in ICC_SPECIAL_MODES:
+            if persistent_confirmed.get(boss_name, {}).get(mode) == "✅":
+                uwu_icc_kills[boss_name][mode] = "✅"
+    return uwu_icc_kills
+
+
+def _persist_new_confirmed_icc_kills(nombre: str, uwu_icc_kills):
+    uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
+    persistent_confirmed = _load_confirmed_icc_kills(nombre)
+    changed = False
+
+    for boss_name in ICC_SPECIAL_BOSSES:
+        for mode in ICC_SPECIAL_MODES:
+            if (
+                uwu_icc_kills.get(boss_name, {}).get(mode) == "✅"
+                and persistent_confirmed.get(boss_name, {}).get(mode) != "✅"
+            ):
+                persistent_confirmed[boss_name][mode] = "✅"
+                changed = True
+
+    if changed:
+        set_external_cache(
+            "character_icc_confirmed_kills",
+            "/personaje/confirmed-kills",
+            _build_confirmed_icc_kills_key(nombre),
+            persistent_confirmed,
+            {"character": nombre},
+        )
+
+    return persistent_confirmed
 
 
 def _fetch_item_source_hint(item_id: str) -> dict:
@@ -91,18 +155,17 @@ def _fetch_item_source_hint(item_id: str) -> dict:
 
 
 def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
-    if not isinstance(uwu_icc_kills, dict):
-        uwu_icc_kills = {}
+    uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
 
     if not isinstance(gear_data, list) or not gear_data:
         return uwu_icc_kills
 
     unresolved = False
-    for boss_name in ("Marrowgar", "Deathwhisper"):
+    for boss_name in ICC_SPECIAL_BOSSES:
         boss_modes = uwu_icc_kills.get(boss_name, {})
         if not isinstance(boss_modes, dict):
             continue
-        if boss_modes.get("25H") is None:
+        if boss_modes.get("25H") != "✅":
             unresolved = True
             break
 
@@ -128,37 +191,44 @@ def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
         if hint.get("deathwhisper"):
             found_25h["Deathwhisper"] = True
 
-    for boss_name in ("Marrowgar", "Deathwhisper"):
+    for boss_name in ICC_SPECIAL_BOSSES:
         boss_modes = uwu_icc_kills.setdefault(boss_name, {})
         if not isinstance(boss_modes, dict):
             boss_modes = {}
             uwu_icc_kills[boss_name] = boss_modes
-        if boss_modes.get("25H") is None and found_25h.get(boss_name):
+        if boss_modes.get("25H") != "✅" and found_25h.get(boss_name):
             boss_modes["25H"] = "✅"
 
     return uwu_icc_kills
 
 
 def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
-    if not isinstance(uwu_icc_kills, dict):
-        uwu_icc_kills = {}
+    uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
 
     if not isinstance(achi_payload, dict):
         return uwu_icc_kills
 
+    completed_ids = achi_payload.get("completed_ids", set())
+    if isinstance(completed_ids, list):
+        completed_ids = set(str(x) for x in completed_ids)
+    elif isinstance(completed_ids, set):
+        completed_ids = set(str(x) for x in completed_ids)
+    else:
+        completed_ids = set()
+
     mode_to_achievement = {
-        "10H": "storming_10h_achieved",
-        "25N": "storming_25n_achieved",
-        "25H": "storming_25h_achieved",
+        "10H": bool(achi_payload.get("storming_10h_achieved") or "4628" in completed_ids),
+        "25N": bool(achi_payload.get("storming_25n_achieved") or "4604" in completed_ids),
+        "25H": bool(achi_payload.get("storming_25h_achieved") or "4632" in completed_ids),
     }
 
-    for boss_name in ("Marrowgar", "Deathwhisper"):
+    for boss_name in ICC_SPECIAL_BOSSES:
         boss_modes = uwu_icc_kills.setdefault(boss_name, {})
         if not isinstance(boss_modes, dict):
             boss_modes = {}
             uwu_icc_kills[boss_name] = boss_modes
-        for mode, achievement_key in mode_to_achievement.items():
-            if boss_modes.get(mode) is None and achi_payload.get(achievement_key):
+        for mode, achieved in mode_to_achievement.items():
+            if boss_modes.get(mode) != "✅" and achieved:
                 boss_modes[mode] = "✅"
 
     return uwu_icc_kills
@@ -616,8 +686,25 @@ async def _personaje_impl(
         except Exception:
             uwu_icc_kills = {}
 
+        uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
+        persistent_confirmed = _load_confirmed_icc_kills(nombre_char)
+        uwu_icc_kills = _overlay_persistent_confirmed_kills(
+            uwu_icc_kills,
+            persistent_confirmed,
+        )
+
+        # Orden requerido:
+        # 1) UwU Logs
+        # 2) Storming the Citadel
+        # 3) Ítems equipados del boss
         uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
         uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
+
+        persistent_confirmed = _persist_new_confirmed_icc_kills(nombre_char, uwu_icc_kills)
+        uwu_icc_kills = _overlay_persistent_confirmed_kills(
+            uwu_icc_kills,
+            persistent_confirmed,
+        )
 
         embed_final = _build_personaje_embed(
             nombre_char,
