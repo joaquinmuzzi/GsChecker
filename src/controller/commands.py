@@ -19,6 +19,7 @@ from src.schemas.constants import (
 from src.functions.warmane import (
     _fetch_summary,
     _fetch_specs,
+    _fetch_professions,
     _fetch_achievements,
     _fetch_toc_achievements,
     _fetch_gear_data,
@@ -328,6 +329,7 @@ def _serialize_personaje_payload(
     missing_gems,
     uwu_icc_kills,
     spec_gs_entries,
+    professions=None,
 ):
     return {
         "nombre_char": nombre_char,
@@ -348,6 +350,7 @@ def _serialize_personaje_payload(
         "missing_gems": missing_gems,
         "uwu_icc_kills": uwu_icc_kills,
         "spec_gs_entries": spec_gs_entries,
+        "professions": professions or [],
     }
 
 
@@ -371,6 +374,7 @@ def _build_personaje_embed_from_cache(payload: dict):
         payload.get("uwu_icc_kills"),
         spec_gs_value=_format_spec_gs_value(payload.get("spec_gs_entries", [])),
         guild_rank=payload.get("guild_rank"),
+        professions=payload.get("professions"),
     )
 
 
@@ -546,6 +550,9 @@ async def _personaje_impl(
         uwu_icc_task = loop.run_in_executor(
             EXECUTOR, _uwu_icc_bugfix_kills, nombre, UWU_SERVER
         )
+        prof_task = loop.run_in_executor(
+            EXECUTOR, _fetch_professions, nombre, "Lordaeron"
+        )
         summary_task = loop.run_in_executor(
             EXECUTOR, _fetch_summary, nombre, "Lordaeron"
         )
@@ -559,8 +566,8 @@ async def _personaje_impl(
             EXECUTOR, _fetch_statistics, nombre, "Lordaeron", 15062
         )
 
-        summary, gear_data, achi_payload, stats_rows = await asyncio.gather(
-            summary_task, gear_task, achi_task, stats_task
+        summary, gear_data, achi_payload, stats_rows, professions = await asyncio.gather(
+            summary_task, gear_task, achi_task, stats_task, prof_task
         )
 
         if isinstance(summary, dict) and summary.get("__error__"):
@@ -686,6 +693,7 @@ async def _personaje_impl(
             loading_symbol=LOADING_FRAMES[0],
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             guild_rank=guild_rank,
+            professions=professions,
         )
         personaje_view = _build_personaje_view(nombre_char)
         await _safe_edit_original_response(interaction, content=None, embed=embed_initial, view=personaje_view)
@@ -715,6 +723,7 @@ async def _personaje_impl(
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
                 spec_gs_value=_format_spec_gs_value(spec_gs_entries),
                 guild_rank=guild_rank,
+                professions=professions,
             )
             frame_idx += 1
             await _safe_edit_original_response(interaction, content=None, embed=embed_loading, view=personaje_view)
@@ -763,6 +772,7 @@ async def _personaje_impl(
             uwu_icc_kills=uwu_icc_kills,
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             guild_rank=guild_rank,
+            professions=professions,
         )
         set_external_cache(
             "command_personaje",
@@ -787,6 +797,7 @@ async def _personaje_impl(
                 missing_gems,
                 uwu_icc_kills,
                 spec_gs_entries,
+                professions,
             ),
             {"character": nombre_char, "command": command_name},
         )

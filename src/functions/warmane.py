@@ -286,6 +286,42 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
     return profile_scraper.get_specs(nombre, server)
 
 
+def _fetch_professions(nombre: str, server: str) -> list[str]:
+    nombre = (nombre or "").strip()
+    server = (server or "").strip()
+    cache_key = ("professions", nombre.lower(), server.lower())
+    cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
+    if cached is not None:
+        return cached
+
+    profile_path = f"/character/{nombre}/{server}/profile"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://armory.warmane.com/",
+    }
+    resp = _warmane_get_with_scheme_fallback(profile_path, headers)
+    if resp is None:
+        return []
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    prof_section = soup.find(class_="profskills")
+    if not prof_section:
+        return []
+
+    result = []
+    for stub in prof_section.find_all(class_="stub"):
+        parts = [p.strip() for p in stub.get_text("\n", strip=True).split("\n") if p.strip()]
+        if len(parts) < 2:
+            continue
+        name = parts[0].capitalize()
+        value = parts[1].replace(" ", "")
+        result.append(f"{name} {value}")
+
+    _cache_set(SUMMARY_CACHE, cache_key, result)
+    return result
+
+
 def _fetch_guild_rank(nombre: str, guild: str, server: str):
     clean_name = str(nombre or "").strip()
     clean_guild = str(guild or "").strip()
@@ -296,9 +332,6 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
     cache_key = (clean_name.lower(), clean_guild.lower(), clean_server.lower())
     cached = _cache_get(GUILD_RANK_CACHE, cache_key, GUILD_RANK_TTL)
     if cached is not None:
-        print(
-            f"[INFO] Guild rank cache hit for '{clean_name}' guild='{clean_guild}' => {cached!r}"
-        )
         return cached or None
 
     guild_slug = quote_plus(clean_guild)

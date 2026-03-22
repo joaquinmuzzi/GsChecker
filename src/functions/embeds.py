@@ -254,12 +254,15 @@ def _build_personaje_embed(
     loading_symbol="?",
     spec_gs_value: str | None = None,
     guild_rank: str | None = None,
+    professions: list[str] | None = None,
 ):
     embed = discord.Embed(title=nombre_char, color=0x2B2D31)
     embed.add_field(name="Spec | GS", value=spec_gs_value or str(gs), inline=True)
     embed.add_field(
         name="Level | Race | Class",
-        value=f"{nivel} {raza} {clase}",
+        value=f"{nivel} {raza} {clase}" + (
+            ("\n" + " · ".join(professions)) if professions else ""
+        ),
         inline=True,
     )
     guild_value = guild_display
