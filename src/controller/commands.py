@@ -455,6 +455,7 @@ def _serialize_personaje_payload(
     missing_gems,
     uwu_icc_kills,
     spec_gs_entries,
+    active_spec_name,
     professions=None,
 ):
     return {
@@ -477,6 +478,7 @@ def _serialize_personaje_payload(
         "missing_gems": missing_gems,
         "uwu_icc_kills": uwu_icc_kills,
         "spec_gs_entries": spec_gs_entries,
+        "active_spec_name": active_spec_name,
         "professions": professions or [],
     }
 
@@ -502,6 +504,7 @@ def _build_personaje_embed_from_cache(payload: dict):
         spec_gs_value=_format_spec_gs_value(payload.get("spec_gs_entries", [])),
         guild_rank=payload.get("guild_rank"),
         professions=payload.get("professions"),
+        active_spec_name=payload.get("active_spec_name"),
     )
 
 
@@ -803,6 +806,7 @@ async def _personaje_impl(
             gs_by_spec,
             active_specs,
         )
+        active_spec_name = active_specs[0] if active_specs else None
 
         halion_10n_achieved = achi_payload["halion_10n_achieved"]
         halion_10h_achieved = achi_payload["halion_10h_achieved"]
@@ -843,6 +847,7 @@ async def _personaje_impl(
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             guild_rank=guild_rank,
             professions=professions,
+            active_spec_name=active_spec_name,
         )
         await _safe_edit_original_response(interaction, content=None, embed=embed_initial, view=personaje_view)
 
@@ -872,6 +877,7 @@ async def _personaje_impl(
                 spec_gs_value=_format_spec_gs_value(spec_gs_entries),
                 guild_rank=guild_rank,
                 professions=professions,
+                active_spec_name=active_spec_name,
             )
             frame_idx += 1
             await _safe_edit_original_response(interaction, content=None, embed=embed_loading, view=personaje_view)
@@ -924,6 +930,7 @@ async def _personaje_impl(
             spec_gs_value=_format_spec_gs_value(spec_gs_entries),
             guild_rank=guild_rank,
             professions=professions,
+            active_spec_name=active_spec_name,
         )
         set_external_cache(
             "command_personaje",
@@ -949,6 +956,7 @@ async def _personaje_impl(
                 missing_gems,
                 uwu_icc_kills,
                 spec_gs_entries,
+                active_spec_name,
                 professions,
             ),
             {"character": nombre_char, "command": command_name, "server": realm},

@@ -263,6 +263,35 @@ _PROF_ABBREV = {
     "tailoring": "Tailor.",
 }
 
+_SPEC_ICON_URLS = {
+    "arms": "https://cdn.warmane.com/wotlk/icons/medium/ability_warrior_savageblow.jpg",
+    "fury": "https://cdn.warmane.com/wotlk/icons/medium/ability_warrior_innerrage.jpg",
+    "protection": "https://cdn.warmane.com/wotlk/icons/medium/inv_shield_06.jpg",
+    "holy": "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_holybolt.jpg",
+    "retribution": "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_auraoflight.jpg",
+    "blood": "https://cdn.warmane.com/wotlk/icons/medium/spell_deathknight_bloodpresence.jpg",
+    "frost": "https://cdn.warmane.com/wotlk/icons/medium/spell_deathknight_frostpresence.jpg",
+    "unholy": "https://cdn.warmane.com/wotlk/icons/medium/spell_deathknight_unholypresence.jpg",
+    "balance": "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_starfall.jpg",
+    "feral combat": "https://cdn.warmane.com/wotlk/icons/medium/ability_racial_bearform.jpg",
+    "restoration": "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_healingtouch.jpg",
+    "beast mastery": "https://cdn.warmane.com/wotlk/icons/medium/ability_hunter_bestialdiscipline.jpg",
+    "marksmanship": "https://cdn.warmane.com/wotlk/icons/medium/ability_marksmanship.jpg",
+    "survival": "https://cdn.warmane.com/wotlk/icons/medium/ability_hunter_camouflage.jpg",
+    "arcane": "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_magicalsentry.jpg",
+    "fire": "https://cdn.warmane.com/wotlk/icons/medium/spell_fire_firebolt02.jpg",
+    "discipline": "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_powerwordshield.jpg",
+    "shadow": "https://cdn.warmane.com/wotlk/icons/medium/spell_shadow_shadowwordpain.jpg",
+    "assassination": "https://cdn.warmane.com/wotlk/icons/medium/ability_rogue_eviscerate.jpg",
+    "combat": "https://cdn.warmane.com/wotlk/icons/medium/ability_backstab.jpg",
+    "subtlety": "https://cdn.warmane.com/wotlk/icons/medium/ability_stealth.jpg",
+    "elemental": "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_lightning.jpg",
+    "enhancement": "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_lightningshield.jpg",
+    "affliction": "https://cdn.warmane.com/wotlk/icons/medium/spell_shadow_deathcoil.jpg",
+    "demonology": "https://cdn.warmane.com/wotlk/icons/medium/spell_shadow_metamorphosis.jpg",
+    "destruction": "https://cdn.warmane.com/wotlk/icons/medium/spell_shadow_rainoffire.jpg",
+}
+
 
 def _format_professions_short(professions: list[str]) -> str:
     parts = []
@@ -274,6 +303,13 @@ def _format_professions_short(professions: list[str]) -> str:
         abbrev = _PROF_ABBREV.get(name.lower(), name)
         parts.append(f"{abbrev} {value}".strip())
     return " - ".join(parts)
+
+
+def _spec_icon_url(active_spec_name: str | None) -> str | None:
+    clean_name = str(active_spec_name or "").strip().lower()
+    if not clean_name:
+        return None
+    return _SPEC_ICON_URLS.get(clean_name)
 
 
 def _build_personaje_embed(
@@ -297,8 +333,12 @@ def _build_personaje_embed(
     spec_gs_value: str | None = None,
     guild_rank: str | None = None,
     professions: list[str] | None = None,
+    active_spec_name: str | None = None,
 ):
     embed = discord.Embed(title=nombre_char, color=0x2B2D31)
+    icon_url = _spec_icon_url(active_spec_name)
+    if icon_url and active_spec_name:
+        embed.set_author(name=active_spec_name, icon_url=icon_url)
     embed.add_field(name="Spec", value=spec_gs_value or str(gs), inline=True)
     prof_line = _format_professions_short(professions) if professions else ""
     race_class_value = f"{raza} {clase}"
