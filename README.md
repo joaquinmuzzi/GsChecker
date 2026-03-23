@@ -1,96 +1,108 @@
 # GsChecker
 
-## Feature Summary
+Bot de Discord para consultar personajes de Warmane (WotLK), con foco en resumen de progreso PvE/PvP y calidad de equipo.
 
-- GearScore calculation.
-- ICC 10/25 progression per boss (Normal and Heroic) using Armory statistics.
-- Ruby Sanctum (Halion) progression via The Twilight Destroyer achievements (10/25, Normal/Heroic).
-- Trial of the Crusader (TOC) 10/25 Normal/Heroic via Call of the Crusade / Grand Crusade achievements.
-- DPS preview using [uwulogs](https://uwu-logs.xyz/) API
+## Features
 
-## Example
+- Cálculo de GearScore local a partir de ítems equipados.
+- Resumen de personaje con:
+  - clase/raza/nivel,
+  - specs (activa e inactiva),
+  - guild + rango,
+  - progreso ICC 10/25 (normal y heroico),
+  - Ruby Sanctum (Halion),
+  - enchants/gemas faltantes,
+  - links a Armory y UwU Logs.
+- DPS por boss (max/promedio) vía uwu-logs.xyz.
+- Logros ToC (10N/10H/25N/25H).
+- Cache en memoria + cache externo en Postgres (si está configurado).
 
-![Ejemplo del bot](docs/ejemplo.png)
+## Comandos
 
-## Installation
+- `/personaje <nombre> [reino]`
+- `/p <nombre> [reino]` (alias corto)
+- `/dps <nombre> [spec]`
+- `/ptoc <nombre>`
+- `/ping`
 
-1. Clone and enter the repository
+### Alcance por comando
 
-```python
-  1. git clone <https://github.com/yourusername/GsChecker.git>
-  2. cd GsChecker
+- `/personaje` y `/p`: aceptan reino opcional (por defecto Lordaeron).
+- `/dps` y `/ptoc`: actualmente consultan Lordaeron.
+
+Reinos soportados por `/personaje` en el estado actual del código:
+
+- Lordaeron
+- Icecrown
+- Blackrock
+- Onyxia
+- Frostmourne
+
+## Instalación
+
+1) Clonar repositorio
+
+```bash
+git clone https://github.com/joaquinmuzzi/GsChecker.git
+cd GsChecker
 ```
 
-2. Create a .env file and add:
+2) Crear `.env`
 
-```python
-DISCORD_TOKEN=your_token_here
+```bash
+DISCORD_TOKEN=tu_token
 ```
 
-3. Install dependencies
+3) Instalar dependencias y ejecutar
 
-### Option A: Script
+### Opción A (script)
 
-```Python
+```bash
 ./run.sh
 ```
 
-### Option B: Pip
+### Opción B (venv + pip)
 
-```Python
+```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
 
-### Option C: Poetry
+### Opción C (Poetry)
 
-```Python
+```bash
 poetry install
 poetry run python main.py
 ```
 
-#### Usage Commands
+## Arquitectura rápida
 
-`/p <name>`: general summary (GS, ICC, RS, enchants/gems, and links).
+- `main.py`: arranque del bot, sync de slash commands, lock de proceso.
+- `src/controller/commands.py`: comandos slash y orquestación.
+- `src/functions/warmane.py`: integración Armory (summary, stats, achievements, guild rank).
+- `src/functions/uwu.py`: integración uwu-logs.xyz.
+- `profile_scraper.py`: parsing de gear/spec/enchants/gems.
+- `src/db/postgres.py`: cache externa (`external_api_cache`).
 
-`/ptoc <name>`: shows only TOC 10/25 NM/HC achievements.
+## Diagnóstico del estado actual (22-03-2026)
 
-`/dps <name>`: UwU Logs DPS by boss (max and average).
+- El proyecto está funcional y con mejoras recientes en:
+  - aislamiento de cache de GS por reino,
+  - fallbacks para specs/summary,
+  - ícono de spec activa en header del embed.
+- Riesgos conocidos:
+  - Warmane puede responder con rate-limit o payloads incompletos en endpoints de talentos.
+  - `/dps` depende completamente de uwu-logs.xyz.
+  - Puede existir data legacy en cache externa previa a cambios de claves por reino.
 
+## Ejemplo
 
-### Code Reuse
+![Ejemplo del bot](docs/ejemplo.png)
 
-This project is based on the logic and achievement ID mappings from the WarmaneProfileParser project (MIT).
+## Code Reuse
 
-The original repository is not included in this project; only ideas and achievement mapping data were reused.
+Este proyecto reutiliza ideas y mapeos de IDs/logros inspirados en WarmaneProfileParser (MIT):
 
-Original repository:
-<https://github.com/Ridepad/WarmaneProfileParser>
-
-Original project license (MIT):
-
-```bash
-MIT License
-
-Copyright (c) 2020 Ridepad
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+- https://github.com/Ridepad/WarmaneProfileParser

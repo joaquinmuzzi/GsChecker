@@ -472,7 +472,7 @@
 <header>
   <div class="badge">Discord Bot</div>
   <h1>Gs<span>Checker</span></h1>
-  <p>Manual de usuario · Servidor <strong>Lordaeron</strong> (Warmane)</p>
+  <p>Manual de usuario · Warmane WotLK (multi-reino en <strong>/personaje</strong>)</p>
 </header>
 
 <div class="page">
@@ -506,7 +506,7 @@
       <h2>GsChecker</h2>
       <p>
         <strong>GsChecker</strong> es un bot de Discord que permite consultar información de personajes
-        del servidor <strong>Lordaeron</strong> (Warmane, WotLK). Con un simple comando podés ver
+        de Warmane (WotLK). Con un simple comando podés ver
         GearScore, progresión de raids, logros, specs activas, enchants/gemas faltantes y
         estadísticas de DPS desde UwU Logs.
       </p>
@@ -529,6 +529,7 @@
         <div class="syntax">
           <span class="prefix">/personaje</span>
           <span class="arg"> &lt;nombre&gt;</span>
+          <span class="opt"> [reino]</span>
         </div>
         <div class="alias">Alias: <code>/p</code></div>
         <p>
@@ -541,14 +542,24 @@
           <tr>
             <td><code>nombre</code></td>
             <td><span class="req">requerido</span></td>
-            <td>Nombre del personaje en Lordaeron.</td>
+            <td>Nombre del personaje.</td>
+          </tr>
+          <tr>
+            <td><code>reino</code></td>
+            <td><span class="opt-label">opcional</span></td>
+            <td>
+              Reino del personaje. Si no se envía, usa <strong>Lordaeron</strong>.
+              Reinos soportados en estado actual: Lordaeron, Icecrown, Blackrock, Onyxia, Frostmourne.
+            </td>
           </tr>
         </table>
 
         <h3>Ejemplo</h3>
         <div class="preview"><span class="blue">/personaje Muzzi</span>
 <span class="green"># o equivalentemente:</span>
-<span class="blue">/p Muzzi</span></div>
+      <span class="blue">/p Muzzi</span>
+      <span class="green"># con reino explícito:</span>
+      <span class="blue">/p Muzzi Icecrown</span></div>
 
         <h3>¿Qué incluye la respuesta?</h3>
         <ul style="padding-left:20px; margin-top:6px; line-height:2">
@@ -597,7 +608,7 @@ Lich King   | <span class="green">✅ 12</span>     | <span class="red">❌ 0</s
           <tr>
             <td><code>nombre</code></td>
             <td><span class="req">requerido</span></td>
-            <td>Nombre del personaje en Lordaeron.</td>
+            <td>Nombre del personaje en Lordaeron (alcance actual de /dps).</td>
           </tr>
           <tr>
             <td><code>spec</code></td>
@@ -644,7 +655,7 @@ Saurfang   | 10N  | 11    | <span class="gold">7200.50</span>   | 6850.22
           <tr>
             <td><code>nombre</code></td>
             <td><span class="req">requerido</span></td>
-            <td>Nombre del personaje en Lordaeron.</td>
+            <td>Nombre del personaje en Lordaeron (alcance actual de /ptoc).</td>
           </tr>
         </table>
 
@@ -757,8 +768,13 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
 
       <h3>Servidor</h3>
       <div class="callout info">
-        El bot está configurado para el servidor <strong>Lordaeron</strong> únicamente.
-        Consultas de otros servidores de Warmane no están soportadas.
+        <strong>/personaje</strong> y <strong>/p</strong> permiten elegir reino (por defecto Lordaeron).<br>
+        <strong>/dps</strong> y <strong>/ptoc</strong> actualmente operan sobre Lordaeron.
+      </div>
+
+      <div class="callout warn">
+        ⚠️ Algunas respuestas de Armory pueden variar por reino (especialmente talentos/specs), y hay rate-limit intermitente.
+        Si un dato no aparece al instante, reintentar luego de unos segundos.
       </div>
     </section>
 
@@ -780,9 +796,11 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
       </a>
 
       <h3>Arquitectura general</h3>
-      <p>El bot corre como un proceso único (Python) en Railway. Cada comando dispara tareas
-         concurrentes usando <code>asyncio</code> + <code>ThreadPoolExecutor</code> para no
-         bloquear el event loop mientras se hacen requests HTTP.</p>
+      <p>
+        El bot corre como proceso único (Python). Los slash commands están en
+        <code>src/controller/commands.py</code> y ejecutan tareas concurrentes con
+        <code>asyncio</code> + <code>ThreadPoolExecutor</code> para consultas a Warmane/UwU.
+      </p>
 
       <div class="flow">
         <div class="flow-step">Usuario en Discord</div>
@@ -805,10 +823,33 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
         <div class="arch-card">
           <div class="arch-title">main.py</div>
           <ul>
-            <li>Comandos del bot</li>
-            <li>Caché en memoria (TTL)</li>
-            <li>Formateo de tablas y embeds</li>
+            <li>Boot del bot + sync slash commands</li>
             <li>Lock de proceso (<code>/tmp</code>)</li>
+            <li>Carga de entorno y DB init</li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-title">src/controller/commands.py</div>
+          <ul>
+            <li>Implementación de /personaje, /p, /dps, /ptoc, /ping</li>
+            <li>Orquestación async de fuentes externas</li>
+            <li>Cache command-level y serialización de payload</li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-title">src/functions/warmane.py</div>
+          <ul>
+            <li>Summary, achievements, stats y guild rank</li>
+            <li>Fallbacks API/HTML de Armory</li>
+            <li>Cache en memoria con TTL</li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-title">src/functions/uwu.py</div>
+          <ul>
+            <li>Integración uwu-logs.xyz</li>
+            <li>Resumen DPS por boss/mode</li>
+            <li>Fallbacks para kills especiales</li>
           </ul>
         </div>
         <div class="arch-card">
@@ -817,6 +858,14 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
             <li>Scraping de página de perfil</li>
             <li>Extracción de gear y specs</li>
             <li>Detección de enchants/gemas faltantes</li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-title">src/db/postgres.py</div>
+          <ul>
+            <li>Cache externo (<code>external_api_cache</code>)</li>
+            <li>Lectura/escritura de payloads JSON</li>
+            <li>TTL por fuente</li>
           </ul>
         </div>
         <div class="arch-card">
@@ -838,7 +887,11 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
       </div>
 
       <h3>Variables de entorno requeridas</h3>
-      <div class="preview">DISCORD_TOKEN=<span class="gold">tu_token_aqui</span></div>
+      <div class="preview">DISCORD_TOKEN=<span class="gold">tu_token_aqui</span>
+
+    # Opcional para cache externo
+    DATABASE_URL=<span class="gold">postgresql://user:pass@host:5432/db</span>
+    # (también soporta POSTGRES_URL o variables PG*)</div>
 
       <h3>Correr localmente</h3>
       <div class="preview"><span class="green"># Clonar e instalar dependencias</span>
