@@ -49,7 +49,7 @@ ICC_ITEM_IDS_25H = {str(item_id) for item_id in range(51928, 51939)}
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
-    return f"command:personaje:v6:{nombre.strip().lower()}"
+    return f"command:personaje:v7:{nombre.strip().lower()}"
 
 
 def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
@@ -61,6 +61,10 @@ def _build_character_spec_gs_key(nombre: str, server: str, spec_name: str) -> st
         f"character:spec-gs:{server.strip().lower()}:"
         f"{nombre.strip().lower()}:{spec_name.strip().lower()}"
     )
+
+
+def _build_character_spec_gs_legacy_key(nombre: str, spec_name: str) -> str:
+    return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
 
 
 def _build_confirmed_icc_kills_key(nombre: str, server: str) -> str:
@@ -308,13 +312,29 @@ def _get_known_gs_by_spec(
         if clean_name in active_specs and current_gs not in {None, "N/A"}:
             result[clean_name] = current_gs
             continue
+
+        cache_payload = None
         cached = get_external_cache(
             "character_spec_gs",
             _build_character_spec_gs_key(nombre, server, clean_name),
             CHARACTER_SPEC_GS_TTL,
         )
         if isinstance(cached, dict) and cached.get("gs") not in {None, "N/A"}:
-            result[clean_name] = cached.get("gs")
+            cache_payload = cached
+
+        if cache_payload is None:
+            legacy_cached = get_external_cache(
+                "character_spec_gs",
+                _build_character_spec_gs_legacy_key(nombre, clean_name),
+                CHARACTER_SPEC_GS_TTL,
+            )
+            if isinstance(legacy_cached, dict) and legacy_cached.get("gs") not in {None, "N/A"}:
+                legacy_server = str(legacy_cached.get("server") or "").strip().lower()
+                if not legacy_server or legacy_server == str(server or "").strip().lower():
+                    cache_payload = legacy_cached
+
+        if isinstance(cache_payload, dict):
+            result[clean_name] = cache_payload.get("gs")
     return result
 
 
