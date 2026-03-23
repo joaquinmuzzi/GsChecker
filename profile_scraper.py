@@ -109,6 +109,21 @@ def _save_socket_cache(cache: dict) -> None:
 
 def get_specs(char_name: str, server: str) -> list[dict]:
     try:
+        profile_url = f"https://armory.warmane.com/character/{char_name}/{server}/profile"
+        profile_resp = SESSION.get(profile_url, headers=HEADERS, timeout=8)
+        if profile_resp.status_code == 200:
+            profile_soup = BeautifulSoup(profile_resp.text, "html.parser")
+            profile_specs = []
+            for text_node in profile_soup.select("div.specialization div.stub div.text"):
+                text_copy = BeautifulSoup(str(text_node), "html.parser")
+                for value_span in text_copy.select("span.value"):
+                    value_span.extract()
+                spec_name = " ".join(text_copy.get_text(" ", strip=True).split())
+                if spec_name and spec_name in WOW_CLASSIC_CLASSES:
+                    profile_specs.append(spec_name)
+            if len(profile_specs) == 1:
+                return [{"name": profile_specs[0], "active": True}]
+
         url = f"https://armory.warmane.com/character/{char_name}/{server}/talents"
         resp = SESSION.get(url, headers=HEADERS, timeout=8)
         if resp.status_code != 200:
