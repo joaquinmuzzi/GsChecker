@@ -292,6 +292,17 @@ _SPEC_ICON_URLS = {
     "destruction": "https://cdn.warmane.com/wotlk/icons/medium/spell_shadow_rainoffire.jpg",
 }
 
+_CLASS_SPEC_ICON_URLS = {
+    ("paladin", "protection"): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_devotionaura.jpg",
+    ("warrior", "protection"): "https://cdn.warmane.com/wotlk/icons/medium/inv_shield_06.jpg",
+    ("priest", "holy"): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_guardianspirit.jpg",
+    ("paladin", "holy"): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_holybolt.jpg",
+    ("mage", "frost"): "https://cdn.warmane.com/wotlk/icons/medium/spell_frost_frostbolt02.jpg",
+    ("death knight", "frost"): "https://cdn.warmane.com/wotlk/icons/medium/spell_deathknight_frostpresence.jpg",
+    ("druid", "restoration"): "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_healingtouch.jpg",
+    ("shaman", "restoration"): "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_magicimmunity.jpg",
+}
+
 
 def _format_professions_short(professions: list[str]) -> str:
     parts = []
@@ -305,10 +316,14 @@ def _format_professions_short(professions: list[str]) -> str:
     return " - ".join(parts)
 
 
-def _spec_icon_url(active_spec_name: str | None) -> str | None:
+def _spec_icon_url(active_spec_name: str | None, class_name: str | None = None) -> str | None:
     clean_name = str(active_spec_name or "").strip().lower()
     if not clean_name:
         return None
+    clean_class_name = str(class_name or "").strip().lower()
+    class_specific = _CLASS_SPEC_ICON_URLS.get((clean_class_name, clean_name))
+    if class_specific:
+        return class_specific
     return _SPEC_ICON_URLS.get(clean_name)
 
 
@@ -336,7 +351,7 @@ def _build_personaje_embed(
     active_spec_name: str | None = None,
 ):
     embed = discord.Embed(color=0x2B2D31)
-    icon_url = _spec_icon_url(active_spec_name)
+    icon_url = _spec_icon_url(active_spec_name, clase)
     if icon_url:
         embed.set_author(name=nombre_char, icon_url=icon_url)
     else:
