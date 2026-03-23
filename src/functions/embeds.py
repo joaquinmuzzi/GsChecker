@@ -335,10 +335,12 @@ def _build_personaje_embed(
     professions: list[str] | None = None,
     active_spec_name: str | None = None,
 ):
-    embed = discord.Embed(title=nombre_char, color=0x2B2D31)
+    embed = discord.Embed(color=0x2B2D31)
     icon_url = _spec_icon_url(active_spec_name)
-    if icon_url and active_spec_name:
-        embed.set_author(name=active_spec_name, icon_url=icon_url)
+    if icon_url:
+        embed.set_author(name=nombre_char, icon_url=icon_url)
+    else:
+        embed.title = nombre_char
     embed.add_field(name="Spec", value=spec_gs_value or str(gs), inline=True)
     prof_line = _format_professions_short(professions) if professions else ""
     race_class_value = f"{raza} {clase}"
