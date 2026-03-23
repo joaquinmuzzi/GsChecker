@@ -85,10 +85,6 @@ def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict
                 continue
             if isinstance(payload, dict):
                 return payload
-    print(
-        f"[WARN] Warmane POST request failed for path='{path}' "
-        f"(last_status={last_status}, last_error={last_error})"
-    )
     return None
 
 
@@ -239,11 +235,6 @@ def _summary_from_profile_html(nombre: str, server: str):
 
     page_title = soup.title.get_text(" ", strip=True) if soup.title else ""
     not_found_hint = "Character does not exist" in page_text
-    print(
-        f"[WARN] summary scrape miss for '{nombre}'/{server} "
-        f"(status=200, character_sheet={'yes' if character_sheet else 'no'}, "
-        f"title='{page_title}', not_found_hint={not_found_hint})"
-    )
     return None
 
 

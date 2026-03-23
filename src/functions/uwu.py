@@ -340,11 +340,6 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
             any_mode_checked = any_mode_checked or checked
             result[short_name][mode] = "✅" if found else ("❌" if checked else None)
 
-        if not any_mode_checked:
-            print(
-                f"[WARN] UwU ICC checks unavailable for '{nombre}'/{server} boss='{full_boss_name}'"
-            )
-
     _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
     return result
 
