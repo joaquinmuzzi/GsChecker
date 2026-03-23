@@ -273,7 +273,7 @@ def _format_professions_short(professions: list[str]) -> str:
         value = value.split("/")[0].strip()
         abbrev = _PROF_ABBREV.get(name.lower(), name)
         parts.append(f"{abbrev} {value}".strip())
-    return " · ".join(parts)
+    return " - ".join(parts)
 
 
 def _build_personaje_embed(
@@ -299,12 +299,12 @@ def _build_personaje_embed(
     professions: list[str] | None = None,
 ):
     embed = discord.Embed(title=nombre_char, color=0x2B2D31)
-    embed.add_field(name="Spec | GS", value=spec_gs_value or str(gs), inline=True)
+    embed.add_field(name="Spec", value=spec_gs_value or str(gs), inline=True)
     prof_line = _format_professions_short(professions) if professions else ""
     race_class_value = f"{raza} {clase}"
     if prof_line:
         race_class_value += f"\n{prof_line}"
-    embed.add_field(name="Race | Class", value=race_class_value, inline=True)
+    embed.add_field(name="Class", value=race_class_value, inline=True)
     guild_value = guild_display
     clean_rank = str(guild_rank or "").strip()
     if clean_rank:

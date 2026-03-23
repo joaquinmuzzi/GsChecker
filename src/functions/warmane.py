@@ -389,9 +389,6 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
             rank_text = " ".join(rank_text.split())
             if rank_text:
                 _cache_set(GUILD_RANK_CACHE, cache_key, rank_text)
-                print(
-                    f"[INFO] Guild rank parsed for '{clean_name}' guild='{clean_guild}' => {rank_text!r}"
-                )
                 return rank_text
             break
     except Exception:
