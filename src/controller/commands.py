@@ -49,7 +49,7 @@ ICC_ITEM_IDS_25H = {str(item_id) for item_id in range(51928, 51939)}
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
-    return f"command:personaje:v5:{nombre.strip().lower()}"
+    return f"command:personaje:v6:{nombre.strip().lower()}"
 
 
 def _build_dps_cache_key(nombre: str, spec: str | None) -> str:

@@ -23,6 +23,20 @@ from src.schemas.constants import (
 from src.functions.cache import _cache_get, _cache_set
 
 
+WOW_CLASSES = (
+    "Death Knight",
+    "Paladin",
+    "Warrior",
+    "Hunter",
+    "Rogue",
+    "Priest",
+    "Shaman",
+    "Mage",
+    "Warlock",
+    "Druid",
+)
+
+
 def _cache_get_stale(cache: dict, key):
     entry = cache.get(key)
     if not entry:
@@ -126,7 +140,7 @@ def _summary_from_profile_html(nombre: str, server: str):
         if level_node:
             level_text = " ".join(level_node.get_text(" ", strip=True).split())
             level_pattern = re.compile(
-                r"Level\s+(?P<level>\d+)\s+(?P<race>.+?)\s+(?P<class>[^,]+),\s*(?P<server>.+)$",
+                r"Level\s+(?P<level>\d+)\s+(?P<race_class>.+?),\s*(?P<server>.+)$",
                 re.IGNORECASE,
             )
             level_match = level_pattern.search(level_text)
@@ -136,11 +150,20 @@ def _summary_from_profile_html(nombre: str, server: str):
                     for key, value in level_match.groupdict().items()
                 }
                 if level_data.get("server", "").lower() == target_server_lower:
+                    race_class = level_data.get("race_class") or ""
+                    parsed_race = "N/A"
+                    parsed_class = race_class or "N/A"
+                    for wow_class in WOW_CLASSES:
+                        suffix = f" {wow_class}"
+                        if race_class.endswith(suffix):
+                            parsed_race = race_class[: -len(suffix)].strip() or "N/A"
+                            parsed_class = wow_class
+                            break
                     return {
                         "name": parsed_name or target_name,
                         "level": int(level_data.get("level") or 0),
-                        "race": level_data.get("race") or "N/A",
-                        "class": level_data.get("class") or "N/A",
+                        "race": parsed_race,
+                        "class": parsed_class,
                         "guild": guild_name,
                         "gearScore": "N/A",
                     }
@@ -271,10 +294,19 @@ def _fetch_summary(nombre: str, server: str):
     if cached is not None:
         return cached
 
-    summary = _summary_from_profile_html(nombre, server)
+    summary = _summary_from_api(nombre, server)
+    profile_summary = _summary_from_profile_html(nombre, server)
+
     if summary is None:
-        print(f"[WARN] Falling back to API summary for '{nombre}'/{server}")
-        summary = _summary_from_api(nombre, server)
+        if profile_summary is not None:
+            print(f"[WARN] Falling back to profile summary for '{nombre}'/{server}")
+            summary = profile_summary
+    elif isinstance(profile_summary, dict):
+        if not summary.get("guild") or summary.get("guild") == "Sin guild":
+            summary["guild"] = profile_summary.get("guild") or summary.get("guild")
+        if summary.get("gearScore") in {None, "", "N/A"}:
+            summary["gearScore"] = profile_summary.get("gearScore") or summary.get("gearScore")
+
     if summary is not None:
         _cache_set(SUMMARY_CACHE, cache_key, summary)
         return summary

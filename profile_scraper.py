@@ -9,6 +9,35 @@ HEADERS = {"User-Agent": "GsChecker/1.0"}
 SESSION = requests.Session()
 ITEM_SESSION = requests.Session()
 
+WOW_CLASSIC_CLASSES = {
+    "Balance",
+    "Feral Combat",
+    "Restoration",
+    "Arcane",
+    "Fire",
+    "Frost",
+    "Holy",
+    "Protection",
+    "Retribution",
+    "Beast Mastery",
+    "Marksmanship",
+    "Survival",
+    "Assassination",
+    "Combat",
+    "Subtlety",
+    "Arms",
+    "Fury",
+    "Discipline",
+    "Shadow",
+    "Elemental",
+    "Enhancement",
+    "Affliction",
+    "Demonology",
+    "Destruction",
+    "Blood",
+    "Unholy",
+}
+
 SLOT_FALLBACK_ORDER = [
     "Head",
     "Neck",
@@ -80,18 +109,45 @@ def _save_socket_cache(cache: dict) -> None:
 
 def get_specs(char_name: str, server: str) -> list[dict]:
     try:
-        url = f"http://armory.warmane.com/character/{char_name}/{server}/talents"
+        url = f"https://armory.warmane.com/character/{char_name}/{server}/talents"
         resp = SESSION.get(url, headers=HEADERS, timeout=8)
         if resp.status_code != 200:
-            return []
-        soup = BeautifulSoup(resp.text, "html.parser")
-        talents = soup.find_all("td", attrs={"data-spec": True})
+            resp = None
         specs = []
-        for td in talents:
+        if resp is not None:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            talents = soup.find_all("td", attrs={"data-spec": True})
+            for td in talents:
+                specs.append(
+                    {
+                        "name": td.get_text(strip=True),
+                        "active": "selected" in td.get("class", []),
+                    }
+                )
+            if specs:
+                return specs
+
+        api_url = f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
+        api_resp = SESSION.get(api_url, headers=HEADERS, timeout=8)
+        if api_resp.status_code != 200:
+            return []
+
+        payload = api_resp.json()
+        talents = payload.get("talents") if isinstance(payload, dict) else None
+        if not isinstance(talents, list):
+            return []
+
+        specs = []
+        for idx, talent in enumerate(talents):
+            if not isinstance(talent, dict):
+                continue
+            name = str(talent.get("tree") or "").strip()
+            if not name or name not in WOW_CLASSIC_CLASSES:
+                continue
             specs.append(
                 {
-                    "name": td.get_text(strip=True),
-                    "active": "selected" in td.get("class", []),
+                    "name": name,
+                    "active": idx == 0,
                 }
             )
         return specs
