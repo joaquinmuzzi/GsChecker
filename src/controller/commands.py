@@ -49,19 +49,55 @@ ICC_ITEM_IDS_25H = {str(item_id) for item_id in range(51928, 51939)}
 
 
 def _build_personaje_cache_key(nombre: str) -> str:
-    return f"command:personaje:v4:{nombre.strip().lower()}"
+    return f"command:personaje:v5:{nombre.strip().lower()}"
 
 
 def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
     return f"command:dps:v2:{nombre.strip().lower()}:{(spec or '').strip().lower()}"
 
 
-def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:
-    return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
+def _build_character_spec_gs_key(nombre: str, server: str, spec_name: str) -> str:
+    return (
+        f"character:spec-gs:{server.strip().lower()}:"
+        f"{nombre.strip().lower()}:{spec_name.strip().lower()}"
+    )
 
 
-def _build_confirmed_icc_kills_key(nombre: str) -> str:
-    return f"character:icc-confirmed-kills:{nombre.strip().lower()}"
+def _build_confirmed_icc_kills_key(nombre: str, server: str) -> str:
+    return (
+        f"character:icc-confirmed-kills:{server.strip().lower()}:"
+        f"{nombre.strip().lower()}"
+    )
+
+
+DEFAULT_CHARACTER_REALM = "Lordaeron"
+SUPPORTED_CHARACTER_REALMS = {
+    "lordaeron": "Lordaeron",
+    "icecrown": "Icecrown",
+    "blackrock": "Blackrock",
+    "onyxia": "Onyxia",
+    "frostmourne": "Frostmourne",
+}
+
+
+def _normalize_character_realm(reino: str | None) -> str:
+    clean_realm = str(reino or "").strip()
+    if not clean_realm:
+        return DEFAULT_CHARACTER_REALM
+
+    normalized = SUPPORTED_CHARACTER_REALMS.get(clean_realm.lower())
+    if normalized:
+        return normalized
+
+    title_realm = clean_realm.title()
+    normalized = SUPPORTED_CHARACTER_REALMS.get(title_realm.lower())
+    if normalized:
+        return normalized
+
+    valid_realms = ", ".join(SUPPORTED_CHARACTER_REALMS.values())
+    raise ValueError(
+        f"⚠️ Reino inválido: '{clean_realm}'. Reinos válidos: {valid_realms}."
+    )
 
 
 def _normalize_special_uwu_kills(uwu_icc_kills):
@@ -76,10 +112,10 @@ def _normalize_special_uwu_kills(uwu_icc_kills):
     return base
 
 
-def _load_confirmed_icc_kills(nombre: str) -> dict:
+def _load_confirmed_icc_kills(nombre: str, server: str) -> dict:
     cached = get_external_cache(
         "character_icc_confirmed_kills",
-        _build_confirmed_icc_kills_key(nombre),
+        _build_confirmed_icc_kills_key(nombre, server),
         CONFIRMED_KILLS_TTL,
     )
     return _normalize_special_uwu_kills(cached if isinstance(cached, dict) else {})
@@ -95,9 +131,9 @@ def _overlay_persistent_confirmed_kills(uwu_icc_kills, persistent_confirmed: dic
     return uwu_icc_kills
 
 
-def _persist_new_confirmed_icc_kills(nombre: str, uwu_icc_kills):
+def _persist_new_confirmed_icc_kills(nombre: str, server: str, uwu_icc_kills):
     uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
-    persistent_confirmed = _load_confirmed_icc_kills(nombre)
+    persistent_confirmed = _load_confirmed_icc_kills(nombre, server)
     changed = False
 
     for boss_name in ICC_SPECIAL_BOSSES:
@@ -113,9 +149,9 @@ def _persist_new_confirmed_icc_kills(nombre: str, uwu_icc_kills):
         set_external_cache(
             "character_icc_confirmed_kills",
             "/personaje/confirmed-kills",
-            _build_confirmed_icc_kills_key(nombre),
+            _build_confirmed_icc_kills_key(nombre, server),
             persistent_confirmed,
-            {"character": nombre},
+            {"character": nombre, "server": server},
         )
 
     return persistent_confirmed
@@ -254,7 +290,13 @@ def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
     return uwu_icc_kills
 
 
-def _get_known_gs_by_spec(nombre: str, spec_names: list[str], current_gs=None, active_specs=None):
+def _get_known_gs_by_spec(
+    nombre: str,
+    server: str,
+    spec_names: list[str],
+    current_gs=None,
+    active_specs=None,
+):
     active_specs = set(active_specs or [])
     result = {}
     seen = set()
@@ -268,7 +310,7 @@ def _get_known_gs_by_spec(nombre: str, spec_names: list[str], current_gs=None, a
             continue
         cached = get_external_cache(
             "character_spec_gs",
-            _build_character_spec_gs_key(nombre, clean_name),
+            _build_character_spec_gs_key(nombre, server, clean_name),
             CHARACTER_SPEC_GS_TTL,
         )
         if isinstance(cached, dict) and cached.get("gs") not in {None, "N/A"}:
@@ -312,6 +354,7 @@ def _format_spec_gs_value(spec_gs_entries: list[dict]) -> str:
 
 def _serialize_personaje_payload(
     nombre_char,
+    server,
     gs,
     nivel,
     raza,
@@ -333,6 +376,7 @@ def _serialize_personaje_payload(
 ):
     return {
         "nombre_char": nombre_char,
+        "server": server,
         "gs": gs,
         "nivel": nivel,
         "raza": raza,
@@ -519,7 +563,10 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
 
 
 async def _personaje_impl(
-    interaction: discord.Interaction, nombre: str, command_name: str
+    interaction: discord.Interaction,
+    nombre: str,
+    command_name: str,
+    reino: str | None = None,
 ):
     server_name = interaction.guild.name if interaction.guild else "DM"
     print(
@@ -528,42 +575,46 @@ async def _personaje_impl(
     )
     try:
         nombre = nombre.capitalize()
+        realm = _normalize_character_realm(reino)
         await _safe_defer(interaction)
 
-        personaje_cache_key = _build_personaje_cache_key(nombre)
+        personaje_cache_key = f"{_build_personaje_cache_key(nombre)}:{realm.lower()}"
         cached_payload = get_external_cache(
             "command_personaje", personaje_cache_key, COMMAND_PERSONAJE_TTL
         )
         if isinstance(cached_payload, dict):
             embed_cached = _build_personaje_embed_from_cache(cached_payload)
-            view_cached = _build_personaje_view(cached_payload["nombre_char"])
+            view_cached = _build_personaje_view(
+                cached_payload["nombre_char"],
+                cached_payload.get("server", DEFAULT_CHARACTER_REALM),
+            )
             await _safe_edit_original_response(interaction, content=None, embed=embed_cached, view=view_cached)
             return
 
         await _safe_edit_original_response(
             interaction,
-            content=f"⏳ Calculando perfil de {nombre}...", embed=None
+            content=f"⏳ Calculando perfil de {nombre} en {realm}...", embed=None
         )
 
         loop = asyncio.get_running_loop()
 
         uwu_icc_task = loop.run_in_executor(
-            EXECUTOR, _uwu_icc_bugfix_kills, nombre, UWU_SERVER
+            EXECUTOR, _uwu_icc_bugfix_kills, nombre, realm
         )
         prof_task = loop.run_in_executor(
-            EXECUTOR, _fetch_professions, nombre, "Lordaeron"
+            EXECUTOR, _fetch_professions, nombre, realm
         )
         summary_task = loop.run_in_executor(
-            EXECUTOR, _fetch_summary, nombre, "Lordaeron"
+            EXECUTOR, _fetch_summary, nombre, realm
         )
         gear_task = loop.run_in_executor(
-            EXECUTOR, _fetch_gear_data, nombre, "Lordaeron"
+            EXECUTOR, _fetch_gear_data, nombre, realm
         )
         achi_task = loop.run_in_executor(
-            EXECUTOR, _fetch_achievements, nombre, "Lordaeron"
+            EXECUTOR, _fetch_achievements, nombre, realm
         )
         stats_task = loop.run_in_executor(
-            EXECUTOR, _fetch_statistics, nombre, "Lordaeron", 15062
+            EXECUTOR, _fetch_statistics, nombre, realm, 15062
         )
 
         summary, gear_data, achi_payload, stats_rows, professions = await asyncio.gather(
@@ -598,7 +649,7 @@ async def _personaje_impl(
             )
             return
 
-        talents = _fetch_specs(nombre, "Lordaeron")
+        talents = _fetch_specs(nombre, realm)
         if isinstance(talents, list) and len(talents) > 0:
             sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
             active_specs = [
@@ -640,7 +691,7 @@ async def _personaje_impl(
                     _fetch_guild_rank,
                     nombre_char,
                     guild,
-                    "Lordaeron",
+                    realm,
                 )
             except Exception:
                 guild_rank = None
@@ -652,13 +703,14 @@ async def _personaje_impl(
             set_external_cache(
                 "character_spec_gs",
                 "/personaje",
-                _build_character_spec_gs_key(nombre_char, clean_active_spec),
+                _build_character_spec_gs_key(nombre_char, realm, clean_active_spec),
                 {"character": nombre_char, "spec": clean_active_spec, "gs": gs},
-                {"character": nombre_char, "spec": clean_active_spec},
+                {"character": nombre_char, "spec": clean_active_spec, "server": realm},
             )
 
         gs_by_spec = _get_known_gs_by_spec(
             nombre_char,
+            realm,
             active_specs + inactive_specs,
             gs,
             active_specs,
@@ -683,10 +735,10 @@ async def _personaje_impl(
 
         # Cargar kills confirmadas del DB antes del embed inicial,
         # así los ✅ ya guardados aparecen de inmediato sin loading.
-        persistent_confirmed = _load_confirmed_icc_kills(nombre_char)
+        persistent_confirmed = _load_confirmed_icc_kills(nombre_char, realm)
         initial_uwu_kills = _normalize_special_uwu_kills(dict(persistent_confirmed))
 
-        personaje_view = _build_personaje_view(nombre_char)
+        personaje_view = _build_personaje_view(nombre_char, realm)
         embed_initial = _build_personaje_embed(
             nombre_char,
             gs,
@@ -759,7 +811,11 @@ async def _personaje_impl(
         uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
         uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
 
-        persistent_confirmed = _persist_new_confirmed_icc_kills(nombre_char, uwu_icc_kills)
+        persistent_confirmed = _persist_new_confirmed_icc_kills(
+            nombre_char,
+            realm,
+            uwu_icc_kills,
+        )
         uwu_icc_kills = _overlay_persistent_confirmed_kills(
             uwu_icc_kills,
             persistent_confirmed,
@@ -792,6 +848,7 @@ async def _personaje_impl(
             personaje_cache_key,
             _serialize_personaje_payload(
                 nombre_char,
+                realm,
                 gs,
                 nivel,
                 raza,
@@ -811,12 +868,14 @@ async def _personaje_impl(
                 spec_gs_entries,
                 professions,
             ),
-            {"character": nombre_char, "command": command_name},
+            {"character": nombre_char, "command": command_name, "server": realm},
         )
         await _safe_edit_original_response(interaction, content=None, embed=embed_final, view=personaje_view)
 
     except discord.NotFound:
         return
+    except ValueError as e:
+        await _safe_send_error(interaction, str(e))
     except Exception as e:
         await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
 
@@ -832,17 +891,31 @@ def register_commands(bot):
         name="personaje",
         description="Muestra información del personaje desde la API de Warmane.",
     )
-    @discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
-    async def personaje(interaction: discord.Interaction, nombre: str):
-        await _personaje_impl(interaction, nombre, "personaje")
+    @discord.app_commands.describe(
+        nombre="Nombre del personaje.",
+        reino="Reino opcional. Por defecto: Lordaeron.",
+    )
+    async def personaje(
+        interaction: discord.Interaction,
+        nombre: str,
+        reino: str | None = None,
+    ):
+        await _personaje_impl(interaction, nombre, "personaje", reino)
 
     @bot.tree.command(
         name="p",
         description="Alias corto de /personaje para consultar un personaje.",
     )
-    @discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
-    async def p(interaction: discord.Interaction, nombre: str):
-        await _personaje_impl(interaction, nombre, "p")
+    @discord.app_commands.describe(
+        nombre="Nombre del personaje.",
+        reino="Reino opcional. Por defecto: Lordaeron.",
+    )
+    async def p(
+        interaction: discord.Interaction,
+        nombre: str,
+        reino: str | None = None,
+    ):
+        await _personaje_impl(interaction, nombre, "p", reino)
 
     @bot.tree.command(
         name="dps",
