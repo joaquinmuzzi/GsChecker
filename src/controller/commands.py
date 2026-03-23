@@ -186,6 +186,20 @@ def _overlay_persistent_confirmed_kills(uwu_icc_kills, persistent_confirmed: dic
     return uwu_icc_kills
 
 
+def _finalize_special_uwu_kills(uwu_icc_kills):
+    uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
+    for boss_name in ICC_SPECIAL_BOSSES:
+        boss_modes = uwu_icc_kills.setdefault(boss_name, {})
+        if not isinstance(boss_modes, dict):
+            boss_modes = {}
+            uwu_icc_kills[boss_name] = boss_modes
+        for mode in ICC_SPECIAL_MODES:
+            value = boss_modes.get(mode)
+            if value not in {"✅", "❌"}:
+                boss_modes[mode] = "?"
+    return uwu_icc_kills
+
+
 def _persist_new_confirmed_icc_kills(nombre: str, server: str, uwu_icc_kills):
     uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
     persistent_confirmed = _load_confirmed_icc_kills(nombre, server)
@@ -607,6 +621,10 @@ def _http_retry_after(exc: discord.HTTPException) -> float:
     return max(retry_after, 0.0)
 
 
+def _is_expired_token(exc: discord.HTTPException) -> bool:
+    return getattr(exc, "status", None) == 401 and getattr(exc, "code", None) == 50027
+
+
 async def _safe_edit_original_response(
     interaction: discord.Interaction, *, content=None, embed=None, view=None
 ) -> None:
@@ -618,7 +636,11 @@ async def _safe_edit_original_response(
                 kwargs["view"] = view
             await interaction.edit_original_response(**kwargs)
             return
+        except discord.NotFound:
+            return
         except discord.HTTPException as exc:
+            if _is_expired_token(exc):
+                return
             if getattr(exc, "status", None) != 429:
                 raise
             last_exc = exc
@@ -634,7 +656,11 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
             await interaction.followup.send(message)
         else:
             await interaction.response.send_message(message)
+    except discord.NotFound:
+        return
     except discord.HTTPException as exc:
+        if _is_expired_token(exc):
+            return
         if getattr(exc, "status", None) != 429:
             raise
         wait_for = _http_retry_after(exc) or 3
@@ -909,6 +935,7 @@ async def _personaje_impl(
             uwu_icc_kills,
             persistent_confirmed,
         )
+        uwu_icc_kills = _finalize_special_uwu_kills(uwu_icc_kills)
 
         embed_final = _build_personaje_embed(
             nombre_char,
@@ -965,6 +992,10 @@ async def _personaje_impl(
 
     except discord.NotFound:
         return
+    except discord.HTTPException as e:
+        if _is_expired_token(e):
+            return
+        await _safe_send_error(interaction, f"❌ Error de red: {e}")
     except ValueError as e:
         await _safe_send_error(interaction, str(e))
     except Exception as e:
@@ -1208,6 +1239,10 @@ def register_commands(bot):
 
         except discord.NotFound:
             return
+        except discord.HTTPException as e:
+            if _is_expired_token(e):
+                return
+            await _safe_send_error(interaction, f"❌ Error de red: {e}")
         except Exception as e:
             await _safe_send_error(interaction, f"❌ Error al obtener DPS: {e}")
 
@@ -1274,5 +1309,9 @@ def register_commands(bot):
 
         except discord.NotFound:
             return
+        except discord.HTTPException as e:
+            if _is_expired_token(e):
+                return
+            await _safe_send_error(interaction, f"❌ Error de red: {e}")
         except Exception as e:
             await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")

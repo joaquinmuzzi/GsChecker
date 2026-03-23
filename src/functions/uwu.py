@@ -233,7 +233,10 @@ def _pick_uwu_spec(nombre: str, server: str):
     return best_spec_i, best_payload
 
 
-def _uwu_icc_bugfix_kills(nombre: str, server: str):
+def _uwu_icc_bugfix_kills(
+    nombre: str,
+    server: str,
+):
     cache_key = ("v2", nombre.lower(), server)
     cached = _cache_get(UWU_ICC_KILLS_CACHE, cache_key, UWU_ICC_KILLS_TTL)
     if cached is not None:
@@ -280,22 +283,27 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
 
     probe_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
 
+    # Si el personaje no tiene perfil válido en UwU no tiene sentido escanear
+    # miles de listas de ranking: salimos de inmediato con ❌ en todos los modos.
     if not probe_pairs:
-        probe_pairs = _discover_uwu_spec_class_pairs(
-            nombre,
-            server,
-            ["Lord Marrowgar", "Lady Deathwhisper"],
-            ("10H", "25N", "25H"),
-        )
+        for short_name in target:
+            for mode in modes:
+                result[short_name][mode] = "❌"
+        _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
+        return result
 
     for short_name, full_boss_name in target.items():
-        any_mode_checked = False
         for mode in modes:
             found = character_mode_presence.get(short_name, {}).get(mode, False)
             checked = found
-            mode_pairs = list(probe_pairs)
-            for spec_i, class_i in mode_pairs:
-                top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
+            for spec_i, class_i in probe_pairs:
+                top_rows = _fetch_uwu_top(
+                    server,
+                    full_boss_name,
+                    mode,
+                    class_i,
+                    spec_i,
+                )
                 if not isinstance(top_rows, list):
                     continue
                 checked = True
@@ -310,34 +318,6 @@ def _uwu_icc_bugfix_kills(nombre: str, server: str):
                         break
                 if found:
                     break
-
-            if not found:
-                discovered_mode_pairs = _discover_uwu_spec_class_pairs(
-                    nombre,
-                    server,
-                    [full_boss_name],
-                    (mode,),
-                )
-                for pair in discovered_mode_pairs:
-                    if pair not in probe_pairs:
-                        probe_pairs.append(pair)
-                for spec_i, class_i in discovered_mode_pairs:
-                    top_rows = _fetch_uwu_top(server, full_boss_name, mode, class_i, spec_i)
-                    if not isinstance(top_rows, list):
-                        continue
-                    checked = True
-                    for row in top_rows:
-                        if not isinstance(row, list) or len(row) < 6:
-                            continue
-                        row_name = str(row[3]).lower() if len(row) > 3 else ""
-                        if row_name != lower_name:
-                            continue
-                        if _uwu_row_dps(row) is not None:
-                            found = True
-                            break
-                    if found:
-                        break
-            any_mode_checked = any_mode_checked or checked
             result[short_name][mode] = "✅" if found else ("❌" if checked else None)
 
     _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
