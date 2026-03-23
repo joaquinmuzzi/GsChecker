@@ -277,6 +277,7 @@ _SPEC_ICON_URLS = {
     "restoration": "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_healingtouch.jpg",
     "beast mastery": "https://cdn.warmane.com/wotlk/icons/medium/ability_hunter_bestialdiscipline.jpg",
     "marksmanship": "https://cdn.warmane.com/wotlk/icons/medium/ability_marksmanship.jpg",
+    "marksman": "https://cdn.warmane.com/wotlk/icons/medium/ability_marksmanship.jpg",
     "survival": "https://cdn.warmane.com/wotlk/icons/medium/ability_hunter_camouflage.jpg",
     "arcane": "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_magicalsentry.jpg",
     "fire": "https://cdn.warmane.com/wotlk/icons/medium/spell_fire_firebolt02.jpg",
