@@ -4,7 +4,11 @@ import discord
 
 import gearscore
 import profile_scraper
-from src.db.postgres import get_external_cache, set_external_cache
+from src.db.postgres import (
+    find_character_spec_gs_by_metadata,
+    get_external_cache,
+    set_external_cache,
+)
 from src.schemas.constants import (
     CHARACTER_SPEC_GS_TTL,
     COMMAND_DPS_TTL,
@@ -83,6 +87,31 @@ SUPPORTED_CHARACTER_REALMS = {
     "frostmourne": "Frostmourne",
 }
 
+CLASS_SPEC_FALLBACK = {
+    "Death Knight": ["Blood", "Frost", "Unholy"],
+    "Druid": ["Balance", "Feral Combat", "Restoration"],
+    "Hunter": ["Beast Mastery", "Marksmanship", "Survival"],
+    "Mage": ["Arcane", "Fire", "Frost"],
+    "Paladin": ["Holy", "Protection", "Retribution"],
+    "Priest": ["Discipline", "Holy", "Shadow"],
+    "Rogue": ["Assassination", "Combat", "Subtlety"],
+    "Shaman": ["Elemental", "Enhancement", "Restoration"],
+    "Warlock": ["Affliction", "Demonology", "Destruction"],
+    "Warrior": ["Arms", "Fury", "Protection"],
+}
+
+SPEC_SYNONYM_GROUPS = [
+    ("Retribution", "Retri", "Ret"),
+    ("Feral Combat", "Feral"),
+    ("Beast Mastery", "BM"),
+    ("Marksmanship", "MM"),
+    ("Survival", "SV"),
+    ("Death Knight", "DK"),
+    ("Blood", "BDK"),
+    ("Frost", "FDK"),
+    ("Unholy", "UDK"),
+]
+
 
 def _normalize_character_realm(reino: str | None) -> str:
     clean_realm = str(reino or "").strip()
@@ -102,6 +131,28 @@ def _normalize_character_realm(reino: str | None) -> str:
     raise ValueError(
         f"⚠️ Reino inválido: '{clean_realm}'. Reinos válidos: {valid_realms}."
     )
+
+
+def _fallback_spec_names_for_class(class_name: str) -> list[str]:
+    clean_class_name = str(class_name or "").strip()
+    return list(CLASS_SPEC_FALLBACK.get(clean_class_name, []))
+
+
+def _spec_lookup_candidates(spec_name: str) -> list[str]:
+    clean_name = str(spec_name or "").strip()
+    if not clean_name:
+        return []
+
+    lowered = clean_name.lower()
+    candidates = [clean_name]
+    for group in SPEC_SYNONYM_GROUPS:
+        group_lower = [entry.lower() for entry in group]
+        if lowered in group_lower:
+            for entry in group:
+                if entry.lower() not in {value.lower() for value in candidates}:
+                    candidates.append(entry)
+            break
+    return candidates
 
 
 def _normalize_special_uwu_kills(uwu_icc_kills):
@@ -314,24 +365,36 @@ def _get_known_gs_by_spec(
             continue
 
         cache_payload = None
-        cached = get_external_cache(
-            "character_spec_gs",
-            _build_character_spec_gs_key(nombre, server, clean_name),
-            CHARACTER_SPEC_GS_TTL,
-        )
-        if isinstance(cached, dict) and cached.get("gs") not in {None, "N/A"}:
-            cache_payload = cached
+        for lookup_spec_name in _spec_lookup_candidates(clean_name):
+            cached = get_external_cache(
+                "character_spec_gs",
+                _build_character_spec_gs_key(nombre, server, lookup_spec_name),
+                CHARACTER_SPEC_GS_TTL,
+            )
+            if isinstance(cached, dict) and cached.get("gs") not in {None, "N/A"}:
+                cache_payload = cached
+                break
 
-        if cache_payload is None:
             legacy_cached = get_external_cache(
                 "character_spec_gs",
-                _build_character_spec_gs_legacy_key(nombre, clean_name),
+                _build_character_spec_gs_legacy_key(nombre, lookup_spec_name),
                 CHARACTER_SPEC_GS_TTL,
             )
             if isinstance(legacy_cached, dict) and legacy_cached.get("gs") not in {None, "N/A"}:
                 legacy_server = str(legacy_cached.get("server") or "").strip().lower()
-                if not legacy_server or legacy_server == str(server or "").strip().lower():
+                if legacy_server == str(server or "").strip().lower():
                     cache_payload = legacy_cached
+                    break
+
+        if cache_payload is None:
+            metadata_cached = find_character_spec_gs_by_metadata(
+                nombre,
+                server,
+                _spec_lookup_candidates(clean_name),
+                CHARACTER_SPEC_GS_TTL,
+            )
+            if isinstance(metadata_cached, dict) and metadata_cached.get("gs") not in {None, "N/A"}:
+                cache_payload = metadata_cached
 
         if isinstance(cache_payload, dict):
             result[clean_name] = cache_payload.get("gs")
@@ -669,7 +732,7 @@ async def _personaje_impl(
             )
             return
 
-        talents = _fetch_specs(nombre, realm)
+        talents = _fetch_specs(nombre_char, realm)
         if isinstance(talents, list) and len(talents) > 0:
             sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
             active_specs = [
@@ -681,8 +744,8 @@ async def _personaje_impl(
                 if not t.get("active", False)
             ]
         else:
-            active_specs = ["N/A"]
-            inactive_specs = ["N/A"]
+            active_specs = []
+            inactive_specs = _fallback_spec_names_for_class(clase)
 
         try:
             gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)

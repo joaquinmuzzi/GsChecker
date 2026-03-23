@@ -131,3 +131,64 @@ def set_external_cache(
             conn.commit()
     except Exception as exc:
         print(f"[WARN] Error guardando caché Postgres ({source}): {exc}")
+
+
+def find_character_spec_gs_by_metadata(
+    character_name: str,
+    server: str,
+    spec_candidates: list[str],
+    ttl_seconds: int,
+):
+    if not db_enabled():
+        return None
+
+    clean_character = str(character_name or "").strip().lower()
+    clean_server = str(server or "").strip().lower()
+    clean_specs = [str(spec or "").strip().lower() for spec in spec_candidates if str(spec or "").strip()]
+    if not clean_character or not clean_specs:
+        return None
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT payload_json
+                    FROM external_api_cache
+                    WHERE source = 'character_spec_gs'
+                      AND fetched_at >= NOW() - (%s * INTERVAL '1 second')
+                      AND LOWER(
+                            COALESCE(
+                                metadata_json::jsonb->>'character',
+                                payload_json::jsonb->>'character',
+                                ''
+                            )
+                          ) = %s
+                      AND LOWER(
+                            COALESCE(
+                                metadata_json::jsonb->>'spec',
+                                payload_json::jsonb->>'spec',
+                                ''
+                            )
+                          ) = ANY(%s)
+                      AND (
+                            LOWER(
+                                COALESCE(
+                                    metadata_json::jsonb->>'server',
+                                    payload_json::jsonb->>'server',
+                                    ''
+                                )
+                            ) = %s
+                          )
+                    ORDER BY fetched_at DESC
+                    LIMIT 1
+                    """,
+                    (ttl_seconds, clean_character, clean_specs, clean_server),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return json.loads(row[0])
+    except Exception as exc:
+        print(f"[WARN] Error buscando spec GS por metadata ({character_name}/{server}): {exc}")
+        return None

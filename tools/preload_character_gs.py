@@ -17,8 +17,11 @@ from src.functions.warmane import _fetch_gear_data, _fetch_specs, _fetch_summary
 from src.schemas.constants import UWU_MODES_ALL, UWU_PDPS_BOSS_ORDER
 
 
-def _build_character_spec_gs_key(nombre: str, spec_name: str) -> str:
-    return f"character:spec-gs:{nombre.strip().lower()}:{spec_name.strip().lower()}"
+def _build_character_spec_gs_key(nombre: str, server: str, spec_name: str) -> str:
+    return (
+        f"character:spec-gs:{server.strip().lower()}:"
+        f"{nombre.strip().lower()}:{spec_name.strip().lower()}"
+    )
 
 
 def _normalize_name(name: str) -> str:
@@ -144,7 +147,7 @@ def _store_character_gs(payload: dict) -> int:
         set_external_cache(
             "character_spec_gs",
             "/tools/preload_character_gs",
-            _build_character_spec_gs_key(nombre_char, spec_name),
+            _build_character_spec_gs_key(nombre_char, server, spec_name),
             {
                 "character": nombre_char,
                 "server": server,
