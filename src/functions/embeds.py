@@ -473,4 +473,11 @@ def _build_personaje_view(
             style=discord.ButtonStyle.link,
         )
     )
+    view.add_item(
+        discord.ui.Button(
+            label="Donar",
+            url="https://cafecito.app/muzzijoaquin",
+            style=discord.ButtonStyle.link,
+        )
+    )
     return view
