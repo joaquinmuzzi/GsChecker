@@ -41,8 +41,7 @@ def init_database() -> bool:
 
     with _get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS external_api_cache (
                     cache_key TEXT PRIMARY KEY,
                     source TEXT NOT NULL,
@@ -51,14 +50,11 @@ def init_database() -> bool:
                     metadata_json TEXT,
                     fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
-                """
-            )
-            cur.execute(
-                """
+                """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_external_api_cache_source_fetched_at
                 ON external_api_cache (source, fetched_at DESC)
-                """
-            )
+                """)
         conn.commit()
 
     print("[INFO] Postgres inicializado correctamente.")
@@ -144,7 +140,11 @@ def find_character_spec_gs_by_metadata(
 
     clean_character = str(character_name or "").strip().lower()
     clean_server = str(server or "").strip().lower()
-    clean_specs = [str(spec or "").strip().lower() for spec in spec_candidates if str(spec or "").strip()]
+    clean_specs = [
+        str(spec or "").strip().lower()
+        for spec in spec_candidates
+        if str(spec or "").strip()
+    ]
     if not clean_character or not clean_specs:
         return None
 
@@ -190,5 +190,7 @@ def find_character_spec_gs_by_metadata(
                     return None
                 return json.loads(row[0])
     except Exception as exc:
-        print(f"[WARN] Error buscando spec GS por metadata ({character_name}/{server}): {exc}")
+        print(
+            f"[WARN] Error buscando spec GS por metadata ({character_name}/{server}): {exc}"
+        )
         return None

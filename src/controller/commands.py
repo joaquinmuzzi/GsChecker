@@ -39,7 +39,6 @@ from src.functions.embeds import (
     _render_table,
 )
 
-
 DPS_COMMAND_TIMEOUT_SECONDS = 45
 ITEM_SOURCE_TTL = 86400
 CONFIRMED_KILLS_TTL = 315360000
@@ -321,7 +320,9 @@ def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
             boss_modes = {}
             uwu_icc_kills[boss_name] = boss_modes
         for mode in ICC_SPECIAL_MODES:
-            if boss_modes.get(mode) != "✅" and found_modes.get(boss_name, {}).get(mode):
+            if boss_modes.get(mode) != "✅" and found_modes.get(boss_name, {}).get(
+                mode
+            ):
                 boss_modes[mode] = "✅"
 
     return uwu_icc_kills
@@ -342,9 +343,15 @@ def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
         completed_ids = set()
 
     mode_to_achievement = {
-        "10H": bool(achi_payload.get("storming_10h_achieved") or "4628" in completed_ids),
-        "25N": bool(achi_payload.get("storming_25n_achieved") or "4604" in completed_ids),
-        "25H": bool(achi_payload.get("storming_25h_achieved") or "4632" in completed_ids),
+        "10H": bool(
+            achi_payload.get("storming_10h_achieved") or "4628" in completed_ids
+        ),
+        "25N": bool(
+            achi_payload.get("storming_25n_achieved") or "4604" in completed_ids
+        ),
+        "25H": bool(
+            achi_payload.get("storming_25h_achieved") or "4632" in completed_ids
+        ),
     }
 
     for boss_name in ICC_SPECIAL_BOSSES:
@@ -394,7 +401,10 @@ def _get_known_gs_by_spec(
                 _build_character_spec_gs_legacy_key(nombre, lookup_spec_name),
                 CHARACTER_SPEC_GS_TTL,
             )
-            if isinstance(legacy_cached, dict) and legacy_cached.get("gs") not in {None, "N/A"}:
+            if isinstance(legacy_cached, dict) and legacy_cached.get("gs") not in {
+                None,
+                "N/A",
+            }:
                 legacy_server = str(legacy_cached.get("server") or "").strip().lower()
                 if legacy_server == str(server or "").strip().lower():
                     cache_payload = legacy_cached
@@ -407,7 +417,10 @@ def _get_known_gs_by_spec(
                 _spec_lookup_candidates(clean_name),
                 CHARACTER_SPEC_GS_TTL,
             )
-            if isinstance(metadata_cached, dict) and metadata_cached.get("gs") not in {None, "N/A"}:
+            if isinstance(metadata_cached, dict) and metadata_cached.get("gs") not in {
+                None,
+                "N/A",
+            }:
                 cache_payload = metadata_cached
 
         if isinstance(cache_payload, dict):
@@ -435,7 +448,9 @@ def _build_spec_gs_entries(
                 "gearscore": gs_by_spec.get(clean_name, "?"),
             }
         )
-    return sorted(entries, key=lambda entry: (not entry.get("main", False), entry.get("name", "")))
+    return sorted(
+        entries, key=lambda entry: (not entry.get("main", False), entry.get("name", ""))
+    )
 
 
 def _format_spec_gs_value(spec_gs_entries: list[dict]) -> str:
@@ -579,11 +594,15 @@ def _build_dps_embed_from_cache(payload: dict):
                 failed_parts.append(f"{mode}:{value}")
     failed_note = ""
     if failed_parts:
-        failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
+        failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(
+            failed_parts
+        )
 
     timeout_note = ""
     if timed_out:
-        timeout_note = "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
+        timeout_note = (
+            "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
+        )
 
     embed = discord.Embed(
         title=f"{nombre_char} - Uwulogs DPS{spec_display}",
@@ -700,12 +719,15 @@ async def _personaje_impl(
                 cached_payload["nombre_char"],
                 cached_payload.get("server", DEFAULT_CHARACTER_REALM),
             )
-            await _safe_edit_original_response(interaction, content=None, embed=embed_cached, view=view_cached)
+            await _safe_edit_original_response(
+                interaction, content=None, embed=embed_cached, view=view_cached
+            )
             return
 
         await _safe_edit_original_response(
             interaction,
-            content=f"⏳ Calculando perfil de {nombre} en {realm}...", embed=None
+            content=f"⏳ Calculando perfil de {nombre} en {realm}...",
+            embed=None,
         )
 
         loop = asyncio.get_running_loop()
@@ -713,30 +735,23 @@ async def _personaje_impl(
         uwu_icc_task = loop.run_in_executor(
             EXECUTOR, _uwu_icc_bugfix_kills, nombre, realm
         )
-        prof_task = loop.run_in_executor(
-            EXECUTOR, _fetch_professions, nombre, realm
-        )
-        summary_task = loop.run_in_executor(
-            EXECUTOR, _fetch_summary, nombre, realm
-        )
-        gear_task = loop.run_in_executor(
-            EXECUTOR, _fetch_gear_data, nombre, realm
-        )
-        achi_task = loop.run_in_executor(
-            EXECUTOR, _fetch_achievements, nombre, realm
-        )
+        prof_task = loop.run_in_executor(EXECUTOR, _fetch_professions, nombre, realm)
+        summary_task = loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
+        gear_task = loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre, realm)
+        achi_task = loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre, realm)
         stats_task = loop.run_in_executor(
             EXECUTOR, _fetch_statistics, nombre, realm, 15062
         )
 
-        summary, gear_data, achi_payload, stats_rows, professions = await asyncio.gather(
-            summary_task, gear_task, achi_task, stats_task, prof_task
+        summary, gear_data, achi_payload, stats_rows, professions = (
+            await asyncio.gather(
+                summary_task, gear_task, achi_task, stats_task, prof_task
+            )
         )
 
         if isinstance(summary, dict) and summary.get("__error__"):
             await _safe_edit_original_response(
-                interaction,
-                content=summary["__error__"], embed=None
+                interaction, content=summary["__error__"], embed=None
             )
             return
 
@@ -875,7 +890,9 @@ async def _personaje_impl(
             professions=professions,
             active_spec_name=active_spec_name,
         )
-        await _safe_edit_original_response(interaction, content=None, embed=embed_initial, view=personaje_view)
+        await _safe_edit_original_response(
+            interaction, content=None, embed=embed_initial, view=personaje_view
+        )
 
         frame_idx = 1
         while not uwu_icc_task.done():
@@ -906,7 +923,9 @@ async def _personaje_impl(
                 active_spec_name=active_spec_name,
             )
             frame_idx += 1
-            await _safe_edit_original_response(interaction, content=None, embed=embed_loading, view=personaje_view)
+            await _safe_edit_original_response(
+                interaction, content=None, embed=embed_loading, view=personaje_view
+            )
 
         try:
             uwu_icc_kills = await uwu_icc_task
@@ -988,7 +1007,9 @@ async def _personaje_impl(
             ),
             {"character": nombre_char, "command": command_name, "server": realm},
         )
-        await _safe_edit_original_response(interaction, content=None, embed=embed_final, view=personaje_view)
+        await _safe_edit_original_response(
+            interaction, content=None, embed=embed_final, view=personaje_view
+        )
 
     except discord.NotFound:
         return
@@ -1066,7 +1087,9 @@ def register_commands(bot):
             )
             if isinstance(cached_payload, dict):
                 embed_cached = _build_dps_embed_from_cache(cached_payload)
-                await _safe_edit_original_response(interaction, content=None, embed=embed_cached)
+                await _safe_edit_original_response(
+                    interaction, content=None, embed=embed_cached
+                )
                 return
 
             await _safe_edit_original_response(
@@ -1124,7 +1147,8 @@ def register_commands(bot):
             if not isinstance(uwu_dps_summary, dict):
                 await _safe_edit_original_response(
                     interaction,
-                    content="⚠️ No se pudo leer respuesta de UwU Logs.", embed=None
+                    content="⚠️ No se pudo leer respuesta de UwU Logs.",
+                    embed=None,
                 )
                 return
 
@@ -1132,9 +1156,7 @@ def register_commands(bot):
             failed_by_mode = uwu_dps_summary.get("failed_by_mode", {})
             timed_out = bool(uwu_dps_summary.get("timed_out", False))
             if not uwu_rows:
-                timeout_note = (
-                    " (cálculo parcial por timeout)" if timed_out else ""
-                )
+                timeout_note = " (cálculo parcial por timeout)" if timed_out else ""
                 await _safe_edit_original_response(
                     interaction,
                     content=f"⚠️ No hay datos DPS en UwU Logs para {nombre_char}{timeout_note}.",
@@ -1205,11 +1227,15 @@ def register_commands(bot):
                         failed_parts.append(f"{mode}:{value}")
             failed_note = ""
             if failed_parts:
-                failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
+                failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(
+                    failed_parts
+                )
 
             timeout_note = ""
             if timed_out:
-                timeout_note = "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
+                timeout_note = (
+                    "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
+                )
 
             embed = discord.Embed(
                 title=f"{nombre_char} - Uwulogs DPS{spec_display}",

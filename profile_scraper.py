@@ -109,12 +109,16 @@ def _save_socket_cache(cache: dict) -> None:
 
 def get_specs(char_name: str, server: str) -> list[dict]:
     try:
-        profile_url = f"https://armory.warmane.com/character/{char_name}/{server}/profile"
+        profile_url = (
+            f"https://armory.warmane.com/character/{char_name}/{server}/profile"
+        )
         profile_resp = SESSION.get(profile_url, headers=HEADERS, timeout=8)
         if profile_resp.status_code == 200:
             profile_soup = BeautifulSoup(profile_resp.text, "html.parser")
             profile_specs = []
-            for text_node in profile_soup.select("div.specialization div.stub div.text"):
+            for text_node in profile_soup.select(
+                "div.specialization div.stub div.text"
+            ):
                 text_copy = BeautifulSoup(str(text_node), "html.parser")
                 for value_span in text_copy.select("span.value"):
                     value_span.extract()
@@ -142,7 +146,9 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             if specs:
                 return specs
 
-        api_url = f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
+        api_url = (
+            f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
+        )
         api_resp = SESSION.get(api_url, headers=HEADERS, timeout=8)
         if api_resp.status_code != 200:
             return []

@@ -81,17 +81,16 @@ def _collect_names_from_uwu(server: str, limit: int, best_only: bool) -> list[st
                         qps = query_idx / elapsed
                         remaining = max(total_queries - query_idx, 0)
                         eta_sec = int(remaining / qps) if qps > 0 else 0
-                        pct = (query_idx / total_queries) * 100 if total_queries else 100
+                        pct = (
+                            (query_idx / total_queries) * 100 if total_queries else 100
+                        )
                         print(
                             "[UWU] "
                             f"{query_idx}/{total_queries} ({pct:.1f}%) | "
                             f"nombres={len(names)} | eta={eta_sec}s"
                         )
 
-            print(
-                f"[UWU] Boss {boss} mode {mode} listo | "
-                f"nombres={len(names)}"
-            )
+            print(f"[UWU] Boss {boss} mode {mode} listo | " f"nombres={len(names)}")
 
         print(
             f"[UWU] Boss {boss} finalizado en "
@@ -123,7 +122,11 @@ def _calculate_character_gs(nombre: str, server: str) -> dict | None:
     try:
         gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
         gear_ids = [gid for gid in gear_ids if gid]
-        gs = sum(gearscore.main(gear_ids)) if gear_ids else summary.get("gearScore", "N/A")
+        gs = (
+            sum(gearscore.main(gear_ids))
+            if gear_ids
+            else summary.get("gearScore", "N/A")
+        )
     except Exception:
         gs = summary.get("gearScore", "N/A")
 
@@ -234,7 +237,9 @@ def main():
         names = names[: args.max_characters]
 
     if not names:
-        print("[ERROR] No hay personajes para procesar. Usa --name, --names-file o --seed-uwu.")
+        print(
+            "[ERROR] No hay personajes para procesar. Usa --name, --names-file o --seed-uwu."
+        )
         return
 
     print(f"[INFO] Procesando {len(names)} personajes en {args.server}...")

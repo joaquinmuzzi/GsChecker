@@ -22,7 +22,6 @@ from src.schemas.constants import (
 )
 from src.functions.cache import _cache_get, _cache_set
 
-
 WOW_CLASSES = (
     "Death Knight",
     "Paladin",
@@ -71,7 +70,9 @@ def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict
         for scheme in ("https", "http"):
             url = f"{scheme}://armory.warmane.com{path}"
             try:
-                resp = SESSION.post(url, headers=headers, data=data, timeout=HTTP_TIMEOUT)
+                resp = SESSION.post(
+                    url, headers=headers, data=data, timeout=HTTP_TIMEOUT
+                )
             except Exception as exc:
                 last_error = str(exc)
                 continue
@@ -195,7 +196,9 @@ def _summary_from_profile_html(nombre: str, server: str):
             k: (" ".join(v.split()) if isinstance(v, str) else v)
             for k, v in match.groupdict().items()
         }
-        parsed_guild = (data.get("guild_bracket") or data.get("guild_plain") or "").strip()
+        parsed_guild = (
+            data.get("guild_bracket") or data.get("guild_plain") or ""
+        ).strip()
         return {
             "name": target_name,
             "level": int(data.get("level") or 0),
@@ -296,7 +299,9 @@ def _fetch_summary(nombre: str, server: str):
         if not summary.get("guild") or summary.get("guild") == "Sin guild":
             summary["guild"] = profile_summary.get("guild") or summary.get("guild")
         if summary.get("gearScore") in {None, "", "N/A"}:
-            summary["gearScore"] = profile_summary.get("gearScore") or summary.get("gearScore")
+            summary["gearScore"] = profile_summary.get("gearScore") or summary.get(
+                "gearScore"
+            )
 
     if summary is not None:
         _cache_set(SUMMARY_CACHE, cache_key, summary)
@@ -334,7 +339,9 @@ def _fetch_professions(nombre: str, server: str) -> list[str]:
 
     result = []
     for stub in prof_section.find_all(class_="stub"):
-        parts = [p.strip() for p in stub.get_text("\n", strip=True).split("\n") if p.strip()]
+        parts = [
+            p.strip() for p in stub.get_text("\n", strip=True).split("\n") if p.strip()
+        ]
         if len(parts) < 2:
             continue
         name = parts[0].capitalize()
@@ -420,9 +427,7 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
         )
 
     _cache_set(GUILD_RANK_CACHE, cache_key, "")
-    print(
-        f"[WARN] Guild rank not found for '{clean_name}' guild='{clean_guild}'"
-    )
+    print(f"[WARN] Guild rank not found for '{clean_name}' guild='{clean_guild}'")
     return None
 
 

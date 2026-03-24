@@ -294,14 +294,38 @@ _SPEC_ICON_URLS = {
 }
 
 _CLASS_SPEC_ICON_URLS = {
-    ("paladin", "protection"): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_devotionaura.jpg",
-    ("warrior", "protection"): "https://cdn.warmane.com/wotlk/icons/medium/inv_shield_06.jpg",
-    ("priest", "holy"): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_guardianspirit.jpg",
-    ("paladin", "holy"): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_holybolt.jpg",
-    ("mage", "frost"): "https://cdn.warmane.com/wotlk/icons/medium/spell_frost_frostbolt02.jpg",
-    ("death knight", "frost"): "https://cdn.warmane.com/wotlk/icons/medium/spell_deathknight_frostpresence.jpg",
-    ("druid", "restoration"): "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_healingtouch.jpg",
-    ("shaman", "restoration"): "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_magicimmunity.jpg",
+    (
+        "paladin",
+        "protection",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_devotionaura.jpg",
+    (
+        "warrior",
+        "protection",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/inv_shield_06.jpg",
+    (
+        "priest",
+        "holy",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_guardianspirit.jpg",
+    (
+        "paladin",
+        "holy",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_holy_holybolt.jpg",
+    (
+        "mage",
+        "frost",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_frost_frostbolt02.jpg",
+    (
+        "death knight",
+        "frost",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_deathknight_frostpresence.jpg",
+    (
+        "druid",
+        "restoration",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_healingtouch.jpg",
+    (
+        "shaman",
+        "restoration",
+    ): "https://cdn.warmane.com/wotlk/icons/medium/spell_nature_magicimmunity.jpg",
 }
 
 
@@ -317,7 +341,9 @@ def _format_professions_short(professions: list[str]) -> str:
     return " - ".join(parts)
 
 
-def _spec_icon_url(active_spec_name: str | None, class_name: str | None = None) -> str | None:
+def _spec_icon_url(
+    active_spec_name: str | None, class_name: str | None = None
+) -> str | None:
     clean_name = str(active_spec_name or "").strip().lower()
     if not clean_name:
         return None
@@ -422,10 +448,17 @@ def _build_personaje_embed(
             inline=False,
         )
 
+    embed.set_footer(
+        text="¿Te gusta el bot? Apoyame en https://cafecito.app/muzzijoaquin",
+        icon_url="https://i.imgur.com/8n0v7yX.png",
+    )
+
     return embed
 
 
-def _build_personaje_view(nombre_char: str, server: str = "Lordaeron") -> discord.ui.View:
+def _build_personaje_view(
+    nombre_char: str, server: str = "Lordaeron"
+) -> discord.ui.View:
     view = discord.ui.View()
     view.add_item(
         discord.ui.Button(

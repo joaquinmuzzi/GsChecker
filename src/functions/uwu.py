@@ -28,7 +28,9 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
         return cached
 
     persistent_cache_key = f"uwu:character:{server}:{nombre.lower()}:{spec_i}"
-    cached = get_external_cache("uwu_character", persistent_cache_key, UWU_CHARACTER_TTL)
+    cached = get_external_cache(
+        "uwu_character", persistent_cache_key, UWU_CHARACTER_TTL
+    )
     if cached is not None:
         _cache_set(UWU_CHARACTER_CACHE, cache_key, cached)
         return cached
