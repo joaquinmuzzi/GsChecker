@@ -449,7 +449,7 @@ def _build_personaje_embed(
         )
 
     embed.set_footer(
-        text="☕ ¿Te gusta el bot? Apoyame en https://cafecito.app/muzzijoaquin",
+        text="☕ ¿Te gusta el bot? Apóyame con un Cafecito para mantener el bot online",
     )
 
     return embed
@@ -475,7 +475,7 @@ def _build_personaje_view(
     )
     view.add_item(
         discord.ui.Button(
-            label="Donar",
+            label="Cafecito",
             url="https://cafecito.app/muzzijoaquin",
             style=discord.ButtonStyle.link,
         )
