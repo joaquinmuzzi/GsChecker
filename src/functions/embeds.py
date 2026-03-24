@@ -449,8 +449,7 @@ def _build_personaje_embed(
         )
 
     embed.set_footer(
-        text="¿Te gusta el bot? Apoyame en https://cafecito.app/muzzijoaquin",
-        icon_url="https://i.imgur.com/8n0v7yX.png",
+        text="☕ ¿Te gusta el bot? Apoyame en https://cafecito.app/muzzijoaquin",
     )
 
     return embed
