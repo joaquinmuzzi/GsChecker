@@ -344,6 +344,22 @@ WOW_CLASSIC_SPEC_NAMES = {
     "Blood", "Unholy",
 }
 
+# Abbreviated/alternate names the Warmane armory sometimes returns
+_SPEC_NAME_ALIASES: dict[str, str] = {
+    "Marksman": "Marksmanship",
+    "Feral": "Feral Combat",
+    "Prot": "Protection",
+    "Ret": "Retribution",
+    "Disc": "Discipline",
+    "BM": "Beast Mastery",
+}
+
+
+def _normalize_spec_name(raw: str) -> str:
+    """Map abbreviated/alternate armory spec names to canonical WOW_CLASSIC_SPEC_NAMES."""
+    stripped = raw.strip()
+    return _SPEC_NAME_ALIASES.get(stripped, stripped)
+
 
 def _parse_specs_from_html(html: str) -> list[dict]:
     """Parse spec names from the armory profile HTML.
@@ -362,7 +378,7 @@ def _parse_specs_from_html(html: str) -> list[dict]:
         text_copy = BeautifulSoup(str(text_node), "html.parser")
         for value_span in text_copy.select("span.value"):
             value_span.extract()
-        spec_name = " ".join(text_copy.get_text(" ", strip=True).split())
+        spec_name = _normalize_spec_name(" ".join(text_copy.get_text(" ", strip=True).split()))
         if spec_name and spec_name in WOW_CLASSIC_SPEC_NAMES:
             stub_classes = stub.get("class") or []
             is_active = "active" in stub_classes or "selected" in stub_classes
@@ -405,11 +421,11 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
         soup = BeautifulSoup(resp.text, "html.parser")
         result = [
             {
-                "name": td.get_text(strip=True),
+                "name": _normalize_spec_name(td.get_text(strip=True)),
                 "active": "selected" in (td.get("class") or []),
             }
             for td in soup.find_all("td", attrs={"data-spec": True})
-            if td.get_text(strip=True) in WOW_CLASSIC_SPEC_NAMES
+            if _normalize_spec_name(td.get_text(strip=True)) in WOW_CLASSIC_SPEC_NAMES
         ]
         if result:
             _cache_set(SUMMARY_CACHE, cache_key, result)
@@ -427,10 +443,10 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
             talents = payload.get("talents") if isinstance(payload, dict) else None
             if isinstance(talents, list):
                 result = [
-                    {"name": str(t.get("tree") or "").strip(), "active": idx == 0}
+                    {"name": _normalize_spec_name(str(t.get("tree") or "").strip()), "active": idx == 0}
                     for idx, t in enumerate(talents)
                     if isinstance(t, dict)
-                    and str(t.get("tree") or "").strip() in WOW_CLASSIC_SPEC_NAMES
+                    and _normalize_spec_name(str(t.get("tree") or "").strip()) in WOW_CLASSIC_SPEC_NAMES
                 ]
                 if result:
                     _cache_set(SUMMARY_CACHE, cache_key, result)

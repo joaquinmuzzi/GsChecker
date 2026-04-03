@@ -149,6 +149,8 @@ _WOTLK_EPIC_GEMS: frozenset[str] = frozenset(
     # Dragon's Eye (JC-only epics)
     | {"36766", "36767"}
     | {str(i) for i in range(42142, 42159)}
+    # Stormjewels (epic fishing/WG reward gems, same stats as regular WotLK epics)
+    | {"45862", "45879", "45880", "45881", "45882", "45883", "45987"}
     # Special all-stats gems
     | {"42702", "49110"}
 )
