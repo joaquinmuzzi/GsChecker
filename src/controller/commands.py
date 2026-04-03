@@ -38,6 +38,8 @@ from src.functions.embeds import (
     _extract_icc_boss_kills,
     _render_table,
 )
+from src.audit.integration import run_full_audit
+from src.audit.coach import build_fallback_summary
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
 ITEM_SOURCE_TTL = 86400
@@ -1355,3 +1357,175 @@ def register_commands(bot):
             await _safe_send_error(interaction, f"❌ Error de red: {e}")
         except Exception as e:
             await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
+
+    @bot.tree.command(
+        name="ia",
+        description="Análisis BiS + resumen de coach por IA (Groq) para el personaje.",
+    )
+    @discord.app_commands.describe(
+        nombre="Nombre del personaje.",
+        reino="Reino opcional. Por defecto: Lordaeron.",
+    )
+    async def ia(
+        interaction: discord.Interaction,
+        nombre: str,
+        reino: str | None = None,
+    ):
+        server_name = interaction.guild.name if interaction.guild else "DM"
+        print(
+            f"[LOG] Comando 'ia' usado por {interaction.user} "
+            f"para personaje: {nombre} desde servidor: {server_name}"
+        )
+        try:
+            nombre = nombre.capitalize()
+            realm = _normalize_character_realm(reino)
+            await _safe_defer(interaction)
+
+            await _safe_edit_original_response(
+                interaction,
+                content=f"⏳ Analizando a **{nombre}** en {realm} con IA...",
+                embed=None,
+            )
+
+            loop = asyncio.get_running_loop()
+
+            # Fetch summary (class + spec) y gear en paralelo
+            summary_task = loop.run_in_executor(
+                EXECUTOR, _fetch_summary, nombre, realm
+            )
+            gear_task = loop.run_in_executor(
+                EXECUTOR, _fetch_gear_data, nombre, realm
+            )
+            summary, gear_data = await asyncio.gather(summary_task, gear_task)
+
+            if isinstance(summary, dict) and summary.get("__error__"):
+                await _safe_edit_original_response(
+                    interaction, content=summary["__error__"], embed=None
+                )
+                return
+
+            if not isinstance(summary, dict):
+                await _safe_edit_original_response(
+                    interaction,
+                    content="⚠️ No se pudo obtener información del personaje en Armory.",
+                    embed=None,
+                )
+                return
+
+            nivel = summary.get("level", 0)
+            if nivel != 80:
+                await _safe_edit_original_response(
+                    interaction,
+                    content=f"⚠️ **{nombre}** no es nivel 80.",
+                    embed=None,
+                )
+                return
+
+            char_class = str(summary.get("class") or "")
+            nombre_char = str(summary.get("name") or nombre)
+
+            # Determinar spec activa
+            specs_raw = await loop.run_in_executor(
+                EXECUTOR, _fetch_specs, nombre_char, realm
+            )
+            active_spec = ""
+            if isinstance(specs_raw, list):
+                for t in specs_raw:
+                    if isinstance(t, dict) and t.get("active"):
+                        active_spec = str(t.get("name") or "")
+                        break
+                if not active_spec and specs_raw:
+                    active_spec = str(specs_raw[0].get("name") or "")
+
+            # Ejecutar auditoría + Groq
+            import os as _os
+            report = await run_full_audit(
+                char_name=nombre_char,
+                server=realm,
+                char_class=char_class,
+                spec=active_spec,
+                gear_data=gear_data or [],
+                generate_summary=True,
+                groq_api_key=_os.getenv("GROQ_API_KEY"),
+            )
+
+            if report is None:
+                await _safe_edit_original_response(
+                    interaction,
+                    content=(
+                        f"⚠️ No hay guía BiS para **{char_class} {active_spec}** todavía.\n"
+                        "Guías disponibles: Warrior Fury · Death Knight Blood · "
+                        "Mage Arcane · Paladin Retribution."
+                    ),
+                    embed=None,
+                )
+                return
+
+            # Si Groq falló, usar el fallback de texto plano
+            coach_text = report.coach_summary or build_fallback_summary(report)
+
+            # Color por score
+            if report.overall_score >= 80:
+                color = 0x57F287   # verde
+            elif report.overall_score >= 50:
+                color = 0xFEE75C   # amarillo
+            else:
+                color = 0xED4245   # rojo
+
+            embed = discord.Embed(
+                title=f"🤖 Análisis IA · {nombre_char} ({report.spec_name})",
+                color=color,
+            )
+            embed.add_field(
+                name=(
+                    f"Score: {report.overall_score}/100  |  "
+                    f"{report.critical_count} crítico(s) · {report.warning_count} aviso(s)"
+                ),
+                value=coach_text[:1020] if coach_text else "Sin análisis disponible.",
+                inline=False,
+            )
+
+            # Caps de estadísticas compactos
+            if report.stat_caps:
+                cap_lines = []
+                for s in report.stat_caps:
+                    icon = "✅" if s.is_capped else "❌"
+                    line = f"{icon} **{s.display_name}**: {s.current_value:.0f}/{s.cap_value:.0f}"
+                    if not s.is_capped and s.must_reach:
+                        line += f" *(falta {s.delta:.0f})*"
+                    cap_lines.append(line)
+                embed.add_field(
+                    name="Caps de estadísticas",
+                    value="\n".join(cap_lines),
+                    inline=False,
+                )
+
+            # Resumen rápido de problemas críticos
+            crit_lines = (
+                [f"• {i.message}" for i in report.item_issues if i.severity.value == "critical"]
+                + [f"• {e.message}" for e in report.enchant_issues if e.severity.value == "critical"]
+                + [f"• {g.slot}: {g.issue}" for g in report.gem_issues if g.severity.value == "critical"]
+            )
+            if crit_lines:
+                embed.add_field(
+                    name="🚨 Críticos",
+                    value="\n".join(crit_lines[:8])[:1020],
+                    inline=False,
+                )
+
+            embed.set_footer(
+                text="Fuente: Armory Warmane · IA: Groq llama-3.3-70b · /p para resumen completo"
+            )
+
+            await _safe_edit_original_response(
+                interaction, content=None, embed=embed
+            )
+
+        except discord.NotFound:
+            return
+        except discord.HTTPException as e:
+            if _is_expired_token(e):
+                return
+            await _safe_send_error(interaction, f"❌ Error de red: {e}")
+        except Exception as e:
+            await _safe_send_error(interaction, f"❌ Error en /ia: {e}")
