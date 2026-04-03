@@ -303,8 +303,14 @@ def _fetch_summary(nombre: str, server: str):
     if cached is not None:
         return cached
 
-    summary = _summary_from_api(nombre, server)
-    profile_summary = _summary_from_profile_html(nombre, server)
+    # Fetch API summary and profile HTML in parallel — both are needed but independent
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        api_future = pool.submit(_summary_from_api, nombre, server)
+        html_future = pool.submit(_fetch_profile_page_html, nombre, server)
+        summary = api_future.result()
+        html_future.result()  # ensures HTML is cached; _summary_from_profile_html will reuse it
+
+    profile_summary = _summary_from_profile_html(nombre, server)  # instant: HTML already in cache
 
     if summary is None:
         if profile_summary is not None:
@@ -325,6 +331,55 @@ def _fetch_summary(nombre: str, server: str):
     return {"__error__": f"⚠️ No se encontró el personaje '{nombre}' en {server}."}
 
 
+WOW_CLASSIC_SPEC_NAMES = {
+    "Balance", "Feral Combat", "Restoration",
+    "Arcane", "Fire", "Frost",
+    "Holy", "Protection", "Retribution",
+    "Beast Mastery", "Marksmanship", "Survival",
+    "Assassination", "Combat", "Subtlety",
+    "Arms", "Fury",
+    "Discipline", "Shadow",
+    "Elemental", "Enhancement",
+    "Affliction", "Demonology", "Destruction",
+    "Blood", "Unholy",
+}
+
+
+def _parse_specs_from_html(html: str) -> list[dict]:
+    """Parse spec names from the armory profile HTML.
+    The first spec in the specialization section is the active one.
+    Returns [] if no specs are found so the caller can fall back.
+    """
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    stubs = soup.select("div.specialization div.stub")
+    specs = []
+    for stub in stubs:
+        text_node = stub.select_one("div.text")
+        if not text_node:
+            continue
+        text_copy = BeautifulSoup(str(text_node), "html.parser")
+        for value_span in text_copy.select("span.value"):
+            value_span.extract()
+        spec_name = " ".join(text_copy.get_text(" ", strip=True).split())
+        if spec_name and spec_name in WOW_CLASSIC_SPEC_NAMES:
+            stub_classes = stub.get("class") or []
+            is_active = "active" in stub_classes or "selected" in stub_classes
+            specs.append({"name": spec_name, "_active_flag": is_active})
+
+    if not specs:
+        return []
+
+    # If any stub has an explicit active marker, use that; otherwise first = active
+    has_explicit_active = any(s["_active_flag"] for s in specs)
+    result = []
+    for i, s in enumerate(specs):
+        active = s["_active_flag"] if has_explicit_active else (i == 0)
+        result.append({"name": s["name"], "active": active})
+    return result
+
+
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
     nombre = (nombre or "").strip()
     server = (server or "").strip()
@@ -332,10 +387,58 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
     if cached is not None:
         return cached
-    result = profile_scraper.get_specs(nombre, server)
+
+    # 1st attempt: reuse the profile HTML already fetched/cached by _fetch_summary
+    #   (no extra HTTP request if we're running concurrently with summary task)
+    html = _fetch_profile_page_html(nombre, server)
+    result = _parse_specs_from_html(html)
     if result:
         _cache_set(SUMMARY_CACHE, cache_key, result)
-    return result
+        return result
+
+    # 2nd attempt: dedicated talents page (has explicit "selected" class per spec)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    resp = _warmane_get_with_scheme_fallback(
+        f"/character/{nombre}/{server}/talents", headers
+    )
+    if resp is not None:
+        soup = BeautifulSoup(resp.text, "html.parser")
+        result = [
+            {
+                "name": td.get_text(strip=True),
+                "active": "selected" in (td.get("class") or []),
+            }
+            for td in soup.find_all("td", attrs={"data-spec": True})
+            if td.get_text(strip=True) in WOW_CLASSIC_SPEC_NAMES
+        ]
+        if result:
+            _cache_set(SUMMARY_CACHE, cache_key, result)
+            return result
+
+    # 3rd attempt: JSON API
+    api_resp = _warmane_get_with_scheme_fallback(
+        f"/api/character/{nombre}/{server}/talents",
+        {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+         "Accept": "application/json"},
+    )
+    if api_resp is not None:
+        try:
+            payload = api_resp.json()
+            talents = payload.get("talents") if isinstance(payload, dict) else None
+            if isinstance(talents, list):
+                result = [
+                    {"name": str(t.get("tree") or "").strip(), "active": idx == 0}
+                    for idx, t in enumerate(talents)
+                    if isinstance(t, dict)
+                    and str(t.get("tree") or "").strip() in WOW_CLASSIC_SPEC_NAMES
+                ]
+                if result:
+                    _cache_set(SUMMARY_CACHE, cache_key, result)
+                    return result
+        except Exception:
+            pass
+
+    return []
 
 
 def _fetch_professions(nombre: str, server: str) -> list[str]:

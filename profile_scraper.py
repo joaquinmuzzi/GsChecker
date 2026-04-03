@@ -213,6 +213,8 @@ _INT_HEAL_GEMS: frozenset[str] = frozenset(
         "40133",  # Purified Dreadstone (+12 SP +10 Spirit)
         "40134",  # Royal Dreadstone (+12 Int +5 mp5)
         "40128",  # Quick King's Amber (+20 Haste)
+        "42150",  # Quick Dragon's Eye (+34 Haste)
+        "40179",  # Energized Eye of Zul (+10 Haste +5 mp5)
 
     }
 )
