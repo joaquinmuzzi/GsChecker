@@ -526,3 +526,105 @@ def get_suboptimal_gems_from_gear_data(
                 results.append(f"{slot}: {label}")
 
     return results
+
+
+# ── WotLK level-80 stat conversion constants ─────────────────────────────────
+_HIT_RATING_PER_PCT    = 32.789   # 1 % hit      = 32.789 hit rating
+_EXP_RATING_PER_SKILL  = 8.197    # 1 exp skill  = 8.197  expertise rating
+_HASTE_RATING_PER_PCT  = 32.789   # 1 % haste    = 32.789 haste rating
+_CRIT_RATING_PER_PCT   = 45.906   # 1 % crit     = 45.906 crit rating
+
+# Specs whose *spell* hit column is the relevant one for audit comparisons
+_CASTER_DPS_SPECS: frozenset[str] = frozenset({
+    "Arcane", "Fire", "Frost",
+    "Affliction", "Demonology", "Destruction",
+    "Balance", "Shadow", "Elemental",
+})
+_HEALER_SPECS_SET: frozenset[str] = frozenset({
+    "Holy", "Discipline", "Restoration",
+})
+
+
+def get_character_stats(
+    char_name: str,
+    server: str = "Lordaeron",
+) -> dict[str, float]:
+    """
+    Fetch and parse secondary stats from the Warmane armory character summary
+    page.  Returns a subset of :class:`CharacterStats` field names → float.
+    Returns an empty dict on any failure.
+
+    Notes
+    -----
+    * The armory lists *hit rating* three times (Melee, Ranged, Spell).
+      Both ``hit_rating`` (first / melee) and ``spell_hit_rating`` (last /
+      spell) are returned so the caller can pick the right one by spec.
+    * ``Expertise`` is shown as a skill integer (e.g. 26) and is converted
+      to an equivalent rating using 8.197 rating / skill point.
+    * Armor Penetration is **not** exposed by the Warmane armory; callers
+      should not rely on ``armor_penetration_rating`` being present.
+    """
+    url = f"https://armory.warmane.com/character/{char_name}/{server}/summary"
+    try:
+        resp = SESSION.get(url, headers=HEADERS, timeout=8)
+        if resp.status_code != 200:
+            return {}
+        return _parse_character_stats_html(resp.text)
+    except Exception:
+        return {}
+
+
+def _parse_character_stats_html(html: str) -> dict[str, float]:
+    """
+    Extract secondary stats from the ``<div class="character-stats">`` block
+    in the Warmane armory character summary page.
+
+    Returned keys (all values are raw **rating** numbers, not percentages):
+    ``hit_rating``, ``spell_hit_rating``, ``expertise_rating``,
+    ``haste_rating``, ``crit_rating``, ``spell_power``,
+    ``defense_rating``, ``dodge_rating``, ``parry_rating``.
+    """
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        stats_div = soup.find(class_="character-stats")
+        if not stats_div:
+            return {}
+        text = stats_div.get_text(" ", strip=True)
+    except Exception:
+        return {}
+
+    result: dict[str, float] = {}
+
+    # Hit rating – listed three times: Melee, Ranged, Spell
+    hit_matches = re.findall(
+        r"Hit rating:\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE
+    )
+    if hit_matches:
+        result["hit_rating"] = round(float(hit_matches[0]) * _HIT_RATING_PER_PCT, 1)
+        if len(hit_matches) >= 3:
+            result["spell_hit_rating"] = round(
+                float(hit_matches[-1]) * _HIT_RATING_PER_PCT, 1
+            )
+
+    # Expertise – shown as skill integer, NOT as a percentage
+    m = re.search(r"Expertise:\s*([0-9]+)", text, re.IGNORECASE)
+    if m:
+        result["expertise_rating"] = round(
+            float(m.group(1)) * _EXP_RATING_PER_SKILL, 1
+        )
+
+    # Haste – last occurrence is the Spell section value
+    haste_matches = re.findall(
+        r"Haste:\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE
+    )
+    if haste_matches:
+        result["haste_rating"] = round(
+            float(haste_matches[-1]) * _HASTE_RATING_PER_PCT, 1
+        )
+
+    # Spell Power
+    m = re.search(r"Spell Power:\s*([0-9]+)", text, re.IGNORECASE)
+    if m:
+        result["spell_power"] = float(m.group(1))
+
+    return result

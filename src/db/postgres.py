@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from contextlib import contextmanager
@@ -194,3 +195,22 @@ def find_character_spec_gs_by_metadata(
             f"[WARN] Error buscando spec GS por metadata ({character_name}/{server}): {exc}"
         )
         return None
+
+
+# ---------------------------------------------------------------------------
+# Async wrappers — run blocking psycopg calls on a thread pool so the asyncio
+# event loop (and Discord heartbeats) are never blocked.
+# ---------------------------------------------------------------------------
+
+async def async_get_external_cache(source: str, cache_key: str, ttl_seconds: int):
+    return await asyncio.to_thread(get_external_cache, source, cache_key, ttl_seconds)
+
+
+async def async_set_external_cache(
+    source: str,
+    endpoint: str,
+    cache_key: str,
+    payload,
+    metadata: dict | None = None,
+) -> None:
+    await asyncio.to_thread(set_external_cache, source, endpoint, cache_key, payload, metadata)

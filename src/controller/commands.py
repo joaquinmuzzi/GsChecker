@@ -5,6 +5,8 @@ import discord
 import gearscore
 import profile_scraper
 from src.db.postgres import (
+    async_get_external_cache,
+    async_set_external_cache,
     find_character_spec_gs_by_metadata,
     get_external_cache,
     set_external_cache,
@@ -715,7 +717,7 @@ async def _personaje_impl(
         await _safe_defer(interaction)
 
         personaje_cache_key = f"{_build_personaje_cache_key(nombre)}:{realm.lower()}"
-        cached_payload = get_external_cache(
+        cached_payload = await async_get_external_cache(
             "command_personaje", personaje_cache_key, COMMAND_PERSONAJE_TTL
         )
         if isinstance(cached_payload, dict):
@@ -839,7 +841,7 @@ async def _personaje_impl(
             clean_active_spec = str(active_spec or "").strip()
             if not clean_active_spec or clean_active_spec == "N/A":
                 continue
-            set_external_cache(
+            await async_set_external_cache(
                 "character_spec_gs",
                 "/personaje",
                 _build_character_spec_gs_key(nombre_char, realm, clean_active_spec),
@@ -847,7 +849,8 @@ async def _personaje_impl(
                 {"character": nombre_char, "spec": clean_active_spec, "server": realm},
             )
 
-        gs_by_spec = _get_known_gs_by_spec(
+        gs_by_spec = await asyncio.to_thread(
+            _get_known_gs_by_spec,
             nombre_char,
             realm,
             active_specs + inactive_specs,
@@ -875,7 +878,7 @@ async def _personaje_impl(
 
         # Cargar kills confirmadas del DB antes del embed inicial,
         # así los ✅ ya guardados aparecen de inmediato sin loading.
-        persistent_confirmed = _load_confirmed_icc_kills(nombre_char, realm)
+        persistent_confirmed = await asyncio.to_thread(_load_confirmed_icc_kills, nombre_char, realm)
         initial_uwu_kills = _normalize_special_uwu_kills(dict(persistent_confirmed))
 
         personaje_view = _build_personaje_view(nombre_char, realm)
@@ -959,7 +962,8 @@ async def _personaje_impl(
         uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
         uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
 
-        persistent_confirmed = _persist_new_confirmed_icc_kills(
+        persistent_confirmed = await asyncio.to_thread(
+            _persist_new_confirmed_icc_kills,
             nombre_char,
             realm,
             uwu_icc_kills,
@@ -993,7 +997,7 @@ async def _personaje_impl(
             active_spec_name=active_spec_name,
             suboptimal_gems=suboptimal_gems,
         )
-        set_external_cache(
+        await async_set_external_cache(
             "command_personaje",
             f"/{command_name}",
             personaje_cache_key,
@@ -1098,7 +1102,7 @@ def register_commands(bot):
             await _safe_defer(interaction)
 
             dps_cache_key = _build_dps_cache_key(nombre, spec)
-            cached_payload = get_external_cache(
+            cached_payload = await async_get_external_cache(
                 "command_dps", dps_cache_key, COMMAND_DPS_TTL
             )
             if isinstance(cached_payload, dict):
@@ -1263,7 +1267,7 @@ def register_commands(bot):
                 value=DOCS_NOTAS_URL,
                 inline=True,
             )
-            set_external_cache(
+            await async_set_external_cache(
                 "command_dps",
                 "/dps",
                 dps_cache_key,
@@ -1424,10 +1428,16 @@ def register_commands(bot):
             char_class = str(summary.get("class") or "")
             nombre_char = str(summary.get("name") or nombre)
 
-            # Determinar spec activa
-            specs_raw = await loop.run_in_executor(
+            # Determinar spec activa y stats del personaje en paralelo
+            from profile_scraper import get_character_stats as _ps_get_char_stats
+            specs_task2 = loop.run_in_executor(
                 EXECUTOR, _fetch_specs, nombre_char, realm
             )
+            stats_task2 = loop.run_in_executor(
+                EXECUTOR, _ps_get_char_stats, nombre_char, realm
+            )
+            specs_raw, raw_stats = await asyncio.gather(specs_task2, stats_task2)
+
             active_spec = ""
             if isinstance(specs_raw, list):
                 for t in specs_raw:
@@ -1437,6 +1447,18 @@ def register_commands(bot):
                 if not active_spec and specs_raw:
                     active_spec = str(specs_raw[0].get("name") or "")
 
+            # Para specs caster/healer, usar el hit de la sección Spell (último)
+            _IA_SPELL_SPECS = frozenset({
+                "Arcane", "Fire", "Frost",
+                "Affliction", "Demonology", "Destruction",
+                "Balance", "Shadow", "Elemental",
+                "Holy", "Discipline", "Restoration",
+            })
+            char_stats: dict = dict(raw_stats or {})
+            spell_hit = char_stats.pop("spell_hit_rating", None)
+            if active_spec in _IA_SPELL_SPECS and spell_hit is not None:
+                char_stats["hit_rating"] = spell_hit
+
             # Ejecutar auditoría + Groq
             import os as _os
             report = await run_full_audit(
@@ -1444,6 +1466,7 @@ def register_commands(bot):
                 server=realm,
                 char_class=char_class,
                 spec=active_spec,
+                stats=char_stats,
                 gear_data=gear_data or [],
                 generate_summary=True,
                 groq_api_key=_os.getenv("GROQ_API_KEY"),
@@ -1489,7 +1512,12 @@ def register_commands(bot):
             if report.stat_caps:
                 cap_lines = []
                 for s in report.stat_caps:
-                    icon = "✅" if s.is_capped else "❌"
+                    if s.is_capped:
+                        icon = "✅"
+                    elif s.must_reach:
+                        icon = "❌"
+                    else:
+                        icon = "ℹ️"
                     line = f"{icon} **{s.display_name}**: {s.current_value:.0f}/{s.cap_value:.0f}"
                     if not s.is_capped and s.must_reach:
                         line += f" *(falta {s.delta:.0f})*"

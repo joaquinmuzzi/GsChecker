@@ -17,12 +17,17 @@ Gem item IDs referenced across guides
   40111 – Bold Cardinal Ruby          (+20 Strength, red)
   40117 – Fractured Cardinal Ruby     (+20 Armor Penetration, red)
   40112 – Delicate Cardinal Ruby      (+20 Agility, red)
+  40113 – Runed Cardinal Ruby         (+23 Spell Power, red)
   40119 – Rigid King's Amber          (+20 Hit Rating, yellow)
   40125 – Potent Ametrine             (+10 Spell Power / +10 Crit, orange)
-  40113 – Brilliant King's Amber      (+20 Intellect, yellow)
+  40126 – Reckless Ametrine           (+12 Spell Power / +10 Haste, orange)
+  40152 – Vivid Eye of Zul            (+10 SP / +10 Spirit, blue/purple)
+  40133 – Purified Dreadstone         (+12 SP / +10 Spirit, blue/purple)
   40116 – Lustrous Eye of Zul         (+9 mp5, blue)
   41285 – Chaotic Skyflare Diamond    (meta: +21 crit dmg, req 2 red > blue)
-  41333 – Relentless Earthsiege Diam  (meta: +21 agi / 3 % shield)
+  41333 – Ember Skyflare Diamond      (meta: +25 SP / +2% int, no color req)
+  41401 – Insightful Earthsiege Diam  (meta: +21 int + mana restore proc)
+  41398 – Relentless Earthsiege Diam  (meta: +21 agi / 3% crit dmg)
 ────────────────────────────────────────────────────────────────────────────
 """
 
@@ -207,16 +212,16 @@ _WARRIOR_FURY_ARP: BisGuide = BisGuide(
         StatCap(
             stat_key="expertise_rating",
             display_name="Expertise Rating",
-            cap_value=214,
-            cap_label="Expertise soft cap (26 exp / 214 rating)",
+            cap_value=213,
+            cap_label="Expertise dodge-cap (26 skill / ~213 rating)",
             must_reach=True,
         ),
         StatCap(
             stat_key="armor_penetration_rating",
             display_name="Armor Penetration",
             cap_value=1400,
-            cap_label="100% ArP cap on NES proc (1400)",
-            must_reach=True,
+            cap_label="100% ArP con NES proc (1400) – no disponible en armory",
+            must_reach=False,
         ),
     ],
     gem_requirements=[
@@ -330,8 +335,8 @@ _DK_BLOOD_DPS: BisGuide = BisGuide(
     },
     stat_caps=[
         StatCap(stat_key="hit_rating",           display_name="Hit Rating",       cap_value=262,  cap_label="8% hit cap"),
-        StatCap(stat_key="expertise_rating",     display_name="Expertise Rating", cap_value=214,  cap_label="Expertise soft cap 26"),
-        StatCap(stat_key="armor_penetration_rating", display_name="Armor Penetration", cap_value=722, cap_label="ArP softcap ~722 (no proc trinket)"),
+        StatCap(stat_key="expertise_rating",     display_name="Expertise Rating", cap_value=213,  cap_label="Expertise dodge-cap (26 skill / ~213 rating)"),
+        StatCap(stat_key="armor_penetration_rating", display_name="Armor Penetration", cap_value=722, cap_label="ArP softcap ~722 (no proc trinket) – no disponible en armory", must_reach=False),
     ],
     gem_requirements=[
         GemRequirement(gem_item_id="41285", gem_name="Chaotic Skyflare Diamond", required_count=1,
@@ -526,7 +531,7 @@ _PALADIN_RET: BisGuide = BisGuide(
     },
     stat_caps=[
         StatCap(stat_key="hit_rating",       display_name="Hit Rating",       cap_value=262, cap_label="8% hit cap"),
-        StatCap(stat_key="expertise_rating", display_name="Expertise Rating", cap_value=214, cap_label="Expertise soft cap 26"),
+        StatCap(stat_key="expertise_rating", display_name="Expertise Rating", cap_value=213, cap_label="Expertise dodge-cap (26 skill / ~213 rating)"),
     ],
     gem_requirements=[
         GemRequirement(gem_item_id="41285", gem_name="Chaotic Skyflare Diamond", required_count=1,
