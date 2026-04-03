@@ -86,6 +86,8 @@ SOCKET_CACHE_ONLY = False
 _SOCKET_CACHE = None
 _SLOT_CACHE = None
 _GEM_DATA: dict | None = None
+# reverse map: enchant_id (str) → {"item_id": str, "name": str, "effect": str, "meta": bool}
+_GEM_BY_ENCHANT: dict | None = None
 
 # ── Meta gem IDs (go in a meta socket, skip from quality checks) ─────────────
 META_GEM_IDS: frozenset[str] = frozenset(
@@ -300,6 +302,28 @@ def _load_gem_data() -> dict:
     except Exception:
         _GEM_DATA = {}
     return _GEM_DATA
+
+
+def _load_gem_by_enchant() -> dict:
+    """Build and cache a reverse lookup: enchant_id → gem info dict."""
+    global _GEM_BY_ENCHANT
+    if _GEM_BY_ENCHANT is not None:
+        return _GEM_BY_ENCHANT
+    gem_data = _load_gem_data()
+    _GEM_BY_ENCHANT = {}
+    for item_id, info in gem_data.items():
+        if not isinstance(info, dict):
+            continue
+        eid = str(info.get("enchant_id") or "")
+        if not eid:
+            continue
+        _GEM_BY_ENCHANT[eid] = {
+            "item_id": item_id,
+            "name": info.get("name", item_id),
+            "effect": info.get("effect", ""),
+            "meta": bool(info.get("colors", {}).get("meta", False)),
+        }
+    return _GEM_BY_ENCHANT
 
 
 def _save_socket_cache(cache: dict) -> None:
@@ -575,7 +599,7 @@ def get_missing_enchants_gems(char_name: str, server: str = "Lordaeron"):
 
 
 def get_gem_name(gem_id: str) -> str:
-    """Return a human-readable gem name from gem_data.json, or the raw ID as fallback."""
+    """Return a human-readable gem name from gem_data.json (lookup by item ID), or the raw ID as fallback."""
     gem_data = _load_gem_data()
     gem_info = gem_data.get(str(gem_id))
     if isinstance(gem_info, dict):
@@ -589,8 +613,12 @@ def get_suboptimal_gems_from_gear_data(
     """
     For each filled (non-meta) gem slot, check whether the gem is in the
     recommended set for the given class/spec.  Returns a list of short
-    description strings such as ``"Head: Smooth King's Amber"`` for every
-    gem that does not match the expected role.
+    description strings such as ``"Head: Brilliant Autumn's Glow (+16 Int)"``
+    for every gem that does not match the expected role.
+
+    The values in gear_data[*]["gems"] are **enchant IDs** (as returned by
+    the Warmane armory), so we resolve them via the enchant→item reverse map
+    before comparing against the optimal item-ID sets.
 
     Returns an empty list when the spec is unknown or no suboptimal gems
     are found.
@@ -605,19 +633,36 @@ def get_suboptimal_gems_from_gear_data(
         return []
 
     combined_ok = acceptable | _ALWAYS_OK_GEMS
+    by_enchant = _load_gem_by_enchant()
     results: list[str] = []
 
     for item in gear_data:
         slot = item.get("slot", "Unknown")
         gems = item.get("gems") or []
-        for gem_id in gems:
-            gem_id_str = str(gem_id or "").strip()
-            if not gem_id_str or gem_id_str == "0":
+        for enchant_id in gems:
+            eid_str = str(enchant_id or "").strip()
+            if not eid_str or eid_str == "0":
                 continue
-            if gem_id_str in META_GEM_IDS:
+
+            gem_info = by_enchant.get(eid_str)
+            if gem_info is None:
+                # Unknown enchant_id — skip silently
                 continue
-            if gem_id_str not in combined_ok:
-                gem_name = get_gem_name(gem_id_str)
-                results.append(f"{slot}: {gem_name}")
+
+            # Skip meta gems (they go in a dedicated meta socket)
+            if gem_info["meta"]:
+                continue
+
+            item_id = gem_info["item_id"]
+
+            # Also skip via item_id-based meta set (belt buckle etc.)
+            if item_id in META_GEM_IDS:
+                continue
+
+            if item_id not in combined_ok:
+                name = gem_info["name"]
+                effect = gem_info["effect"]
+                label = f"{name} ({effect})" if effect else name
+                results.append(f"{slot}: {label}")
 
     return results
