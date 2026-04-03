@@ -210,8 +210,7 @@ _INT_HEAL_GEMS: frozenset[str] = frozenset(
         "40175",  # Dazzling Eye of Zul (+10 Int +5 mp5)
         "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
         "40133",  # Purified Dreadstone (+12 SP +10 Spirit)
-        "40125",
-        "42156",  # Rigid (+20/+34 Hit)
+        "40134",  # Royal Dreadstone (+12 Int +5 mp5)
     }
 )
 
@@ -223,6 +222,7 @@ _TANK_GEMS: frozenset[str] = frozenset(
         "40130",  # Shifting Dreadstone (+10 Agi +15 Stam)
         "40138",  # Regal Dreadstone (+10 Dodge +15 Stam)
         "40139",  # Defender's Dreadstone (+10 Parry +15 Stam)
+        "40167",  # Enduring Eye of Zul (+10 Def +15 Stam)
         "40126",
         "42157",  # Thick King's Amber / Dragon's Eye (+20/+34 Defense)
         "40115",

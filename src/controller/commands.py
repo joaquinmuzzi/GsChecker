@@ -745,10 +745,11 @@ async def _personaje_impl(
         stats_task = loop.run_in_executor(
             EXECUTOR, _fetch_statistics, nombre, realm, 15062
         )
+        specs_task = loop.run_in_executor(EXECUTOR, _fetch_specs, nombre, realm)
 
-        summary, gear_data, achi_payload, stats_rows, professions = (
+        summary, gear_data, achi_payload, stats_rows, professions, talents = (
             await asyncio.gather(
-                summary_task, gear_task, achi_task, stats_task, prof_task
+                summary_task, gear_task, achi_task, stats_task, prof_task, specs_task
             )
         )
 
@@ -779,7 +780,6 @@ async def _personaje_impl(
             )
             return
 
-        talents = _fetch_specs(nombre_char, realm)
         if isinstance(talents, list) and len(talents) > 0:
             sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
             active_specs = [

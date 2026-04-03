@@ -89,20 +89,35 @@ def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict
     return None
 
 
-def _summary_from_profile_html(nombre: str, server: str):
-    profile_path = f"/character/{nombre}/{server}/profile"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        "Referer": "https://armory.warmane.com/",
-    }
+_PROFILE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+    "Referer": "https://armory.warmane.com/",
+}
 
-    resp = _warmane_get_with_scheme_fallback(profile_path, headers)
-    if resp is None:
+
+def _fetch_profile_page_html(nombre: str, server: str) -> str:
+    """Fetch and cache the profile page HTML in-memory (shared between summary,
+    professions and specs to avoid hitting the same URL multiple times per command)."""
+    cache_key = ("profile_html", nombre.lower(), server.lower())
+    cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
+    if cached is not None:
+        return cached
+    resp = _warmane_get_with_scheme_fallback(
+        f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS
+    )
+    html = resp.text if resp is not None else ""
+    _cache_set(SUMMARY_CACHE, cache_key, html)
+    return html
+
+
+def _summary_from_profile_html(nombre: str, server: str):
+    html = _fetch_profile_page_html(nombre, server)
+    if not html:
         return None
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     page_text = soup.get_text(" ", strip=True)
 
     target_server = (server or "").strip()
@@ -311,7 +326,16 @@ def _fetch_summary(nombre: str, server: str):
 
 
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
-    return profile_scraper.get_specs(nombre, server)
+    nombre = (nombre or "").strip()
+    server = (server or "").strip()
+    cache_key = ("specs", nombre.lower(), server.lower())
+    cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
+    if cached is not None:
+        return cached
+    result = profile_scraper.get_specs(nombre, server)
+    if result:
+        _cache_set(SUMMARY_CACHE, cache_key, result)
+    return result
 
 
 def _fetch_professions(nombre: str, server: str) -> list[str]:
@@ -322,17 +346,11 @@ def _fetch_professions(nombre: str, server: str) -> list[str]:
     if cached is not None:
         return cached
 
-    profile_path = f"/character/{nombre}/{server}/profile"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://armory.warmane.com/",
-    }
-    resp = _warmane_get_with_scheme_fallback(profile_path, headers)
-    if resp is None:
+    html = _fetch_profile_page_html(nombre, server)
+    if not html:
         return []
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     prof_section = soup.find(class_="profskills")
     if not prof_section:
         return []
