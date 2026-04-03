@@ -446,9 +446,14 @@ def _build_personaje_embed(
         if suboptimal_gems:
             missing_lines.append("Wrong Gems:")
             missing_lines.extend(f"- {entry}" for entry in suboptimal_gems)
+        # Discord field value limit is 1024 chars; code fences consume 8 chars
+        _FIELD_CONTENT_LIMIT = 1016
+        field_body = "\n".join(missing_lines)
+        if len(field_body) > _FIELD_CONTENT_LIMIT:
+            field_body = field_body[: _FIELD_CONTENT_LIMIT - 4] + "\n..."
         embed.add_field(
             name="Enchants / Gems",
-            value="```\n" + "\n".join(missing_lines) + "\n```",
+            value="```\n" + field_body + "\n```",
             inline=False,
         )
 

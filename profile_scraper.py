@@ -142,62 +142,62 @@ META_GEM_IDS: frozenset[str] = frozenset(
 _ALWAYS_OK_GEMS: frozenset[str] = frozenset({"49110", "42702"})
 
 # ── Optimal gem sets per role (ICC / WoTLK phase) ────────────────────────────
+
+# ArP / Physical DPS — Warrior Arms/Fury, DK Frost, Rogue Combat, Hunter MM, Druid Feral
+_ARP_DPS_GEMS: frozenset[str] = frozenset(
+    {
+        "40117",
+        "42153",  # Fractured Cardinal Ruby / Dragon's Eye (+20/+34 ArP)
+        "40111",
+        "42142",  # Bold Cardinal Ruby / Dragon's Eye (+20/+34 STR)
+        "40112",
+        "42143",  # Delicate Cardinal Ruby / Dragon's Eye (+20/+34 Agi) — Hunter MM alt
+        "40142",  # Inscribed Ametrine (+10 STR +10 Crit)
+        "40147",  # Deadly Ametrine (+10 Agi +10 Crit)
+    }
+)
+
+# Pure STR DPS — Paladin Retribution, DK Unholy
 _STR_DPS_GEMS: frozenset[str] = frozenset(
     {
         "40111",
         "42142",  # Bold Cardinal Ruby / Dragon's Eye (+20/+34 STR)
-        "40117",
-        "42153",  # Fractured Cardinal Ruby / Dragon's Eye (+20/+34 ArP)
-        "40114",
-        "36766",  # Bright Cardinal Ruby / Dragon's Eye (+40/+68 AP)
-        "40129",  # Sovereign Dreadstone (+10 STR +15 Stam)
-        "40140",  # Puissant Dreadstone (+10 ArP +15 Stam)
-        "40142",  # Inscribed Ametrine (+10 STR +10 Crit)
         "40143",  # Etched Ametrine (+10 STR +10 Hit)
-        "40146",  # Fierce Ametrine (+10 STR +10 Haste)
-        "40118",
-        "42154",  # Precise Cardinal Ruby / Dragon's Eye (+20/+34 Expertise)
-        "40125",
-        "42156",  # Rigid King's Amber / Dragon's Eye (+20/+34 Hit)
+        "40142",  # Inscribed Ametrine (+10 STR +10 Crit)
     }
 )
 
+# AGI DPS — Rogue Assassination/Subtlety, Shaman Enhancement, Hunter Survival/BM
 _AGI_DPS_GEMS: frozenset[str] = frozenset(
     {
         "40112",
         "42143",  # Delicate Cardinal Ruby / Dragon's Eye (+20/+34 Agi)
-        "40117",
-        "42153",  # Fractured (+20/+34 ArP) — ArP builds
-        "40114",
-        "36766",  # Bright (+40/+68 AP)
-        "40130",  # Shifting Dreadstone (+10 Agi +15 Stam)
         "40147",  # Deadly Ametrine (+10 Agi +10 Crit)
         "40148",  # Glinting Ametrine (+10 Agi +10 Hit)
-        "40150",  # Deft Ametrine (+10 Agi +10 Haste)
-        "40118",
-        "42154",  # Precise (+20/+34 Expertise)
-        "40125",
-        "42156",  # Rigid (+20/+34 Hit)
     }
 )
 
+# SP caster DPS — Mage Fire/Frost, Warlock all, Priest Shadow, Druid Balance, Shaman Ele
 _SP_DPS_GEMS: frozenset[str] = frozenset(
     {
         "40113",
         "42144",  # Runed Cardinal Ruby / Dragon's Eye (+23/+39 SP)
-        "40152",  # Potent Ametrine (+12 SP +10 Crit)
-        "40153",  # Veiled Ametrine (+12 SP +10 Hit)
         "40155",  # Reckless Ametrine (+12 SP +10 Haste)
-        "40151",  # Luminous Ametrine (+12 SP +10 Int)
-        "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
-        "40128",  # Quick King's Amber (+20 Haste)
-        "40123",
-        "42148",  # Brilliant King's Amber / Dragon's Eye (+20/+34 Int)
-        "40125",
-        "42156",  # Rigid (+20/+34 Hit)
     }
 )
 
+# Arcane Mage — Haste stacking
+_ARCANE_GEMS: frozenset[str] = frozenset(
+    {
+        "40113",
+        "42144",  # Runed Cardinal Ruby / Dragon's Eye (+23/+39 SP)
+        "40128",
+        "42150",  # Quick King's Amber / Dragon's Eye (+20/+34 Haste)
+        "40155",  # Reckless Ametrine (+12 SP +10 Haste)
+    }
+)
+
+# INT/SP Healers — Paladin Holy, Priest Holy/Disc, Druid Restoration
 _INT_HEAL_GEMS: frozenset[str] = frozenset(
     {
         "40123",
@@ -205,28 +205,33 @@ _INT_HEAL_GEMS: frozenset[str] = frozenset(
         "40113",
         "42144",  # Runed Cardinal Ruby / Dragon's Eye (+23/+39 SP)
         "40151",  # Luminous Ametrine (+12 SP +10 Int)
+        "40128",
+        "42150",  # Quick King's Amber / Dragon's Eye (+20/+34 Haste)
         "40155",  # Reckless Ametrine (+12 SP +10 Haste)
-        "40152",  # Potent Ametrine (+12 SP +10 Crit)
-        "40164",  # Timeless Eye of Zul (+10 Int +15 Stam)
-        "40175",  # Dazzling Eye of Zul (+10 Int +5 mp5)
-        "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
-        "40133",  # Purified Dreadstone (+12 SP +10 Spirit)
-        "40134",  # Royal Dreadstone (+12 Int +5 mp5)
-        "40128",  # Quick King's Amber (+20 Haste)
-        "42150",  # Quick Dragon's Eye (+34 Haste)
-        "40179",  # Energized Eye of Zul (+10 Haste +5 mp5)
-
     }
 )
 
+# Shaman Restoration — SP/Haste gems + Solid Majestic Zircon for blue slots
+_SHAM_HEAL_GEMS: frozenset[str] = frozenset(
+    {
+        "40113",
+        "42144",  # Runed Cardinal Ruby / Dragon's Eye (+23/+39 SP)
+        "40128",
+        "42150",  # Quick King's Amber / Dragon's Eye (+20/+34 Haste)
+        "40155",  # Reckless Ametrine (+12 SP +10 Haste)
+        "40119",
+        "36767",  # Solid Majestic Zircon / Dragon's Eye (+30/+51 Stam) — blue slot
+    }
+)
+
+# Tanks — Warrior Prot, Paladin Prot, DK Blood, Druid Feral Tank
 _TANK_GEMS: frozenset[str] = frozenset(
     {
         "40119",
         "36767",  # Solid Majestic Zircon / Dragon's Eye (+30/+51 Stam)
-        "40129",  # Sovereign Dreadstone (+10 STR +15 Stam)
         "40130",  # Shifting Dreadstone (+10 Agi +15 Stam)
-        "40138",  # Regal Dreadstone (+10 Dodge +15 Stam)
-        "40139",  # Defender's Dreadstone (+10 Parry +15 Stam)
+        "40118",
+        "42154",  # Precise Cardinal Ruby / Dragon's Eye (+20/+34 Expertise)
         "40167",  # Enduring Eye of Zul (+10 Def +15 Stam)
         "40126",
         "42157",  # Thick King's Amber / Dragon's Eye (+20/+34 Defense)
@@ -234,54 +239,53 @@ _TANK_GEMS: frozenset[str] = frozenset(
         "42151",  # Subtle Cardinal Ruby / Dragon's Eye (+20/+34 Dodge)
         "40116",
         "42152",  # Flashing Cardinal Ruby / Dragon's Eye (+20/+34 Parry)
-        "40111",
-        "42142",  # Bold (+20/+34 STR) — threat
+        "40138",  # Regal Dreadstone (+10 Dodge +15 Stam)
+        "40139",  # Defender's Dreadstone (+10 Parry +15 Stam)
         "40160",  # Stalwart Ametrine (+10 Dodge +10 Defense)
         "40161",  # Glimmering Ametrine (+10 Parry +10 Defense)
-        "40118",
-        "42154",  # Precise (+20/+34 Expertise) — threat capping
-        "40125",
-        "42156",  # Rigid (+20/+34 Hit) — threat capping
     }
 )
 
 # ── (class_lower, spec_lower) → acceptable gem set ───────────────────────────
 OPTIMAL_GEMS_BY_SPEC: dict[tuple[str, str], frozenset[str]] = {
-    # STR melee DPS
-    ("paladin", "retribution"): _STR_DPS_GEMS,
-    ("warrior", "arms"): _STR_DPS_GEMS,
-    ("warrior", "fury"): _STR_DPS_GEMS,
-    ("death knight", "unholy"): _STR_DPS_GEMS,
-    ("death knight", "frost"): _STR_DPS_GEMS,
-    ("druid", "feral combat"): _STR_DPS_GEMS,
-    # AGI melee DPS
+    # ArP physical DPS
+    ("warrior", "arms"):         _ARP_DPS_GEMS,
+    ("warrior", "fury"):         _ARP_DPS_GEMS,
+    ("death knight", "frost"):   _ARP_DPS_GEMS,
+    ("rogue", "combat"):         _ARP_DPS_GEMS,
+    ("hunter", "marksmanship"):  _ARP_DPS_GEMS,
+    ("druid", "feral combat"):   _ARP_DPS_GEMS,
+    # Pure STR DPS
+    ("paladin", "retribution"):  _STR_DPS_GEMS,
+    ("death knight", "unholy"):  _STR_DPS_GEMS,
+    # AGI DPS
+    ("rogue", "assassination"):  _AGI_DPS_GEMS,
+    ("rogue", "subtlety"):       _AGI_DPS_GEMS,
+    ("shaman", "enhancement"):   _AGI_DPS_GEMS,
+    ("hunter", "survival"):      _AGI_DPS_GEMS,
     ("hunter", "beast mastery"): _AGI_DPS_GEMS,
-    ("hunter", "marksmanship"): _AGI_DPS_GEMS,
-    ("hunter", "survival"): _AGI_DPS_GEMS,
-    ("rogue", "assassination"): _AGI_DPS_GEMS,
-    ("rogue", "combat"): _AGI_DPS_GEMS,
-    ("rogue", "subtlety"): _AGI_DPS_GEMS,
-    ("shaman", "enhancement"): _AGI_DPS_GEMS,
     # SP caster DPS
-    ("mage", "arcane"): _SP_DPS_GEMS,
-    ("mage", "fire"): _SP_DPS_GEMS,
-    ("mage", "frost"): _SP_DPS_GEMS,
-    ("warlock", "affliction"): _SP_DPS_GEMS,
-    ("warlock", "demonology"): _SP_DPS_GEMS,
-    ("warlock", "destruction"): _SP_DPS_GEMS,
-    ("priest", "shadow"): _SP_DPS_GEMS,
-    ("druid", "balance"): _SP_DPS_GEMS,
-    ("shaman", "elemental"): _SP_DPS_GEMS,
+    ("mage", "fire"):            _SP_DPS_GEMS,
+    ("mage", "frost"):           _SP_DPS_GEMS,
+    ("warlock", "affliction"):   _SP_DPS_GEMS,
+    ("warlock", "demonology"):   _SP_DPS_GEMS,
+    ("warlock", "destruction"):  _SP_DPS_GEMS,
+    ("priest", "shadow"):        _SP_DPS_GEMS,
+    ("druid", "balance"):        _SP_DPS_GEMS,
+    ("shaman", "elemental"):     _SP_DPS_GEMS,
+    # Arcane Mage — haste priority
+    ("mage", "arcane"):          _ARCANE_GEMS,
     # INT/SP healers
-    ("paladin", "holy"): _INT_HEAL_GEMS,
-    ("priest", "holy"): _INT_HEAL_GEMS,
-    ("priest", "discipline"): _INT_HEAL_GEMS,
-    ("druid", "restoration"): _INT_HEAL_GEMS,
-    ("shaman", "restoration"): _INT_HEAL_GEMS,
+    ("paladin", "holy"):         _INT_HEAL_GEMS,
+    ("priest", "holy"):          _INT_HEAL_GEMS,
+    ("priest", "discipline"):    _INT_HEAL_GEMS,
+    ("druid", "restoration"):    _INT_HEAL_GEMS,
+    # Shaman healer
+    ("shaman", "restoration"):   _SHAM_HEAL_GEMS,
     # Tanks
-    ("warrior", "protection"): _TANK_GEMS,
-    ("paladin", "protection"): _TANK_GEMS,
-    ("death knight", "blood"): _TANK_GEMS,
+    ("warrior", "protection"):   _TANK_GEMS,
+    ("paladin", "protection"):   _TANK_GEMS,
+    ("death knight", "blood"):   _TANK_GEMS,
 }
 
 
