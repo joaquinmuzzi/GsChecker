@@ -190,6 +190,7 @@ _SP_DPS_GEMS: frozenset[str] = frozenset(
         "40155",  # Reckless Ametrine (+12 SP +10 Haste)
         "40151",  # Luminous Ametrine (+12 SP +10 Int)
         "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
+        "40128",  # Quick King's Amber (+20 Haste)
         "40123",
         "42148",  # Brilliant King's Amber / Dragon's Eye (+20/+34 Int)
         "40125",
@@ -211,6 +212,8 @@ _INT_HEAL_GEMS: frozenset[str] = frozenset(
         "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
         "40133",  # Purified Dreadstone (+12 SP +10 Spirit)
         "40134",  # Royal Dreadstone (+12 Int +5 mp5)
+        "40128",  # Quick King's Amber (+20 Haste)
+
     }
 )
 
