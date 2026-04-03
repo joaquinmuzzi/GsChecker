@@ -486,6 +486,7 @@ def _serialize_personaje_payload(
     spec_gs_entries,
     active_spec_name,
     professions=None,
+    suboptimal_gems=None,
 ):
     return {
         "nombre_char": nombre_char,
@@ -505,6 +506,7 @@ def _serialize_personaje_payload(
         "icc_25": icc_25,
         "missing_enchants": missing_enchants,
         "missing_gems": missing_gems,
+        "suboptimal_gems": suboptimal_gems or [],
         "uwu_icc_kills": uwu_icc_kills,
         "spec_gs_entries": spec_gs_entries,
         "active_spec_name": active_spec_name,
@@ -534,6 +536,7 @@ def _build_personaje_embed_from_cache(payload: dict):
         guild_rank=payload.get("guild_rank"),
         professions=payload.get("professions"),
         active_spec_name=payload.get("active_spec_name"),
+        suboptimal_gems=payload.get("suboptimal_gems"),
     )
 
 
@@ -808,6 +811,13 @@ async def _personaje_impl(
         except Exception:
             missing_enchants, missing_gems = [], []
 
+        try:
+            suboptimal_gems = profile_scraper.get_suboptimal_gems_from_gear_data(
+                gear_data, clase, active_specs[0] if active_specs else ""
+            )
+        except Exception:
+            suboptimal_gems = []
+
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
         guild_rank = None
@@ -889,6 +899,7 @@ async def _personaje_impl(
             guild_rank=guild_rank,
             professions=professions,
             active_spec_name=active_spec_name,
+            suboptimal_gems=suboptimal_gems,
         )
         await _safe_edit_original_response(
             interaction, content=None, embed=embed_initial, view=personaje_view
@@ -921,6 +932,7 @@ async def _personaje_impl(
                 guild_rank=guild_rank,
                 professions=professions,
                 active_spec_name=active_spec_name,
+                suboptimal_gems=suboptimal_gems,
             )
             frame_idx += 1
             await _safe_edit_original_response(
@@ -977,6 +989,7 @@ async def _personaje_impl(
             guild_rank=guild_rank,
             professions=professions,
             active_spec_name=active_spec_name,
+            suboptimal_gems=suboptimal_gems,
         )
         set_external_cache(
             "command_personaje",
@@ -1004,6 +1017,7 @@ async def _personaje_impl(
                 spec_gs_entries,
                 active_spec_name,
                 professions,
+                suboptimal_gems,
             ),
             {"character": nombre_char, "command": command_name, "server": realm},
         )

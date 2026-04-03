@@ -81,9 +81,201 @@ CACHE_PATH = os.path.join(
 SLOT_CACHE_PATH = os.path.join(
     os.path.dirname(__file__), "static", "item_slot_cache.json"
 )
+GEM_DATA_PATH = os.path.join(os.path.dirname(__file__), "static", "gem_data.json")
 SOCKET_CACHE_ONLY = False
 _SOCKET_CACHE = None
 _SLOT_CACHE = None
+_GEM_DATA: dict | None = None
+
+# ── Meta gem IDs (go in a meta socket, skip from quality checks) ─────────────
+META_GEM_IDS: frozenset[str] = frozenset(
+    {
+        "25893",
+        "25894",
+        "25895",
+        "25896",
+        "25898",
+        "25901",
+        "28556",
+        "28557",
+        "32409",
+        "32410",
+        "32640",
+        "32641",
+        "35501",
+        "35503",
+        "41285",
+        "41307",
+        "41333",
+        "41335",
+        "41339",
+        "41375",
+        "41376",
+        "41377",
+        "41378",
+        "41379",
+        "41380",
+        "41381",
+        "41382",
+        "41385",
+        "41389",
+        "41395",
+        "41396",
+        "41397",
+        "41398",
+        "41400",
+        "41401",
+        "44076",
+        "44078",
+        "44081",
+        "44082",
+        "44084",
+        "44087",
+        "44088",
+        "44089",
+    }
+)
+
+# ── Prismatic gems — always acceptable regardless of spec ────────────────────
+_ALWAYS_OK_GEMS: frozenset[str] = frozenset({"49110", "42702"})
+
+# ── Optimal gem sets per role (ICC / WoTLK phase) ────────────────────────────
+_STR_DPS_GEMS: frozenset[str] = frozenset(
+    {
+        "40111",
+        "42142",  # Bold Cardinal Ruby / Dragon's Eye (+20/+34 STR)
+        "40117",
+        "42153",  # Fractured Cardinal Ruby / Dragon's Eye (+20/+34 ArP)
+        "40114",
+        "36766",  # Bright Cardinal Ruby / Dragon's Eye (+40/+68 AP)
+        "40129",  # Sovereign Dreadstone (+10 STR +15 Stam)
+        "40140",  # Puissant Dreadstone (+10 ArP +15 Stam)
+        "40142",  # Inscribed Ametrine (+10 STR +10 Crit)
+        "40143",  # Etched Ametrine (+10 STR +10 Hit)
+        "40146",  # Fierce Ametrine (+10 STR +10 Haste)
+        "40118",
+        "42154",  # Precise Cardinal Ruby / Dragon's Eye (+20/+34 Expertise)
+        "40125",
+        "42156",  # Rigid King's Amber / Dragon's Eye (+20/+34 Hit)
+    }
+)
+
+_AGI_DPS_GEMS: frozenset[str] = frozenset(
+    {
+        "40112",
+        "42143",  # Delicate Cardinal Ruby / Dragon's Eye (+20/+34 Agi)
+        "40117",
+        "42153",  # Fractured (+20/+34 ArP) — ArP builds
+        "40114",
+        "36766",  # Bright (+40/+68 AP)
+        "40130",  # Shifting Dreadstone (+10 Agi +15 Stam)
+        "40147",  # Deadly Ametrine (+10 Agi +10 Crit)
+        "40148",  # Glinting Ametrine (+10 Agi +10 Hit)
+        "40150",  # Deft Ametrine (+10 Agi +10 Haste)
+        "40118",
+        "42154",  # Precise (+20/+34 Expertise)
+        "40125",
+        "42156",  # Rigid (+20/+34 Hit)
+    }
+)
+
+_SP_DPS_GEMS: frozenset[str] = frozenset(
+    {
+        "40113",
+        "42144",  # Runed Cardinal Ruby / Dragon's Eye (+23/+39 SP)
+        "40152",  # Potent Ametrine (+12 SP +10 Crit)
+        "40153",  # Veiled Ametrine (+12 SP +10 Hit)
+        "40155",  # Reckless Ametrine (+12 SP +10 Haste)
+        "40151",  # Luminous Ametrine (+12 SP +10 Int)
+        "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
+        "40123",
+        "42148",  # Brilliant King's Amber / Dragon's Eye (+20/+34 Int)
+        "40125",
+        "42156",  # Rigid (+20/+34 Hit)
+    }
+)
+
+_INT_HEAL_GEMS: frozenset[str] = frozenset(
+    {
+        "40123",
+        "42148",  # Brilliant King's Amber / Dragon's Eye (+20/+34 Int)
+        "40113",
+        "42144",  # Runed Cardinal Ruby / Dragon's Eye (+23/+39 SP)
+        "40151",  # Luminous Ametrine (+12 SP +10 Int)
+        "40155",  # Reckless Ametrine (+12 SP +10 Haste)
+        "40152",  # Potent Ametrine (+12 SP +10 Crit)
+        "40164",  # Timeless Eye of Zul (+10 Int +15 Stam)
+        "40175",  # Dazzling Eye of Zul (+10 Int +5 mp5)
+        "40132",  # Glowing Dreadstone (+12 SP +15 Stam)
+        "40133",  # Purified Dreadstone (+12 SP +10 Spirit)
+        "40125",
+        "42156",  # Rigid (+20/+34 Hit)
+    }
+)
+
+_TANK_GEMS: frozenset[str] = frozenset(
+    {
+        "40119",
+        "36767",  # Solid Majestic Zircon / Dragon's Eye (+30/+51 Stam)
+        "40129",  # Sovereign Dreadstone (+10 STR +15 Stam)
+        "40130",  # Shifting Dreadstone (+10 Agi +15 Stam)
+        "40138",  # Regal Dreadstone (+10 Dodge +15 Stam)
+        "40139",  # Defender's Dreadstone (+10 Parry +15 Stam)
+        "40126",
+        "42157",  # Thick King's Amber / Dragon's Eye (+20/+34 Defense)
+        "40115",
+        "42151",  # Subtle Cardinal Ruby / Dragon's Eye (+20/+34 Dodge)
+        "40116",
+        "42152",  # Flashing Cardinal Ruby / Dragon's Eye (+20/+34 Parry)
+        "40111",
+        "42142",  # Bold (+20/+34 STR) — threat
+        "40160",  # Stalwart Ametrine (+10 Dodge +10 Defense)
+        "40161",  # Glimmering Ametrine (+10 Parry +10 Defense)
+        "40118",
+        "42154",  # Precise (+20/+34 Expertise) — threat capping
+        "40125",
+        "42156",  # Rigid (+20/+34 Hit) — threat capping
+    }
+)
+
+# ── (class_lower, spec_lower) → acceptable gem set ───────────────────────────
+OPTIMAL_GEMS_BY_SPEC: dict[tuple[str, str], frozenset[str]] = {
+    # STR melee DPS
+    ("paladin", "retribution"): _STR_DPS_GEMS,
+    ("warrior", "arms"): _STR_DPS_GEMS,
+    ("warrior", "fury"): _STR_DPS_GEMS,
+    ("death knight", "unholy"): _STR_DPS_GEMS,
+    ("death knight", "frost"): _STR_DPS_GEMS,
+    ("druid", "feral combat"): _STR_DPS_GEMS,
+    # AGI melee DPS
+    ("hunter", "beast mastery"): _AGI_DPS_GEMS,
+    ("hunter", "marksmanship"): _AGI_DPS_GEMS,
+    ("hunter", "survival"): _AGI_DPS_GEMS,
+    ("rogue", "assassination"): _AGI_DPS_GEMS,
+    ("rogue", "combat"): _AGI_DPS_GEMS,
+    ("rogue", "subtlety"): _AGI_DPS_GEMS,
+    ("shaman", "enhancement"): _AGI_DPS_GEMS,
+    # SP caster DPS
+    ("mage", "arcane"): _SP_DPS_GEMS,
+    ("mage", "fire"): _SP_DPS_GEMS,
+    ("mage", "frost"): _SP_DPS_GEMS,
+    ("warlock", "affliction"): _SP_DPS_GEMS,
+    ("warlock", "demonology"): _SP_DPS_GEMS,
+    ("warlock", "destruction"): _SP_DPS_GEMS,
+    ("priest", "shadow"): _SP_DPS_GEMS,
+    ("druid", "balance"): _SP_DPS_GEMS,
+    ("shaman", "elemental"): _SP_DPS_GEMS,
+    # INT/SP healers
+    ("paladin", "holy"): _INT_HEAL_GEMS,
+    ("priest", "holy"): _INT_HEAL_GEMS,
+    ("priest", "discipline"): _INT_HEAL_GEMS,
+    ("druid", "restoration"): _INT_HEAL_GEMS,
+    ("shaman", "restoration"): _INT_HEAL_GEMS,
+    # Tanks
+    ("warrior", "protection"): _TANK_GEMS,
+    ("paladin", "protection"): _TANK_GEMS,
+    ("death knight", "blood"): _TANK_GEMS,
+}
 
 
 def _load_socket_cache() -> dict:
@@ -96,6 +288,18 @@ def _load_socket_cache() -> dict:
     except Exception:
         _SOCKET_CACHE = {}
     return _SOCKET_CACHE
+
+
+def _load_gem_data() -> dict:
+    global _GEM_DATA
+    if _GEM_DATA is not None:
+        return _GEM_DATA
+    try:
+        with open(GEM_DATA_PATH, "r", encoding="utf-8") as f:
+            _GEM_DATA = json.load(f)
+    except Exception:
+        _GEM_DATA = {}
+    return _GEM_DATA
 
 
 def _save_socket_cache(cache: dict) -> None:
@@ -368,3 +572,52 @@ def get_missing_enchants_gems_from_gear_data(gear_data):
 def get_missing_enchants_gems(char_name: str, server: str = "Lordaeron"):
     gear_data = get_gear_data(char_name, server)
     return get_missing_enchants_gems_from_gear_data(gear_data)
+
+
+def get_gem_name(gem_id: str) -> str:
+    """Return a human-readable gem name from gem_data.json, or the raw ID as fallback."""
+    gem_data = _load_gem_data()
+    gem_info = gem_data.get(str(gem_id))
+    if isinstance(gem_info, dict):
+        return gem_info.get("name", str(gem_id))
+    return str(gem_id)
+
+
+def get_suboptimal_gems_from_gear_data(
+    gear_data: list, clase: str, spec: str
+) -> list[str]:
+    """
+    For each filled (non-meta) gem slot, check whether the gem is in the
+    recommended set for the given class/spec.  Returns a list of short
+    description strings such as ``"Head: Smooth King's Amber"`` for every
+    gem that does not match the expected role.
+
+    Returns an empty list when the spec is unknown or no suboptimal gems
+    are found.
+    """
+    clean_class = str(clase or "").strip().lower()
+    clean_spec = str(spec or "").strip().lower()
+    if not clean_class or not clean_spec:
+        return []
+
+    acceptable = OPTIMAL_GEMS_BY_SPEC.get((clean_class, clean_spec))
+    if acceptable is None:
+        return []
+
+    combined_ok = acceptable | _ALWAYS_OK_GEMS
+    results: list[str] = []
+
+    for item in gear_data:
+        slot = item.get("slot", "Unknown")
+        gems = item.get("gems") or []
+        for gem_id in gems:
+            gem_id_str = str(gem_id or "").strip()
+            if not gem_id_str or gem_id_str == "0":
+                continue
+            if gem_id_str in META_GEM_IDS:
+                continue
+            if gem_id_str not in combined_ok:
+                gem_name = get_gem_name(gem_id_str)
+                results.append(f"{slot}: {gem_name}")
+
+    return results

@@ -376,6 +376,7 @@ def _build_personaje_embed(
     guild_rank: str | None = None,
     professions: list[str] | None = None,
     active_spec_name: str | None = None,
+    suboptimal_gems: list[str] | None = None,
 ):
     embed = discord.Embed(color=0x2B2D31)
     icon_url = _spec_icon_url(active_spec_name, clase)
@@ -434,7 +435,7 @@ def _build_personaje_embed(
         inline=False,
     )
 
-    if missing_enchants or missing_gems:
+    if missing_enchants or missing_gems or suboptimal_gems:
         missing_lines = []
         if missing_enchants:
             missing_lines.append("Enchants Missing:")
@@ -442,6 +443,9 @@ def _build_personaje_embed(
         if missing_gems:
             missing_lines.append("Gems Missing:")
             missing_lines.extend(f"- {slot}" for slot in missing_gems)
+        if suboptimal_gems:
+            missing_lines.append("Gems Suboptimal:")
+            missing_lines.extend(f"- {entry}" for entry in suboptimal_gems)
         embed.add_field(
             name="Enchants / Gems",
             value="```\n" + "\n".join(missing_lines) + "\n```",
