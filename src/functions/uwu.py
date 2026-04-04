@@ -235,6 +235,91 @@ def _pick_uwu_spec(nombre: str, server: str):
     return best_spec_i, best_payload
 
 
+def _extract_character_overview(data: dict, nombre: str) -> dict | None:
+    """Extrae filas de resumen por boss de un payload JSON de UwU character."""
+    if not isinstance(data, dict) or data.get("__error__"):
+        return None
+    profile_name = str(data.get("name") or "")
+    if profile_name.startswith("Unknown-"):
+        return None
+    bosses = data.get("bosses") or {}
+    if not isinstance(bosses, dict):
+        return None
+
+    rows = []
+    for boss_name in UWU_BOSS_SHORT:
+        boss_short = UWU_BOSS_SHORT[boss_name]
+        bd = bosses.get(boss_name)
+        if not isinstance(bd, dict) or not bd:
+            rows.append({
+                "boss": boss_short, "rank": "-", "points": "0.00",
+                "best_dps": "-", "duration": "-", "kills": "-", "date": "-",
+            })
+            continue
+        rank = bd.get("rank_players")
+        pts = bd.get("points")
+        dps_max = bd.get("dps_max")
+        dur_s = bd.get("fastest_kill_duration")
+        kills = bd.get("raids")
+        raid_id = str(bd.get("raid_id") or "")
+
+        pts_str = f"{pts / 100:.2f}" if pts is not None else "0.00"
+        dps_str = f"{dps_max:,.1f}".replace(",", " ") if dps_max is not None else "-"
+        if dur_s is not None:
+            m, s = divmod(int(dur_s), 60)
+            dur_str = f"{m:02d}:{s:02d}"
+        else:
+            dur_str = "-"
+        # raid_id: "YY-MM-DD-XXXXX" → "DD-MM-YY"
+        date_str = "-"
+        if raid_id:
+            parts = raid_id.split("-")
+            if len(parts) >= 3:
+                date_str = f"{parts[2]}-{parts[1]}-{parts[0]}"
+        rows.append({
+            "boss": boss_short,
+            "rank": str(rank) if rank is not None else "-",
+            "points": pts_str,
+            "best_dps": dps_str,
+            "duration": dur_str,
+            "kills": str(kills) if kills is not None else "-",
+            "date": date_str,
+        })
+
+    overall_pts = data.get("overall_points")
+    overall_rank = data.get("overall_rank")
+    return {
+        "rows": rows,
+        "overall_points": f"{overall_pts / 100:.2f}" if overall_pts is not None else "0.00",
+        "overall_rank": str(overall_rank) if overall_rank is not None else "-",
+        "name": str(data.get("name") or nombre),
+    }
+
+
+def _fetch_uwu_overview_for_dps(
+    nombre: str, server: str, spec_filter: str | None = None
+) -> dict | None:
+    """
+    Obtiene de forma rápida el resumen de personaje (rank/points/dps por boss)
+    desde UwU Logs. Usa la mejor spec disponible salvo que spec_filter lo indique.
+    """
+    if spec_filter:
+        kw = spec_filter.strip().lower()
+        spec_i_candidates = UWU_SPEC_KEYWORDS.get(kw)
+        if spec_i_candidates:
+            for si in spec_i_candidates:
+                data = _fetch_uwu_character(nombre, server, si)
+                result = _extract_character_overview(data, nombre)
+                if result is not None:
+                    return result
+            return None
+
+    _, data = _pick_uwu_spec(nombre, server)
+    if data is None:
+        return None
+    return _extract_character_overview(data, nombre)
+
+
 def _uwu_icc_bugfix_kills(
     nombre: str,
     server: str,

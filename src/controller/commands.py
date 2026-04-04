@@ -32,11 +32,16 @@ from src.functions.warmane import (
     _fetch_statistics,
     _fetch_guild_rank,
 )
-from src.functions.uwu import _uwu_icc_bugfix_kills, _build_uwu_dps_summary
+from src.functions.uwu import (
+    _uwu_icc_bugfix_kills,
+    _build_uwu_dps_summary,
+    _fetch_uwu_overview_for_dps,
+)
 from src.functions.embeds import (
     _build_personaje_embed,
     _build_personaje_view,
     _format_uwu_dps_table,
+    _format_uwu_overview_table,
     _extract_icc_boss_kills,
     _render_table,
 )
@@ -611,9 +616,20 @@ def _build_dps_embed_from_cache(payload: dict):
             "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
         )
 
+    # Bloque de overview (rank/points/dps por boss) almacenado en caché
+    uwu_overview = payload.get("uwu_overview")
+    overview_prefix = ""
+    if isinstance(uwu_overview, dict) and uwu_overview.get("rows"):
+        overview_table = _format_uwu_overview_table(uwu_overview["rows"])
+        overall_pts = uwu_overview.get("overall_points", "?")
+        overview_prefix = (
+            f"**Overall: {overall_pts} pts**\n"
+            f"```\n{overview_table}\n```\n"
+        )
+
     embed = discord.Embed(
         title=f"{nombre_char} - Uwulogs DPS{spec_display}",
-        description=table_block + warning_note + failed_note + timeout_note,
+        description=overview_prefix + table_block + warning_note + failed_note + timeout_note,
         color=0x2B2D31,
     )
     embed.add_field(
@@ -1140,6 +1156,37 @@ def register_commands(bot):
 
             nombre_char = str(summary.get("name") or nombre)
 
+            # --- Fase 1: overview rápido (rank/points/dps por boss) ---
+            overview_future = loop.run_in_executor(
+                EXECUTOR,
+                _fetch_uwu_overview_for_dps,
+                nombre_char,
+                UWU_SERVER,
+                spec,
+            )
+            try:
+                uwu_overview = await asyncio.wait_for(overview_future, timeout=12.0)
+            except asyncio.TimeoutError:
+                uwu_overview = None
+
+            if uwu_overview and uwu_overview.get("rows"):
+                overview_table = _format_uwu_overview_table(uwu_overview["rows"])
+                overview_block = f"```\n{overview_table}\n```"
+                overall_pts = uwu_overview.get("overall_points", "?")
+                overview_embed = discord.Embed(
+                    title=f"{nombre_char} - UwU Overview{spec_display}",
+                    description=(
+                        f"**Overall: {overall_pts} pts**\n"
+                        + overview_block
+                        + "\n⏳ Calculando tabla DPS detallada..."
+                    ),
+                    color=0x2B2D31,
+                )
+                await _safe_edit_original_response(
+                    interaction, content=None, embed=overview_embed
+                )
+
+            # --- Fase 2: tabla DPS detallada ---
             uwu_dps_future = loop.run_in_executor(
                 EXECUTOR,
                 _build_uwu_dps_summary,
@@ -1257,9 +1304,19 @@ def register_commands(bot):
                     "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
                 )
 
+            # --- Bloque de overview (va encima de la tabla DPS) ---
+            overview_prefix = ""
+            if uwu_overview and uwu_overview.get("rows"):
+                overview_table = _format_uwu_overview_table(uwu_overview["rows"])
+                overall_pts = uwu_overview.get("overall_points", "?")
+                overview_prefix = (
+                    f"**Overall: {overall_pts} pts**\n"
+                    f"```\n{overview_table}\n```\n"
+                )
+
             embed = discord.Embed(
                 title=f"{nombre_char} - Uwulogs DPS{spec_display}",
-                description=table_block + warning_note + failed_note + timeout_note,
+                description=overview_prefix + table_block + warning_note + failed_note + timeout_note,
                 color=0x2B2D31,
             )
             embed.add_field(
@@ -1278,6 +1335,7 @@ def register_commands(bot):
                     "uwu_rows": uwu_dps_summary.get("rows", []),
                     "failed_by_mode": failed_by_mode,
                     "timed_out": timed_out,
+                    "uwu_overview": uwu_overview,
                 },
                 {"character": nombre_char, "spec": spec or ""},
             )

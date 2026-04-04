@@ -73,6 +73,30 @@ def _format_uwu_dps_table(rows) -> str:
     return "\n".join([header_line, sep_line] + body_lines)
 
 
+def _format_uwu_overview_table(rows) -> str:
+    """Formateo de tabla de resumen de personaje UwU (rank/points/dps/dur/kills/date)."""
+    headers = ["Boss", "Rank", "Points", "Best DPS", "Dur", "Kills", "Date"]
+    key_map = {
+        "Boss": "boss", "Rank": "rank", "Points": "points",
+        "Best DPS": "best_dps", "Dur": "duration", "Kills": "kills", "Date": "date",
+    }
+    widths = {
+        h: max(
+            _display_width(h),
+            max((_display_width(r[key_map[h]]) for r in rows), default=0),
+        )
+        for h in headers
+    }
+    header_line = " | ".join(_pad(h, widths[h]) for h in headers)
+    total_width = sum(widths[h] for h in headers) + len(headers) * 3
+    sep_line = "-" * total_width
+    body_lines = [
+        " | ".join(_pad(row[key_map[h]], widths[h]) for h in headers)
+        for row in rows
+    ]
+    return "\n".join([header_line, sep_line] + body_lines)
+
+
 def _extract_icc_boss_kills(stats_rows):
     boss_patterns = {
         "Marrowgar": ["Lord Marrowgar"],
