@@ -74,11 +74,10 @@ def _format_uwu_dps_table(rows) -> str:
 
 
 def _format_uwu_overview_table(rows) -> str:
-    """Formateo de tabla de resumen de personaje UwU (rank/points/dps/dur/kills/date)."""
-    headers = ["Boss", "Rank", "Points", "Best DPS", "Dur", "Kills", "Date"]
+    """Formateo de tabla de resumen de personaje UwU (boss/dps/kills/date)."""
+    headers = ["Boss", "Best DPS", "Kills", "Date"]
     key_map = {
-        "Boss": "boss", "Rank": "rank", "Points": "points",
-        "Best DPS": "best_dps", "Dur": "duration", "Kills": "kills", "Date": "date",
+        "Boss": "boss", "Best DPS": "best_dps", "Kills": "kills", "Date": "date",
     }
     widths = {
         h: max(
