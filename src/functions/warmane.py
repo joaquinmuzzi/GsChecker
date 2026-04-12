@@ -363,7 +363,8 @@ def _normalize_spec_name(raw: str) -> str:
 
 def _parse_specs_from_html(html: str) -> list[dict]:
     """Parse spec names from the armory profile HTML.
-    The first spec in the specialization section is the active one.
+    If the HTML has no explicit active marker, use a points-based heuristic
+    (highest points) and only then fall back to first spec.
     Returns [] if no specs are found so the caller can fall back.
     """
     if not html:
@@ -375,6 +376,13 @@ def _parse_specs_from_html(html: str) -> list[dict]:
         text_node = stub.select_one("div.text")
         if not text_node:
             continue
+        points_value = 0
+        points_span = text_node.select_one("span.value")
+        if points_span:
+            points_text = "".join(points_span.get_text(" ", strip=True).split())
+            points_match = re.search(r"(\d+)", points_text)
+            if points_match:
+                points_value = int(points_match.group(1))
         text_copy = BeautifulSoup(str(text_node), "html.parser")
         for value_span in text_copy.select("span.value"):
             value_span.extract()
@@ -382,16 +390,38 @@ def _parse_specs_from_html(html: str) -> list[dict]:
         if spec_name and spec_name in WOW_CLASSIC_SPEC_NAMES:
             stub_classes = stub.get("class") or []
             is_active = "active" in stub_classes or "selected" in stub_classes
-            specs.append({"name": spec_name, "_active_flag": is_active})
+            specs.append(
+                {
+                    "name": spec_name,
+                    "_active_flag": is_active,
+                    "_points": points_value,
+                }
+            )
 
     if not specs:
         return []
 
-    # If any stub has an explicit active marker, use that; otherwise first = active
+    # Prefer explicit active marker. If absent, choose the highest-points spec.
     has_explicit_active = any(s["_active_flag"] for s in specs)
+    max_points = max((s.get("_points", 0) for s in specs), default=0)
+    use_points_heuristic = not has_explicit_active and max_points > 0
+    points_active_index = -1
+    if use_points_heuristic:
+        for idx, spec_data in enumerate(specs):
+            if spec_data.get("_points", 0) == max_points:
+                points_active_index = idx
+                break
     result = []
     for i, s in enumerate(specs):
-        active = s["_active_flag"] if has_explicit_active else (i == 0)
+        active = (
+            s["_active_flag"]
+            if has_explicit_active
+            else (
+                i == points_active_index
+                if use_points_heuristic
+                else (i == 0)
+            )
+        )
         result.append({"name": s["name"], "active": active})
     return result
 
@@ -404,15 +434,7 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
     if cached is not None:
         return cached
 
-    # 1st attempt: reuse the profile HTML already fetched/cached by _fetch_summary
-    #   (no extra HTTP request if we're running concurrently with summary task)
-    html = _fetch_profile_page_html(nombre, server)
-    result = _parse_specs_from_html(html)
-    if result:
-        _cache_set(SUMMARY_CACHE, cache_key, result)
-        return result
-
-    # 2nd attempt: dedicated talents page (has explicit "selected" class per spec)
+    # 1st attempt: dedicated talents page (has explicit "selected" class per spec)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     resp = _warmane_get_with_scheme_fallback(
         f"/character/{nombre}/{server}/talents", headers
@@ -430,6 +452,13 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
         if result:
             _cache_set(SUMMARY_CACHE, cache_key, result)
             return result
+
+    # 2nd attempt: reuse profile HTML (fallback heuristic when talents page is unavailable)
+    html = _fetch_profile_page_html(nombre, server)
+    result = _parse_specs_from_html(html)
+    if result:
+        _cache_set(SUMMARY_CACHE, cache_key, result)
+        return result
 
     # 3rd attempt: JSON API
     api_resp = _warmane_get_with_scheme_fallback(
