@@ -66,13 +66,15 @@ bot = GsCheckerBot(command_prefix=PREFIX, intents=intents)
 register_commands(bot)
 
 
-@bot.tree.interaction_check
 async def _maintenance_interaction_check(interaction: discord.Interaction) -> bool:
     if interaction.response.is_done():
         await interaction.followup.send(MAINTENANCE_MESSAGE, ephemeral=True)
     else:
         await interaction.response.send_message(MAINTENANCE_MESSAGE, ephemeral=True)
     return False
+
+
+bot.tree.add_check(_maintenance_interaction_check)
 
 
 @bot.check
