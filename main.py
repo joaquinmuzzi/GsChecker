@@ -50,6 +50,8 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise ValueError("DISCORD_TOKEN no encontrado en .env")
 
+MAINTENANCE_MESSAGE = "Bot en mantenimiento..."
+
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -62,6 +64,21 @@ class GsCheckerBot(commands.Bot):
 
 bot = GsCheckerBot(command_prefix=PREFIX, intents=intents)
 register_commands(bot)
+
+
+@bot.tree.interaction_check
+async def _maintenance_interaction_check(interaction: discord.Interaction) -> bool:
+    if interaction.response.is_done():
+        await interaction.followup.send(MAINTENANCE_MESSAGE, ephemeral=True)
+    else:
+        await interaction.response.send_message(MAINTENANCE_MESSAGE, ephemeral=True)
+    return False
+
+
+@bot.check
+async def _maintenance_prefix_check(ctx: commands.Context) -> bool:
+    await ctx.send(MAINTENANCE_MESSAGE)
+    return False
 
 
 @bot.event
