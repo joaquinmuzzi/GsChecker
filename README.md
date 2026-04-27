@@ -77,6 +77,26 @@ poetry install
 poetry run python main.py
 ```
 
+## Deploy en Railway
+
+El repo ya incluye archivos para correr como worker:
+
+- `Procfile` (`worker: bash ./run_railway.sh`)
+- `railway.toml`
+- `run_railway.sh`
+
+Variables recomendadas en Railway:
+
+- `DISCORD_TOKEN`
+- `SCRAPER_BRIDGE_URL` (ej: `https://tu-bridge.loca.lt` o URL de tu VPS)
+- `API_SECRET` (mismo valor que `BRIDGE_SHARED_SECRET` en el bridge)
+- `BRIDGE_VERIFY_SSL=false` (solo si tu bridge usa cert no verificable)
+
+Notas:
+
+- Este servicio es de tipo worker (no expone puerto HTTP).
+- El bridge con Chromium/Cloudflare conviene mantenerlo fuera de Railway (VPS o PC fija).
+
 ## Arquitectura rápida
 
 - `main.py`: arranque del bot, sync de slash commands, lock de proceso.

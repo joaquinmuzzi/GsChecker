@@ -1,14 +1,17 @@
 import re
+import json
+import os
+import time
+import logging
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, unquote_plus
 
 from bs4 import BeautifulSoup
 
 import gearscore
 import profile_scraper
+from WebDataRetriever import fetch_bridge_payload
 from src.schemas.constants import (
-    SESSION,
-    HTTP_TIMEOUT,
     SUMMARY_CACHE,
     SUMMARY_TTL,
     ACHIEVEMENTS_CACHE,
@@ -35,6 +38,12 @@ WOW_CLASSES = (
     "Druid",
 )
 
+logger = logging.getLogger("gschecker.warmane")
+
+# Bridge scraping can queue multiple requests behind one browser lock.
+# Keep this timeout higher than generic HTTP_TIMEOUT to avoid false negatives.
+BRIDGE_REQUEST_TIMEOUT = int(os.getenv("BRIDGE_TIMEOUT", "150"))
+
 
 def _cache_get_stale(cache: dict, key):
     entry = cache.get(key)
@@ -43,49 +52,130 @@ def _cache_get_stale(cache: dict, key):
     return entry[1]
 
 
-def _warmane_get_with_scheme_fallback(path: str, headers: dict):
-    last_status = None
-    last_error = None
-    for scheme in ("https", "http"):
-        url = f"{scheme}://armory.warmane.com{path}"
-        try:
-            resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
-        except Exception as exc:
-            last_error = str(exc)
-            continue
-        last_status = resp.status_code
-        if resp.status_code == 200:
-            return resp
-    print(
-        f"[WARN] Warmane request failed for path='{path}' "
-        f"(last_status={last_status}, last_error={last_error})"
+class _BridgeResponse:
+    def __init__(self, text: str = "", payload=None):
+        self.text = text
+        self.status_code = 200
+        self._payload = payload
+
+    def json(self):
+        if isinstance(self._payload, (dict, list)):
+            return self._payload
+        if isinstance(self.text, str) and self.text.strip():
+            return json.loads(self.text)
+        raise ValueError("No JSON payload")
+
+
+def _parse_bridge_target(path: str):
+    char_match = re.match(
+        r"^/character/(?P<name>[^/]+)/(?P<server>[^/]+)(?:/(?P<section>[^/]+))?$",
+        path,
     )
+    if char_match:
+        section = (char_match.group("section") or "").strip()
+        route = section if section else "character"
+        return {
+            "server": unquote_plus(char_match.group("server")),
+            "name": unquote_plus(char_match.group("name")),
+            "route": route,
+            "extra": {},
+        }
+
+    api_match = re.match(
+        r"^/api/character/(?P<name>[^/]+)/(?P<server>[^/]+)/(?P<section>[^/]+)$",
+        path,
+    )
+    if api_match:
+        return {
+            "server": unquote_plus(api_match.group("server")),
+            "name": unquote_plus(api_match.group("name")),
+            "route": f"api_{api_match.group('section')}",
+            "extra": {},
+        }
+
+    guild_match = re.match(
+        r"^/guild/(?P<guild>[^/]+)/(?P<server>[^/]+)/summary/(?P<name>[^/]+)$",
+        path,
+    )
+    if guild_match:
+        return {
+            "server": unquote_plus(guild_match.group("server")),
+            "name": unquote_plus(guild_match.group("name")),
+            "route": "guild_summary",
+            "extra": {"guild": unquote_plus(guild_match.group("guild"))},
+        }
+
+    return None
+
+
+def _bridge_payload_from_path(path: str, data: dict | None = None):
+    target = _parse_bridge_target(path)
+    if target is None:
+        return None
+
+    extra = dict(target.get("extra") or {})
+    if isinstance(data, dict):
+        extra.update(data)
+
+    return fetch_bridge_payload(
+        server=target["server"],
+        name=target["name"],
+        route=target["route"],
+        extra_params=extra,
+        timeout=BRIDGE_REQUEST_TIMEOUT,
+    )
+
+
+def _warmane_get_with_scheme_fallback(path: str, headers: dict):
+    _ = headers
+    payload = _bridge_payload_from_path(path)
+    if not isinstance(payload, dict):
+        logger.warning("Bridge request failed for path='%s'", path)
+        return None
+
+    html = payload.get("html")
+    if isinstance(html, str):
+        return _BridgeResponse(text=html, payload=payload.get("json"))
+
+    js = payload.get("json")
+    if isinstance(js, (dict, list)):
+        return _BridgeResponse(text=json.dumps(js), payload=js)
+
+    if isinstance(payload, dict):
+        return _BridgeResponse(text=json.dumps(payload), payload=payload)
+
+    logger.warning("Bridge request returned invalid payload for path='%s'", path)
     return None
 
 
 def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict):
-    last_status = None
-    last_error = None
-    for _ in range(2):
-        for scheme in ("https", "http"):
-            url = f"{scheme}://armory.warmane.com{path}"
-            try:
-                resp = SESSION.post(
-                    url, headers=headers, data=data, timeout=HTTP_TIMEOUT
-                )
-            except Exception as exc:
-                last_error = str(exc)
-                continue
-            last_status = resp.status_code
-            if resp.status_code != 200:
-                continue
-            try:
-                payload = resp.json()
-            except Exception as exc:
-                last_error = f"json error: {exc}"
-                continue
-            if isinstance(payload, dict):
-                return payload
+    _ = headers
+    payload = _bridge_payload_from_path(path, data)
+    if not isinstance(payload, dict):
+        return None
+
+    js = payload.get("json")
+    if isinstance(js, dict):
+        return js
+
+    # Bridge statistics endpoint returns {"content": "<table>..."}
+    content = payload.get("content")
+    if isinstance(content, str) and content.strip():
+        return {"content": content}
+
+    html = payload.get("html")
+    if isinstance(html, str):
+        try:
+            parsed = json.loads(html)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+        return {"content": html}
+
+    if isinstance(payload, dict):
+        return payload
+
     return None
 
 
@@ -97,6 +187,33 @@ _PROFILE_HEADERS = {
 }
 
 
+def _looks_like_cloudflare_challenge(html: str) -> bool:
+    if not isinstance(html, str) or not html.strip():
+        return True
+
+    low = html.lower()
+
+    # If profile markers exist, this is likely real armory content.
+    warmane_markers = (
+        "character-sheet",
+        "level-race-class",
+        "profile-content",
+        "guild-name",
+    )
+    if any(marker in low for marker in warmane_markers):
+        return False
+
+    challenge_markers = (
+        "challenges.cloudflare.com",
+        "cf-challenge",
+        "cf-turnstile",
+        "un momento",
+        "just a moment",
+        "verify you are human",
+    )
+    return any(marker in low for marker in challenge_markers)
+
+
 def _fetch_profile_page_html(nombre: str, server: str) -> str:
     """Fetch and cache the profile page HTML in-memory (shared between summary,
     professions and specs to avoid hitting the same URL multiple times per command)."""
@@ -104,11 +221,32 @@ def _fetch_profile_page_html(nombre: str, server: str) -> str:
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
     if cached is not None:
         return cached
-    resp = _warmane_get_with_scheme_fallback(
-        f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS
-    )
-    html = resp.text if resp is not None else ""
-    _cache_set(SUMMARY_CACHE, cache_key, html)
+
+    html = ""
+    for attempt in range(2):
+        resp = _warmane_get_with_scheme_fallback(
+            f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS
+        )
+        html = resp.text if resp is not None else ""
+
+        if html and _looks_like_cloudflare_challenge(html):
+            logger.warning(
+                "Bridge devolvió challenge de Cloudflare para '%s'/%s (intento %s/2)",
+                nombre,
+                server,
+                attempt + 1,
+            )
+            html = ""
+
+        if html:
+            break
+        if attempt == 0:
+            # Bridge requests can fail transiently during browser/captcha warm-up.
+            time.sleep(1)
+
+    # Do not cache empty/failed payloads; they are often transient bridge issues.
+    if html:
+        _cache_set(SUMMARY_CACHE, cache_key, html)
     return html
 
 
@@ -303,6 +441,20 @@ def _fetch_summary(nombre: str, server: str):
     if cached is not None:
         return cached
 
+    # In bridge mode, API summary is not reliable because bridge returns HTML.
+    # Prefer a single profile-based summary to avoid duplicate fragile requests.
+    if (os.getenv("SCRAPER_BRIDGE_URL") or "").strip():
+        profile_summary = _summary_from_profile_html(nombre, server)
+        if profile_summary is not None:
+            _cache_set(SUMMARY_CACHE, cache_key, profile_summary)
+            return profile_summary
+        return {
+            "__error__": (
+                "⚠️ El bridge no pudo superar Cloudflare en este intento. "
+                "Reintentá en unos segundos."
+            )
+        }
+
     # Fetch API summary and profile HTML in parallel — both are needed but independent
     with ThreadPoolExecutor(max_workers=2) as pool:
         api_future = pool.submit(_summary_from_api, nombre, server)
@@ -314,7 +466,9 @@ def _fetch_summary(nombre: str, server: str):
 
     if summary is None:
         if profile_summary is not None:
-            print(f"[WARN] Falling back to profile summary for '{nombre}'/{server}")
+            logger.warning(
+                "Falling back to profile summary for '%s'/%s", nombre, server
+            )
             summary = profile_summary
     elif isinstance(profile_summary, dict):
         if not summary.get("guild") or summary.get("guild") == "Sin guild":
@@ -541,8 +695,10 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
 
     resp = _warmane_get_with_scheme_fallback(guild_path, headers)
     if resp is None:
-        print(
-            f"[WARN] Guild rank request failed for '{clean_name}' guild='{clean_guild}'"
+        logger.warning(
+            "Guild rank request failed for '%s' guild='%s'",
+            clean_name,
+            clean_guild,
         )
         return None
 
@@ -588,12 +744,14 @@ def _fetch_guild_rank(nombre: str, guild: str, server: str):
                 return rank_text
             break
     except Exception:
-        print(
-            f"[WARN] Guild rank BeautifulSoup parsing failed for '{clean_name}' guild='{clean_guild}'"
+        logger.warning(
+            "Guild rank BeautifulSoup parsing failed for '%s' guild='%s'",
+            clean_name,
+            clean_guild,
         )
 
     _cache_set(GUILD_RANK_CACHE, cache_key, "")
-    print(f"[WARN] Guild rank not found for '{clean_name}' guild='{clean_guild}'")
+    logger.warning("Guild rank not found for '%s' guild='%s'", clean_name, clean_guild)
     return None
 
 
@@ -810,8 +968,11 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
     if not isinstance(js, dict):
         stale = _cache_get_stale(STATS_CACHE, cache_key)
         if stale is not None:
-            print(
-                f"[WARN] Using stale statistics cache for '{nombre}'/{server} category={category_id}"
+            logger.warning(
+                "Using stale statistics cache for '%s'/%s category=%s",
+                nombre,
+                server,
+                category_id,
             )
             return stale
         return []
@@ -819,8 +980,11 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
     if not content:
         stale = _cache_get_stale(STATS_CACHE, cache_key)
         if stale is not None:
-            print(
-                f"[WARN] Empty statistics content, using stale cache for '{nombre}'/{server} category={category_id}"
+            logger.warning(
+                "Empty statistics content, using stale cache for '%s'/%s category=%s",
+                nombre,
+                server,
+                category_id,
             )
             return stale
         return []
@@ -835,8 +999,11 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
     if not rows:
         stale = _cache_get_stale(STATS_CACHE, cache_key)
         if stale is not None:
-            print(
-                f"[WARN] No statistics rows parsed, using stale cache for '{nombre}'/{server} category={category_id}"
+            logger.warning(
+                "No statistics rows parsed, using stale cache for '%s'/%s category=%s",
+                nombre,
+                server,
+                category_id,
             )
             return stale
 

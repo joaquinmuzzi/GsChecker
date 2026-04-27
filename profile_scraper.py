@@ -5,7 +5,11 @@ from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
 
-from WebDataRetriever import BRIDGE_UNAVAILABLE_ERROR, fetch_html_via_bridge
+from WebDataRetriever import (
+    BRIDGE_UNAVAILABLE_ERROR,
+    fetch_bridge_payload,
+    fetch_html_via_bridge,
+)
 
 HEADERS = {"User-Agent": "GsChecker/1.0"}
 SESSION = requests.Session()
@@ -215,10 +219,7 @@ def _save_socket_cache(cache: dict) -> None:
 
 def get_specs(char_name: str, server: str) -> list[dict]:
     try:
-        profile_url = (
-            f"https://armory.warmane.com/character/{char_name}/{server}/profile"
-        )
-        profile_html = fetch_html_via_bridge(profile_url, timeout=8)
+        profile_html = fetch_html_via_bridge(server, char_name, "profile")
         if profile_html and profile_html != BRIDGE_UNAVAILABLE_ERROR:
             profile_soup = BeautifulSoup(profile_html, "html.parser")
             profile_specs = []
@@ -234,9 +235,8 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             if len(profile_specs) == 1:
                 return [{"name": profile_specs[0], "active": True}]
 
-        url = f"https://armory.warmane.com/character/{char_name}/{server}/talents"
         specs = []
-        talents_html = fetch_html_via_bridge(url, timeout=8)
+        talents_html = fetch_html_via_bridge(server, char_name, "talents")
         if talents_html and talents_html != BRIDGE_UNAVAILABLE_ERROR:
             soup = BeautifulSoup(talents_html, "html.parser")
             talents = soup.find_all("td", attrs={"data-spec": True})
@@ -250,17 +250,19 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             if specs:
                 return specs
 
-        api_url = (
-            f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
-        )
-        api_html = fetch_html_via_bridge(api_url, timeout=8)
-        if not api_html or api_html == BRIDGE_UNAVAILABLE_ERROR:
+        api_payload = fetch_bridge_payload(server, char_name, "api_talents")
+        if not isinstance(api_payload, dict):
             return []
 
-        try:
-            payload = json.loads(api_html)
-        except ValueError:
-            return []
+        payload = api_payload.get("json")
+        if not isinstance(payload, dict):
+            html_or_json = api_payload.get("html")
+            if not isinstance(html_or_json, str):
+                return []
+            try:
+                payload = json.loads(html_or_json)
+            except ValueError:
+                return []
         talents = payload.get("talents") if isinstance(payload, dict) else None
         if not isinstance(talents, list):
             return []
@@ -418,8 +420,7 @@ def parse_slot(slot):
 
 
 def get_gear_data(char_name: str, server: str = "Lordaeron"):
-    url = f"http://armory.warmane.com/character/{char_name}/{server}"
-    html = fetch_html_via_bridge(url, timeout=8)
+    html = fetch_html_via_bridge(server, char_name, "character")
     if not html or html == BRIDGE_UNAVAILABLE_ERROR:
         return []
     soup = BeautifulSoup(html, "html.parser")
@@ -569,9 +570,8 @@ def get_character_stats(
     * Armor Penetration is **not** exposed by the Warmane armory; callers
       should not rely on ``armor_penetration_rating`` being present.
     """
-    url = f"https://armory.warmane.com/character/{char_name}/{server}/summary"
     try:
-        html = fetch_html_via_bridge(url, timeout=8)
+        html = fetch_html_via_bridge(server, char_name, "summary")
         if not html or html == BRIDGE_UNAVAILABLE_ERROR:
             return {}
         return _parse_character_stats_html(html)

@@ -1,39 +1,271 @@
 import os
+import json
+import time
+from urllib.parse import quote_plus
 
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 BRIDGE_UNAVAILABLE_ERROR = "Error: El puente de scraping local no está disponible"
 
+# ── In-process cache: one bridge call per (character, route) per TTL ────────
+_BRIDGE_CACHE: dict[tuple[str, str, str], tuple[float, dict]] = {}
+_BRIDGE_CACHE_TTL = int(os.getenv("BRIDGE_CACHE_TTL", "120"))
 
-def fetch_html_via_bridge(target_url: str, timeout: int = 8) -> str:
-    """Fetch HTML through the local scraping bridge.
 
-    Returns the html string from the bridge JSON response (`html` field),
-    or a clean error message when the bridge is unavailable.
-    """
-    bridge_url = (os.getenv("SCRAPER_BRIDGE_URL") or "").strip()
-    api_secret = os.getenv("API_SECRET") or ""
+def _cache_get(server: str, name: str, route: str = "") -> dict | None:
+    entry = _BRIDGE_CACHE.get((server.lower(), name.lower(), route.lower()))
+    if entry and (time.monotonic() - entry[0]) < _BRIDGE_CACHE_TTL:
+        return entry[1]
+    return None
 
-    if not bridge_url:
-        return BRIDGE_UNAVAILABLE_ERROR
 
-    headers = {"X-API-KEY": api_secret}
-    try:
-        resp = requests.get(
-            bridge_url,
-            params={"url": target_url},
-            headers=headers,
-            timeout=timeout,
-        )
-        resp.raise_for_status()
-        payload = resp.json()
-        html = payload.get("html") if isinstance(payload, dict) else None
+def _cache_set(server: str, name: str, payload: dict, route: str = "") -> None:
+    _BRIDGE_CACHE[(server.lower(), name.lower(), route.lower())] = (time.monotonic(), payload)
+
+
+def _bridge_verify_ssl() -> bool:
+    raw = (os.getenv("BRIDGE_VERIFY_SSL") or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+
+    # LocalTunnel subdomains often have certificate mismatches.
+    base = _bridge_base_url().lower()
+    if ".loca.lt" in base or "localhost" in base or "127.0.0.1" in base:
+        return False
+    return True
+
+
+# Headed-browser scraping can take 30–60 s. Use a generous default.
+_DEFAULT_BRIDGE_TIMEOUT = int(os.getenv("BRIDGE_TIMEOUT", "60"))
+
+
+def _extract_first_dict(payload: dict, keys: tuple[str, ...]):
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def _extract_first_str(payload: dict, keys: tuple[str, ...]):
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def _normalize_payload_for_route(route: str, payload: dict) -> dict:
+    normalized = dict(payload)
+
+    route_to_html_keys = {
+        "profile": ("profile_html", "profile", "html"),
+        "talents": ("talents_html", "talents_page", "talents", "html"),
+        "summary": ("summary_html", "summary", "html"),
+        "character": ("character_html", "profile_html", "profile", "html"),
+    }
+    route_to_json_keys = {
+        "api_summary": ("summary_json", "api_summary", "summary"),
+        "api_talents": ("talents_json", "api_talents", "talents_data"),
+    }
+
+    html_keys = route_to_html_keys.get(route)
+    if html_keys:
+        html = _extract_first_str(payload, html_keys)
         if isinstance(html, str):
-            return html
-    except requests.RequestException:
-        return BRIDGE_UNAVAILABLE_ERROR
-    except ValueError:
+            normalized["html"] = html
+
+    json_keys = route_to_json_keys.get(route)
+    if json_keys:
+        js = _extract_first_dict(payload, json_keys)
+        if isinstance(js, dict):
+            normalized["json"] = js
+        elif route == "api_talents":
+            talents = payload.get("talents")
+            if isinstance(talents, list):
+                normalized["json"] = {"talents": talents}
+
+    return normalized
+
+
+def _bridge_base_url() -> str:
+    return (os.getenv("SCRAPER_BRIDGE_URL") or "").strip().rstrip("/")
+
+
+def _bridge_character_url(server: str, name: str) -> str:
+    base = _bridge_base_url()
+    if not base:
+        return ""
+    return (
+        f"{base}/get_char/"
+        f"{quote_plus(str(server or '').strip())}/"
+        f"{quote_plus(str(name or '').strip())}"
+    )
+
+
+def _bridge_candidate_requests(server: str, name: str):
+    base = _bridge_base_url()
+    clean_server = quote_plus(str(server or "").strip())
+    clean_name = quote_plus(str(name or "").strip())
+    if not base:
+        return []
+
+    # Only the primary contract. No fallbacks to incompatible routes.
+    candidates = [
+        (f"{base}/get_char/{clean_server}/{clean_name}", None),
+    ]
+    return candidates
+
+
+def _bridge_requests_for_route(
+    route: str,
+    server: str,
+    name: str,
+    extra_params: dict | None = None,
+):
+    """Build candidate bridge requests for a logical route.
+
+    The bridge exposes separate endpoints for profile/talents/statistics, while
+    callers in this project use higher-level route names.
+    """
+    base = _bridge_base_url()
+    clean_server = quote_plus(str(server or "").strip())
+    clean_name = quote_plus(str(name or "").strip())
+    if not base:
+        return []
+
+    route = (route or "character").strip().lower()
+    params = dict(extra_params or {})
+
+    if route in {"character", "profile", "summary", "api_summary"}:
+        return [(f"{base}/get_char/{clean_server}/{clean_name}", params or None)]
+
+    if route in {"talents", "api_talents"}:
+        return [
+            (f"{base}/get_char_talents/{clean_server}/{clean_name}", params or None)
+        ]
+
+    if route in {"statistics"}:
+        return [
+            (f"{base}/get_char_statistics/{clean_server}/{clean_name}", params or None)
+        ]
+
+    if route in {"achievements"}:
+        return [
+            (
+                f"{base}/get_char_achievements/{clean_server}/{clean_name}",
+                params or None,
+            )
+        ]
+
+    if route == "guild_summary":
+        guild = quote_plus(str((extra_params or {}).get("guild") or "").strip())
+        if guild:
+            return [
+                (
+                    f"{base}/get_guild_summary/{clean_server}/{guild}/{clean_name}",
+                    params or None,
+                )
+            ]
+
+    # Fallback to the primary route contract.
+    return _bridge_candidate_requests(server, name)
+
+
+def _response_to_payload(resp):
+    content_type = str(resp.headers.get("Content-Type") or "").lower()
+    body = resp.text if isinstance(resp.text, str) else ""
+
+    if "application/json" in content_type:
+        try:
+            data = resp.json()
+            if isinstance(data, dict):
+                return data
+        except ValueError:
+            pass
+
+    if body.strip().startswith("{"):
+        try:
+            data = json.loads(body)
+            if isinstance(data, dict):
+                return data
+        except ValueError:
+            pass
+
+    if body.strip():
+        return {"html": body}
+
+    return None
+
+
+def fetch_bridge_payload(
+    server: str,
+    name: str,
+    route: str,
+    extra_params: dict | None = None,
+    timeout: int | None = None,
+):
+    """Fetch bridge payload using SCRAPER_BRIDGE_URL/get_char/<realm>/<name>.
+
+    Returns a dict payload on success, or None when bridge is unavailable.
+    The response is cached in-process for BRIDGE_CACHE_TTL seconds (default 120)
+    so every function that parses the same character reuses one single HTTP call.
+    """
+    # ── Cache hit: return stored payload immediately ─────────────────────────
+    cached = _cache_get(server, name, route)
+    if cached is not None:
+        return _normalize_payload_for_route(route, cached)
+
+    api_secret = os.getenv("API_SECRET") or ""
+    candidates = _bridge_requests_for_route(route, server, name, extra_params)
+
+    if not candidates:
+        return None
+
+    effective_timeout = timeout if timeout is not None else _DEFAULT_BRIDGE_TIMEOUT
+    headers = {"X-API-KEY": api_secret, "Accept": "application/json"}
+    verify_ssl = _bridge_verify_ssl()
+    for url, params in candidates:
+        try:
+            resp = requests.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=effective_timeout,
+                verify=verify_ssl,
+            )
+            if resp.status_code >= 500:
+                continue
+            payload = _response_to_payload(resp)
+            if isinstance(payload, dict):
+                # ── Cache miss resolved: store raw payload ────────────────
+                _cache_set(server, name, payload, route)
+                return _normalize_payload_for_route(route, payload)
+        except requests.RequestException:
+            continue
+
+    return None
+
+
+def fetch_html_via_bridge(
+    server: str,
+    name: str,
+    route: str,
+    extra_params: dict | None = None,
+    timeout: int | None = None,
+) -> str:
+    """Return payload['html'] from bridge, or a clean bridge error message."""
+    payload = fetch_bridge_payload(server, name, route, extra_params, timeout)
+    if not isinstance(payload, dict):
         return BRIDGE_UNAVAILABLE_ERROR
 
+    html = payload.get("html")
+    if isinstance(html, str):
+        return html
     return BRIDGE_UNAVAILABLE_ERROR
