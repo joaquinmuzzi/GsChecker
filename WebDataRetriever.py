@@ -27,6 +27,20 @@ def _cache_set(server: str, name: str, payload: dict, route: str = "") -> None:
     _BRIDGE_CACHE[(server.lower(), name.lower(), route.lower())] = (time.monotonic(), payload)
 
 
+def _is_cloudflare_payload(payload: dict) -> bool:
+    """Return True if the bridge payload contains a Cloudflare challenge page."""
+    html = payload.get("html") or ""
+    if not isinstance(html, str) or not html.strip():
+        return False
+    low = html.lower()
+    # If armory markers are present, it's real content.
+    if any(m in low for m in ("character-sheet", "item-model", "profile-content", "level-race-class")):
+        return False
+    # Cloudflare challenge markers.
+    return any(m in low for m in (
+        "challenges.cloudflare.com", "cf-challenge", "cf-turnstile",
+        "just a moment", "un momento", "verify you are human",
+    ))
 def _bridge_verify_ssl() -> bool:
     raw = (os.getenv("BRIDGE_VERIFY_SSL") or "").strip().lower()
     if raw in {"1", "true", "yes", "on"}:
@@ -244,6 +258,9 @@ def fetch_bridge_payload(
                 continue
             payload = _response_to_payload(resp)
             if isinstance(payload, dict):
+                # ── Cache miss resolved: store raw payload ────────────────
+                if _is_cloudflare_payload(payload):
+                    continue
                 # ── Cache miss resolved: store raw payload ────────────────
                 _cache_set(server, name, payload, route)
                 return _normalize_payload_for_route(route, payload)

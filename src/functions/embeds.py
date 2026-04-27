@@ -1,3 +1,4 @@
+import re
 import unicodedata
 
 import discord
@@ -115,27 +116,44 @@ def _extract_icc_boss_kills(stats_rows):
     def parse_value(val: str) -> int:
         if not val or val.strip() in {"- -", "--"}:
             return 0
+        numbers = re.findall(r"\d+", str(val).replace(",", ""))
+        if not numbers:
+            return 0
         try:
-            return int(val.replace(",", ""))
+            return max(int(num) for num in numbers)
         except Exception:
             return 0
 
     icc_10 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
     icc_25 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
 
-    for desc, val in stats_rows:
-        if "Icecrown" not in desc:
+    for row in stats_rows:
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
             continue
+        desc = str(row[0] or "")
+        val = str(row[1] or "")
+        low_desc = desc.lower()
+
         value = parse_value(val)
         if value <= 0:
             continue
-        is_10 = "Icecrown 10 player" in desc
-        is_25 = "Icecrown 25 player" in desc
-        is_hc = "Heroic" in desc
+
+        # Warmane wording varies by endpoint/locale. Accept broader mode markers.
+        is_10 = (
+            "10 player" in low_desc
+            or "(10" in low_desc
+            or "10-player" in low_desc
+        )
+        is_25 = (
+            "25 player" in low_desc
+            or "(25" in low_desc
+            or "25-player" in low_desc
+        )
+        is_hc = "heroic" in low_desc
         if not (is_10 or is_25):
             continue
         for boss_name, patterns in boss_patterns.items():
-            if any(pat in desc for pat in patterns):
+            if any(pat.lower() in low_desc for pat in patterns):
                 if is_10:
                     key = "hc" if is_hc else "nm"
                     icc_10[boss_name][key] = max(icc_10[boss_name][key], value)
@@ -159,8 +177,11 @@ def _extract_toc_boss_kills(stats_rows):
     def parse_value(val: str) -> int:
         if not val or val.strip() in {"- -", "--"}:
             return 0
+        numbers = re.findall(r"\d+", str(val).replace(",", ""))
+        if not numbers:
+            return 0
         try:
-            return int(val.replace(",", ""))
+            return max(int(num) for num in numbers)
         except Exception:
             return 0
 
