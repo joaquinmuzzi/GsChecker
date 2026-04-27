@@ -604,6 +604,8 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
             if _normalize_spec_name(td.get_text(strip=True)) in WOW_CLASSIC_SPEC_NAMES
         ]
         if result:
+            if not any(bool(spec.get("active")) for spec in result):
+                result[0]["active"] = True
             _cache_set(SUMMARY_CACHE, cache_key, result)
             return result
 

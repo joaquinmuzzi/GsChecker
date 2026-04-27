@@ -810,6 +810,20 @@ async def _personaje_impl(
                 for t in sorted_talents
                 if not t.get("active", False)
             ]
+            # Warmane sometimes returns talents without an explicit active marker.
+            # If no active spec is flagged, promote the first valid talent as active.
+            if not active_specs:
+                for talent in sorted_talents:
+                    candidate = str(talent.get("name") or "").strip()
+                    if not candidate or candidate == "N/A":
+                        continue
+                    active_specs = [candidate]
+                    inactive_specs = [
+                        name
+                        for name in inactive_specs
+                        if str(name or "").strip() != candidate
+                    ]
+                    break
         else:
             active_specs = []
             inactive_specs = _fallback_spec_names_for_class(clase)

@@ -157,20 +157,29 @@ def _bridge_requests_for_route(
     route = (route or "character").strip().lower()
     params = dict(extra_params or {})
 
-    if route in {"character", "profile", "summary", "api_summary"}:
+    if route == "character":
+        # Gear score parsing needs equipped items rendered.
+        params.setdefault("wait_selector", ".item-model")
+        return [(f"{base}/get_char/{clean_server}/{clean_name}", params or None)]
+
+    if route in {"profile", "summary", "api_summary"}:
+        params.setdefault("wait_selector", "#character-sheet")
         return [(f"{base}/get_char/{clean_server}/{clean_name}", params or None)]
 
     if route in {"talents", "api_talents"}:
+        params.setdefault("wait_selector", "[data-spec]")
         return [
             (f"{base}/get_char_talents/{clean_server}/{clean_name}", params or None)
         ]
 
     if route in {"statistics"}:
+        params.setdefault("wait_selector", "#data-table-list")
         return [
             (f"{base}/get_char_statistics/{clean_server}/{clean_name}", params or None)
         ]
 
     if route in {"achievements"}:
+        params.setdefault("wait_selector", ".achievement-list")
         return [
             (
                 f"{base}/get_char_achievements/{clean_server}/{clean_name}",
