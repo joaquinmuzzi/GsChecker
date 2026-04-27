@@ -223,26 +223,35 @@ def _fetch_profile_page_html(nombre: str, server: str) -> str:
         return cached
 
     html = ""
-    for attempt in range(2):
-        resp = _warmane_get_with_scheme_fallback(
-            f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS
-        )
-        html = resp.text if resp is not None else ""
+    candidate_paths = [
+        f"/character/{nombre}/{server}/profile",
+        # Fallback: same page through the base character route.
+        f"/character/{nombre}/{server}",
+    ]
 
-        if html and _looks_like_cloudflare_challenge(html):
-            logger.warning(
-                "Bridge devolvió challenge de Cloudflare para '%s'/%s (intento %s/2)",
-                nombre,
-                server,
-                attempt + 1,
-            )
-            html = ""
+    for path in candidate_paths:
+        for attempt in range(2):
+            resp = _warmane_get_with_scheme_fallback(path, _PROFILE_HEADERS)
+            html = resp.text if resp is not None else ""
+
+            if html and _looks_like_cloudflare_challenge(html):
+                logger.warning(
+                    "Bridge devolvió challenge de Cloudflare para '%s'/%s path='%s' (intento %s/2)",
+                    nombre,
+                    server,
+                    path,
+                    attempt + 1,
+                )
+                html = ""
+
+            if html:
+                break
+            if attempt == 0:
+                # Bridge requests can fail transiently during browser/captcha warm-up.
+                time.sleep(1)
 
         if html:
             break
-        if attempt == 0:
-            # Bridge requests can fail transiently during browser/captcha warm-up.
-            time.sleep(1)
 
     # Do not cache empty/failed payloads; they are often transient bridge issues.
     if html:
