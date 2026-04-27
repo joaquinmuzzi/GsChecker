@@ -822,40 +822,55 @@ def _fetch_achievements(nombre: str, server: str):
     halion_25h_achieved = False
 
     def fetch_category(category_id: int):
-        achi_json = _warmane_post_json_with_scheme_fallback(
-            f"/character/{nombre}/{server}/achievements",
-            headers,
-            {"category": category_id},
-        )
-        if not isinstance(achi_json, dict):
-            return []
-        if "content" not in achi_json:
-            return []
-        soup = BeautifulSoup(achi_json["content"], "html.parser")
-        all_achievements = soup.find_all("div", class_="achievement")
-        completed_achievements = []
-        for ach in all_achievements:
-            classes = ach.get("class") or []
-            if isinstance(classes, str):
-                class_list = classes.split()
-            elif isinstance(classes, list):
-                class_list = [str(value) for value in classes]
-            else:
-                class_list = []
-            if "locked" not in class_list:
-                completed_achievements.append(ach)
-        ids = []
-        for ach_div in completed_achievements:
-            ach_id_raw = ach_div.get("id")
-            if isinstance(ach_id_raw, list):
-                ach_id_raw = ach_id_raw[0] if ach_id_raw else ""
-            ach_id_full = str(ach_id_raw or "")
-            if ach_id_full.startswith("ach"):
-                ids.append(ach_id_full.replace("ach", ""))
-        return ids
+        for attempt in range(3):
+            achi_json = _warmane_post_json_with_scheme_fallback(
+                f"/character/{nombre}/{server}/achievements",
+                headers,
+                {"category": category_id},
+            )
+            if not isinstance(achi_json, dict):
+                if attempt < 2:
+                    time.sleep(1 + attempt)
+                continue
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(fetch_category, raid_categories))
+            content = achi_json.get("content", "")
+            if not isinstance(content, str) or not content.strip():
+                if attempt < 2:
+                    time.sleep(1 + attempt)
+                continue
+
+            soup = BeautifulSoup(content, "html.parser")
+            all_achievements = soup.find_all("div", class_="achievement")
+            completed_achievements = []
+            for ach in all_achievements:
+                classes = ach.get("class") or []
+                if isinstance(classes, str):
+                    class_list = classes.split()
+                elif isinstance(classes, list):
+                    class_list = [str(value) for value in classes]
+                else:
+                    class_list = []
+                if "locked" not in class_list:
+                    completed_achievements.append(ach)
+
+            ids = []
+            for ach_div in completed_achievements:
+                ach_id_raw = ach_div.get("id")
+                if isinstance(ach_id_raw, list):
+                    ach_id_raw = ach_id_raw[0] if ach_id_raw else ""
+                ach_id_full = str(ach_id_raw or "")
+                if ach_id_full.startswith("ach"):
+                    ids.append(ach_id_full.replace("ach", ""))
+
+            if ids or all_achievements:
+                return ids
+            if attempt < 2:
+                time.sleep(1 + attempt)
+        return []
+
+    # The bridge runs on a single browser session/lock; parallel category requests
+    # can race and return inconsistent achievement payloads. Fetch sequentially.
+    results = [fetch_category(category_id) for category_id in raid_categories]
 
     for ids in results:
         for ach_id in ids:
@@ -897,6 +912,41 @@ def _fetch_achievements(nombre: str, server: str):
         "storming_25n_achieved": "4604" in completed_ids,
         "storming_25h_achieved": "4632" in completed_ids,
     }
+
+    # If every target flag is false due to transient bridge issues, prefer stale cached data.
+    if not any(
+        [
+            payload["halion_10n_achieved"],
+            payload["halion_10h_achieved"],
+            payload["halion_25n_achieved"],
+            payload["halion_25h_achieved"],
+            payload["storming_10n_achieved"],
+            payload["storming_10h_achieved"],
+            payload["storming_25n_achieved"],
+            payload["storming_25h_achieved"],
+        ]
+    ):
+        stale = _cache_get_stale(ACHIEVEMENTS_CACHE, cache_key)
+        if isinstance(stale, dict) and any(
+            bool(stale.get(key))
+            for key in (
+                "halion_10n_achieved",
+                "halion_10h_achieved",
+                "halion_25n_achieved",
+                "halion_25h_achieved",
+                "storming_10n_achieved",
+                "storming_10h_achieved",
+                "storming_25n_achieved",
+                "storming_25h_achieved",
+            )
+        ):
+            logger.warning(
+                "Using stale achievements cache for '%s'/%s after empty achievements fetch",
+                nombre,
+                server,
+            )
+            return stale
+
     _cache_set(ACHIEVEMENTS_CACHE, cache_key, payload)
     return payload
 
@@ -964,7 +1014,25 @@ def _fetch_gear_data(nombre: str, server: str):
     cached = _cache_get(GEAR_CACHE, cache_key, GEAR_TTL)
     if cached is not None:
         return cached
-    gear_data = profile_scraper.get_gear_data(nombre, server)
+
+    gear_data = []
+    for attempt in range(3):
+        gear_data = profile_scraper.get_gear_data(nombre, server)
+        if isinstance(gear_data, list) and gear_data:
+            break
+        if attempt < 2:
+            time.sleep(1 + attempt)
+
+    if not gear_data:
+        stale = _cache_get_stale(GEAR_CACHE, cache_key)
+        if isinstance(stale, list) and stale:
+            logger.warning(
+                "Using stale gear cache for '%s'/%s after bridge gear fetch failure",
+                nombre,
+                server,
+            )
+            return stale
+
     _cache_set(GEAR_CACHE, cache_key, gear_data)
     return gear_data
 
