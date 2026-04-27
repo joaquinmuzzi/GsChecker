@@ -599,9 +599,15 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
 
     # 1st attempt: dedicated talents page (has explicit "selected" class per spec)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    resp = _warmane_get_with_scheme_fallback(
-        f"/character/{nombre}/{server}/talents", headers
-    )
+    resp = None
+    for attempt in range(2):
+        resp = _warmane_get_with_scheme_fallback(
+            f"/character/{nombre}/{server}/talents", headers
+        )
+        if resp is not None:
+            break
+        if attempt == 0:
+            time.sleep(1)
     if resp is not None:
         soup = BeautifulSoup(resp.text, "html.parser")
         result = [
@@ -971,11 +977,17 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
 
     stats_path = f"/character/{nombre}/{server}/statistics"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    js = _warmane_post_json_with_scheme_fallback(
-        stats_path,
-        headers,
-        {"category": category_id},
-    )
+    js = None
+    for attempt in range(3):
+        js = _warmane_post_json_with_scheme_fallback(
+            stats_path,
+            headers,
+            {"category": category_id},
+        )
+        if isinstance(js, dict) and js.get("content"):
+            break
+        if attempt < 2:
+            time.sleep(1 + attempt)
     if not isinstance(js, dict):
         stale = _cache_get_stale(STATS_CACHE, cache_key)
         if stale is not None:

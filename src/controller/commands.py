@@ -892,6 +892,10 @@ async def _personaje_impl(
             gs_by_spec,
             active_specs,
         )
+        if spec_gs_entries and not any(entry.get("main") for entry in spec_gs_entries):
+            if gs not in {None, "N/A", "?"}:
+                spec_gs_entries[0]["main"] = True
+                spec_gs_entries[0]["gearscore"] = gs
         active_spec_name = active_specs[0] if active_specs else None
 
         halion_10n_achieved = achi_payload["halion_10n_achieved"]
