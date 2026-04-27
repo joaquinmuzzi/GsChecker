@@ -16,6 +16,23 @@ _BRIDGE_CACHE: dict[tuple[str, str, str], tuple[float, dict]] = {}
 _BRIDGE_CACHE_TTL = int(os.getenv("BRIDGE_CACHE_TTL", "120"))
 
 
+def _route_cache_key(route: str, extra_params: dict | None = None) -> str:
+    base = str(route or "").strip().lower()
+    if not isinstance(extra_params, dict) or not extra_params:
+        return base
+
+    parts = []
+    for key in sorted(extra_params.keys()):
+        value = extra_params.get(key)
+        if value is None:
+            continue
+        parts.append(f"{str(key).strip().lower()}={str(value).strip()}")
+
+    if not parts:
+        return base
+    return f"{base}?{'&'.join(parts)}"
+
+
 def _cache_get(server: str, name: str, route: str = "") -> dict | None:
     entry = _BRIDGE_CACHE.get((server.lower(), name.lower(), route.lower()))
     if entry and (time.monotonic() - entry[0]) < _BRIDGE_CACHE_TTL:
@@ -241,7 +258,8 @@ def fetch_bridge_payload(
     so every function that parses the same character reuses one single HTTP call.
     """
     # ── Cache hit: return stored payload immediately ─────────────────────────
-    cached = _cache_get(server, name, route)
+    cache_key = _route_cache_key(route, extra_params)
+    cached = _cache_get(server, name, cache_key)
     if cached is not None:
         return _normalize_payload_for_route(route, cached)
 
@@ -271,7 +289,7 @@ def fetch_bridge_payload(
                 if _is_cloudflare_payload(payload):
                     continue
                 # ── Cache miss resolved: store raw payload ────────────────
-                _cache_set(server, name, payload, route)
+                _cache_set(server, name, payload, cache_key)
                 return _normalize_payload_for_route(route, payload)
         except requests.RequestException:
             continue

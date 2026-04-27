@@ -897,6 +897,23 @@ def _fetch_achievements(nombre: str, server: str):
                 elif key == "halion_25h":
                     halion_25h_achieved = True
 
+    # Rescue pass: transient bridge failures can miss the Ruby Sanctum category
+    # while still returning partial achievements in other categories.
+    if not any(ach_id in completed_ids for ach_id in target_achievements):
+        for category_id in [14922, 14923]:
+            for ach_id in fetch_category(category_id):
+                completed_ids.add(ach_id)
+                if ach_id in target_achievements:
+                    key = target_achievements[ach_id][0]
+                    if key == "halion_10n":
+                        halion_10n_achieved = True
+                    elif key == "halion_10h":
+                        halion_10h_achieved = True
+                    elif key == "halion_25n":
+                        halion_25n_achieved = True
+                    elif key == "halion_25h":
+                        halion_25h_achieved = True
+
     payload = {
         "completed_ids": completed_ids,
         "icc_10n_bosses": icc_10n_bosses,

@@ -413,8 +413,16 @@ def _extract_slot_name(slot, index: int) -> str:
 def parse_slot(slot):
     if not slot.get("rel"):
         return {}
-    item_properties_list = slot["rel"][0].split("&")
-    item_properties = dict(property.split("=") for property in item_properties_list)
+    rel_value = slot["rel"][0]
+    item_properties = {}
+    for chunk in rel_value.split("&"):
+        if "=" not in chunk:
+            continue
+        key, value = chunk.split("=", 1)
+        key = str(key or "").strip()
+        if not key:
+            continue
+        item_properties[key] = value
     item_properties["gems"] = item_properties.get("gems", "0:0:0").split(":")
     return item_properties
 
