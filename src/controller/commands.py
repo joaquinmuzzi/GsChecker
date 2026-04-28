@@ -887,6 +887,23 @@ async def _personaje_impl(
             gs,
             active_specs,
         )
+
+        # If current gear fetch failed (gs unknown), but we have any cached GS for
+        # this character/spec set, reuse it for the active spec instead of showing '?'.
+        if active_specs and gs in {None, "N/A", "?"}:
+            active_name = str(active_specs[0] or "").strip()
+            if active_name and gs_by_spec.get(active_name) in {None, "N/A", "?"}:
+                fallback_gs = next(
+                    (
+                        value
+                        for value in gs_by_spec.values()
+                        if value not in {None, "N/A", "?"}
+                    ),
+                    None,
+                )
+                if fallback_gs is not None:
+                    gs_by_spec[active_name] = fallback_gs
+
         spec_gs_entries = _build_spec_gs_entries(
             active_specs + inactive_specs,
             gs_by_spec,
