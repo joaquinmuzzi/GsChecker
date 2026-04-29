@@ -922,30 +922,8 @@ async def _personaje_impl(
 
         icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
 
-        def _has_any_icc_value() -> bool:
-            for values in icc_10.values():
-                if values.get("nm", 0) > 0 or values.get("hc", 0) > 0:
-                    return True
-            for values in icc_25.values():
-                if values.get("nm", 0) > 0 or values.get("hc", 0) > 0:
-                    return True
-            return False
-
-        # If statistics endpoint is unavailable (common with transient bridge 502),
-        # use Storming achievements as minimum-clear fallback instead of false all-zero.
-        if not _has_any_icc_value():
-            if achi_payload.get("storming_10n_achieved"):
-                for boss in icc_10:
-                    icc_10[boss]["nm"] = max(icc_10[boss]["nm"], 1)
-            if achi_payload.get("storming_10h_achieved"):
-                for boss in icc_10:
-                    icc_10[boss]["hc"] = max(icc_10[boss]["hc"], 1)
-            if achi_payload.get("storming_25n_achieved"):
-                for boss in icc_25:
-                    icc_25[boss]["nm"] = max(icc_25[boss]["nm"], 1)
-            if achi_payload.get("storming_25h_achieved"):
-                for boss in icc_25:
-                    icc_25[boss]["hc"] = max(icc_25[boss]["hc"], 1)
+        # Avoid synthetic ICC counts when statistics are temporarily unavailable.
+        # Storming achievements are handled in the special UwU section only.
 
         guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
         spec_display = " - ".join(
