@@ -934,6 +934,8 @@ def _fetch_gear_data(nombre: str, server: str):
                 server,
             )
             return stale
+        # Don't cache empty results — let the next request try again.
+        return gear_data
 
     _cache_set(GEAR_CACHE, cache_key, gear_data)
     return gear_data
