@@ -5,12 +5,6 @@ from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
 
-from WebDataRetriever import (
-    BRIDGE_UNAVAILABLE_ERROR,
-    fetch_bridge_payload,
-    fetch_html_via_bridge,
-)
-
 HEADERS = {"User-Agent": "GsChecker/1.0"}
 SESSION = requests.Session()
 ITEM_SESSION = requests.Session()
@@ -219,9 +213,12 @@ def _save_socket_cache(cache: dict) -> None:
 
 def get_specs(char_name: str, server: str) -> list[dict]:
     try:
-        profile_html = fetch_html_via_bridge(server, char_name, "profile")
-        if profile_html and profile_html != BRIDGE_UNAVAILABLE_ERROR:
-            profile_soup = BeautifulSoup(profile_html, "html.parser")
+        profile_url = (
+            f"https://armory.warmane.com/character/{char_name}/{server}/profile"
+        )
+        profile_resp = SESSION.get(profile_url, headers=HEADERS, timeout=8)
+        if profile_resp.status_code == 200:
+            profile_soup = BeautifulSoup(profile_resp.text, "html.parser")
             profile_specs = []
             for text_node in profile_soup.select(
                 "div.specialization div.stub div.text"
@@ -235,10 +232,13 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             if len(profile_specs) == 1:
                 return [{"name": profile_specs[0], "active": True}]
 
+        url = f"https://armory.warmane.com/character/{char_name}/{server}/talents"
+        resp = SESSION.get(url, headers=HEADERS, timeout=8)
+        if resp.status_code != 200:
+            resp = None
         specs = []
-        talents_html = fetch_html_via_bridge(server, char_name, "talents")
-        if talents_html and talents_html != BRIDGE_UNAVAILABLE_ERROR:
-            soup = BeautifulSoup(talents_html, "html.parser")
+        if resp is not None:
+            soup = BeautifulSoup(resp.text, "html.parser")
             talents = soup.find_all("td", attrs={"data-spec": True})
             for td in talents:
                 specs.append(
@@ -250,19 +250,14 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             if specs:
                 return specs
 
-        api_payload = fetch_bridge_payload(server, char_name, "api_talents")
-        if not isinstance(api_payload, dict):
+        api_url = (
+            f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
+        )
+        api_resp = SESSION.get(api_url, headers=HEADERS, timeout=8)
+        if api_resp.status_code != 200:
             return []
 
-        payload = api_payload.get("json")
-        if not isinstance(payload, dict):
-            html_or_json = api_payload.get("html")
-            if not isinstance(html_or_json, str):
-                return []
-            try:
-                payload = json.loads(html_or_json)
-            except ValueError:
-                return []
+        payload = api_resp.json()
         talents = payload.get("talents") if isinstance(payload, dict) else None
         if not isinstance(talents, list):
             return []
@@ -428,10 +423,11 @@ def parse_slot(slot):
 
 
 def get_gear_data(char_name: str, server: str = "Lordaeron"):
-    html = fetch_html_via_bridge(server, char_name, "character")
-    if not html or html == BRIDGE_UNAVAILABLE_ERROR:
+    url = f"http://armory.warmane.com/character/{char_name}/{server}"
+    resp = SESSION.get(url, headers=HEADERS, timeout=8)
+    if resp.status_code != 200:
         return []
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(resp.text, "html.parser")
     try:
         equipment = soup.find(class_="item-model").find_all("a")
     except Exception:
@@ -578,11 +574,12 @@ def get_character_stats(
     * Armor Penetration is **not** exposed by the Warmane armory; callers
       should not rely on ``armor_penetration_rating`` being present.
     """
+    url = f"https://armory.warmane.com/character/{char_name}/{server}/summary"
     try:
-        html = fetch_html_via_bridge(server, char_name, "summary")
-        if not html or html == BRIDGE_UNAVAILABLE_ERROR:
+        resp = SESSION.get(url, headers=HEADERS, timeout=8)
+        if resp.status_code != 200:
             return {}
-        return _parse_character_stats_html(html)
+        return _parse_character_stats_html(resp.text)
     except Exception:
         return {}
 

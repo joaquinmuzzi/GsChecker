@@ -88,14 +88,12 @@ El repo ya incluye archivos para correr como worker:
 Variables recomendadas en Railway:
 
 - `DISCORD_TOKEN`
-- `SCRAPER_BRIDGE_URL` (ej: `https://tu-bridge.loca.lt` o URL de tu VPS)
-- `API_SECRET` (mismo valor que `BRIDGE_SHARED_SECRET` en el bridge)
-- `BRIDGE_VERIFY_SSL=false` (solo si tu bridge usa cert no verificable)
+- `DATABASE_URL` (opcional, para cache externa en Postgres)
 
 Notas:
 
 - Este servicio es de tipo worker (no expone puerto HTTP).
-- El bridge con Chromium/Cloudflare conviene mantenerlo fuera de Railway (VPS o PC fija).
+- El bot hace scraping directo contra `armory.warmane.com`.
 
 ## Arquitectura rápida
 

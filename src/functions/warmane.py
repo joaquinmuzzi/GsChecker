@@ -1,17 +1,15 @@
-import re
-import json
-import os
-import time
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import quote_plus, unquote_plus
+from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
 import gearscore
 import profile_scraper
-from WebDataRetriever import fetch_bridge_payload
 from src.schemas.constants import (
+    SESSION,
+    HTTP_TIMEOUT,
     SUMMARY_CACHE,
     SUMMARY_TTL,
     ACHIEVEMENTS_CACHE,
@@ -40,10 +38,6 @@ WOW_CLASSES = (
 
 logger = logging.getLogger("gschecker.warmane")
 
-# Bridge scraping can queue multiple requests behind one browser lock.
-# Keep this timeout higher than generic HTTP_TIMEOUT to avoid false negatives.
-BRIDGE_REQUEST_TIMEOUT = int(os.getenv("BRIDGE_TIMEOUT", "150"))
-
 
 def _cache_get_stale(cache: dict, key):
     entry = cache.get(key)
@@ -52,130 +46,51 @@ def _cache_get_stale(cache: dict, key):
     return entry[1]
 
 
-class _BridgeResponse:
-    def __init__(self, text: str = "", payload=None):
-        self.text = text
-        self.status_code = 200
-        self._payload = payload
-
-    def json(self):
-        if isinstance(self._payload, (dict, list)):
-            return self._payload
-        if isinstance(self.text, str) and self.text.strip():
-            return json.loads(self.text)
-        raise ValueError("No JSON payload")
-
-
-def _parse_bridge_target(path: str):
-    char_match = re.match(
-        r"^/character/(?P<name>[^/]+)/(?P<server>[^/]+)(?:/(?P<section>[^/]+))?$",
-        path,
-    )
-    if char_match:
-        section = (char_match.group("section") or "").strip()
-        route = section if section else "character"
-        return {
-            "server": unquote_plus(char_match.group("server")),
-            "name": unquote_plus(char_match.group("name")),
-            "route": route,
-            "extra": {},
-        }
-
-    api_match = re.match(
-        r"^/api/character/(?P<name>[^/]+)/(?P<server>[^/]+)/(?P<section>[^/]+)$",
-        path,
-    )
-    if api_match:
-        return {
-            "server": unquote_plus(api_match.group("server")),
-            "name": unquote_plus(api_match.group("name")),
-            "route": f"api_{api_match.group('section')}",
-            "extra": {},
-        }
-
-    guild_match = re.match(
-        r"^/guild/(?P<guild>[^/]+)/(?P<server>[^/]+)/summary/(?P<name>[^/]+)$",
-        path,
-    )
-    if guild_match:
-        return {
-            "server": unquote_plus(guild_match.group("server")),
-            "name": unquote_plus(guild_match.group("name")),
-            "route": "guild_summary",
-            "extra": {"guild": unquote_plus(guild_match.group("guild"))},
-        }
-
-    return None
-
-
-def _bridge_payload_from_path(path: str, data: dict | None = None):
-    target = _parse_bridge_target(path)
-    if target is None:
-        return None
-
-    extra = dict(target.get("extra") or {})
-    if isinstance(data, dict):
-        extra.update(data)
-
-    return fetch_bridge_payload(
-        server=target["server"],
-        name=target["name"],
-        route=target["route"],
-        extra_params=extra,
-        timeout=BRIDGE_REQUEST_TIMEOUT,
-    )
-
-
 def _warmane_get_with_scheme_fallback(path: str, headers: dict):
-    _ = headers
-    payload = _bridge_payload_from_path(path)
-    if not isinstance(payload, dict):
-        logger.warning("Bridge request failed for path='%s'", path)
-        return None
-
-    html = payload.get("html")
-    if isinstance(html, str):
-        return _BridgeResponse(text=html, payload=payload.get("json"))
-
-    js = payload.get("json")
-    if isinstance(js, (dict, list)):
-        return _BridgeResponse(text=json.dumps(js), payload=js)
-
-    if isinstance(payload, dict):
-        return _BridgeResponse(text=json.dumps(payload), payload=payload)
-
-    logger.warning("Bridge request returned invalid payload for path='%s'", path)
+    last_status = None
+    last_error = None
+    for scheme in ("https", "http"):
+        url = f"{scheme}://armory.warmane.com{path}"
+        try:
+            resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+        last_status = resp.status_code
+        if resp.status_code == 200:
+            return resp
+    logger.warning(
+        "Warmane request failed for path='%s' (last_status=%s, last_error=%s)",
+        path,
+        last_status,
+        last_error,
+    )
     return None
 
 
 def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict):
-    _ = headers
-    payload = _bridge_payload_from_path(path, data)
-    if not isinstance(payload, dict):
-        return None
-
-    js = payload.get("json")
-    if isinstance(js, dict):
-        return js
-
-    # Bridge statistics endpoint returns {"content": "<table>..."}
-    content = payload.get("content")
-    if isinstance(content, str) and content.strip():
-        return {"content": content}
-
-    html = payload.get("html")
-    if isinstance(html, str):
-        try:
-            parsed = json.loads(html)
-            if isinstance(parsed, dict):
-                return parsed
-        except Exception:
-            pass
-        return {"content": html}
-
-    if isinstance(payload, dict):
-        return payload
-
+    last_status = None
+    last_error = None
+    for _ in range(2):
+        for scheme in ("https", "http"):
+            url = f"{scheme}://armory.warmane.com{path}"
+            try:
+                resp = SESSION.post(
+                    url, headers=headers, data=data, timeout=HTTP_TIMEOUT
+                )
+            except Exception as exc:
+                last_error = str(exc)
+                continue
+            last_status = resp.status_code
+            if resp.status_code != 200:
+                continue
+            try:
+                payload = resp.json()
+            except Exception as exc:
+                last_error = f"json error: {exc}"
+                continue
+            if isinstance(payload, dict):
+                return payload
     return None
 
 
@@ -187,33 +102,6 @@ _PROFILE_HEADERS = {
 }
 
 
-def _looks_like_cloudflare_challenge(html: str) -> bool:
-    if not isinstance(html, str) or not html.strip():
-        return True
-
-    low = html.lower()
-
-    # If profile markers exist, this is likely real armory content.
-    warmane_markers = (
-        "character-sheet",
-        "level-race-class",
-        "profile-content",
-        "guild-name",
-    )
-    if any(marker in low for marker in warmane_markers):
-        return False
-
-    challenge_markers = (
-        "challenges.cloudflare.com",
-        "cf-challenge",
-        "cf-turnstile",
-        "un momento",
-        "just a moment",
-        "verify you are human",
-    )
-    return any(marker in low for marker in challenge_markers)
-
-
 def _fetch_profile_page_html(nombre: str, server: str) -> str:
     """Fetch and cache the profile page HTML in-memory (shared between summary,
     professions and specs to avoid hitting the same URL multiple times per command)."""
@@ -221,39 +109,11 @@ def _fetch_profile_page_html(nombre: str, server: str) -> str:
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
     if cached is not None:
         return cached
-
-    html = ""
-    candidate_paths = [
-        f"/character/{nombre}/{server}/profile",
-        # Fallback: same page through the base character route.
-        f"/character/{nombre}/{server}",
-    ]
-
-    for path in candidate_paths:
-        for attempt in range(2):
-            resp = _warmane_get_with_scheme_fallback(path, _PROFILE_HEADERS)
-            html = resp.text if resp is not None else ""
-
-            if html and _looks_like_cloudflare_challenge(html):
-                logger.warning(
-                    "Bridge devolvió challenge de Cloudflare para '%s'/%s path='%s' (intento %s/2)",
-                    nombre,
-                    server,
-                    path,
-                    attempt + 1,
-                )
-                html = ""
-
-            if html:
-                break
-            if attempt == 0:
-                # Bridge requests can fail transiently during browser/captcha warm-up.
-                time.sleep(1)
-
-        if html:
-            break
-
-    # Do not cache empty/failed payloads; they are often transient bridge issues.
+    resp = _warmane_get_with_scheme_fallback(
+        f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS
+    )
+    html = resp.text if resp is not None else ""
+    # Do not cache empty/failed payloads; they are often transient issues.
     if html:
         _cache_set(SUMMARY_CACHE, cache_key, html)
     return html
@@ -450,20 +310,6 @@ def _fetch_summary(nombre: str, server: str):
     if cached is not None:
         return cached
 
-    # In bridge mode, API summary is not reliable because bridge returns HTML.
-    # Prefer a single profile-based summary to avoid duplicate fragile requests.
-    if (os.getenv("SCRAPER_BRIDGE_URL") or "").strip():
-        profile_summary = _summary_from_profile_html(nombre, server)
-        if profile_summary is not None:
-            _cache_set(SUMMARY_CACHE, cache_key, profile_summary)
-            return profile_summary
-        return {
-            "__error__": (
-                "⚠️ El bridge no pudo superar Cloudflare en este intento. "
-                "Reintentá en unos segundos."
-            )
-        }
-
     # Fetch API summary and profile HTML in parallel — both are needed but independent
     with ThreadPoolExecutor(max_workers=2) as pool:
         api_future = pool.submit(_summary_from_api, nombre, server)
@@ -599,15 +445,9 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
 
     # 1st attempt: dedicated talents page (has explicit "selected" class per spec)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    resp = None
-    for attempt in range(2):
-        resp = _warmane_get_with_scheme_fallback(
-            f"/character/{nombre}/{server}/talents", headers
-        )
-        if resp is not None:
-            break
-        if attempt == 0:
-            time.sleep(1)
+    resp = _warmane_get_with_scheme_fallback(
+        f"/character/{nombre}/{server}/talents", headers
+    )
     if resp is not None:
         soup = BeautifulSoup(resp.text, "html.parser")
         result = [
@@ -822,55 +662,40 @@ def _fetch_achievements(nombre: str, server: str):
     halion_25h_achieved = False
 
     def fetch_category(category_id: int):
-        for attempt in range(3):
-            achi_json = _warmane_post_json_with_scheme_fallback(
-                f"/character/{nombre}/{server}/achievements",
-                headers,
-                {"category": category_id},
-            )
-            if not isinstance(achi_json, dict):
-                if attempt < 2:
-                    time.sleep(1 + attempt)
-                continue
+        achi_json = _warmane_post_json_with_scheme_fallback(
+            f"/character/{nombre}/{server}/achievements",
+            headers,
+            {"category": category_id},
+        )
+        if not isinstance(achi_json, dict):
+            return []
+        if "content" not in achi_json:
+            return []
+        soup = BeautifulSoup(achi_json["content"], "html.parser")
+        all_achievements = soup.find_all("div", class_="achievement")
+        completed_achievements = []
+        for ach in all_achievements:
+            classes = ach.get("class") or []
+            if isinstance(classes, str):
+                class_list = classes.split()
+            elif isinstance(classes, list):
+                class_list = [str(value) for value in classes]
+            else:
+                class_list = []
+            if "locked" not in class_list:
+                completed_achievements.append(ach)
+        ids = []
+        for ach_div in completed_achievements:
+            ach_id_raw = ach_div.get("id")
+            if isinstance(ach_id_raw, list):
+                ach_id_raw = ach_id_raw[0] if ach_id_raw else ""
+            ach_id_full = str(ach_id_raw or "")
+            if ach_id_full.startswith("ach"):
+                ids.append(ach_id_full.replace("ach", ""))
+        return ids
 
-            content = achi_json.get("content", "")
-            if not isinstance(content, str) or not content.strip():
-                if attempt < 2:
-                    time.sleep(1 + attempt)
-                continue
-
-            soup = BeautifulSoup(content, "html.parser")
-            all_achievements = soup.find_all("div", class_="achievement")
-            completed_achievements = []
-            for ach in all_achievements:
-                classes = ach.get("class") or []
-                if isinstance(classes, str):
-                    class_list = classes.split()
-                elif isinstance(classes, list):
-                    class_list = [str(value) for value in classes]
-                else:
-                    class_list = []
-                if "locked" not in class_list:
-                    completed_achievements.append(ach)
-
-            ids = []
-            for ach_div in completed_achievements:
-                ach_id_raw = ach_div.get("id")
-                if isinstance(ach_id_raw, list):
-                    ach_id_raw = ach_id_raw[0] if ach_id_raw else ""
-                ach_id_full = str(ach_id_raw or "")
-                if ach_id_full.startswith("ach"):
-                    ids.append(ach_id_full.replace("ach", ""))
-
-            if ids or all_achievements:
-                return ids
-            if attempt < 2:
-                time.sleep(1 + attempt)
-        return []
-
-    # The bridge runs on a single browser session/lock; parallel category requests
-    # can race and return inconsistent achievement payloads. Fetch sequentially.
-    results = [fetch_category(category_id) for category_id in raid_categories]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(fetch_category, raid_categories))
 
     for ids in results:
         for ach_id in ids:
@@ -897,7 +722,7 @@ def _fetch_achievements(nombre: str, server: str):
                 elif key == "halion_25h":
                     halion_25h_achieved = True
 
-    # Rescue pass: transient bridge failures can miss the Ruby Sanctum category
+    # Rescue pass: transient upstream failures can miss the Ruby Sanctum category
     # while still returning partial achievements in other categories.
     if not any(ach_id in completed_ids for ach_id in target_achievements):
         for category_id in [14922, 14923]:
@@ -930,7 +755,7 @@ def _fetch_achievements(nombre: str, server: str):
         "storming_25h_achieved": "4632" in completed_ids,
     }
 
-    # If every target flag is false due to transient bridge issues, prefer stale cached data.
+    # If every target flag is false due to transient issues, prefer stale cached data.
     if not any(
         [
             payload["halion_10n_achieved"],
@@ -1032,19 +857,13 @@ def _fetch_gear_data(nombre: str, server: str):
     if cached is not None:
         return cached
 
-    gear_data = []
-    for attempt in range(3):
-        gear_data = profile_scraper.get_gear_data(nombre, server)
-        if isinstance(gear_data, list) and gear_data:
-            break
-        if attempt < 2:
-            time.sleep(1 + attempt)
+    gear_data = profile_scraper.get_gear_data(nombre, server)
 
     if not gear_data:
         stale = _cache_get_stale(GEAR_CACHE, cache_key)
         if isinstance(stale, list) and stale:
             logger.warning(
-                "Using stale gear cache for '%s'/%s after bridge gear fetch failure",
+                "Using stale gear cache for '%s'/%s after gear fetch failure",
                 nombre,
                 server,
             )
@@ -1062,17 +881,11 @@ def _fetch_statistics(nombre: str, server: str, category_id: int):
 
     stats_path = f"/character/{nombre}/{server}/statistics"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    js = None
-    for attempt in range(3):
-        js = _warmane_post_json_with_scheme_fallback(
-            stats_path,
-            headers,
-            {"category": category_id},
-        )
-        if isinstance(js, dict) and js.get("content"):
-            break
-        if attempt < 2:
-            time.sleep(1 + attempt)
+    js = _warmane_post_json_with_scheme_fallback(
+        stats_path,
+        headers,
+        {"category": category_id},
+    )
     if not isinstance(js, dict):
         stale = _cache_get_stale(STATS_CACHE, cache_key)
         if stale is not None:
