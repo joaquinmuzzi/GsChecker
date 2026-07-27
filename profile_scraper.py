@@ -1,6 +1,9 @@
 import json
+import logging
 import os
+import random
 import re
+import time
 from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
@@ -8,6 +11,52 @@ from bs4 import BeautifulSoup
 HEADERS = {"User-Agent": "GsChecker/1.0"}
 SESSION = requests.Session()
 ITEM_SESSION = requests.Session()
+
+logger = logging.getLogger("gschecker.profile_scraper")
+
+_RATE_LIMIT_MAX_ATTEMPTS = 3
+_RATE_LIMIT_BACKOFF_MIN = 3.0
+_RATE_LIMIT_BACKOFF_MAX = 5.0
+
+
+def _armory_get(url: str, timeout: int = 8):
+    # Retries armory requests up to 3 times on Cloudflare rate limits (429 / 5xx),
+    # sleeping the Retry-After header value or a jittered 3-5s otherwise.
+    last_resp = None
+    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
+        try:
+            resp = SESSION.get(url, headers=HEADERS, timeout=timeout)
+        except requests.RequestException:
+            return None
+        last_resp = resp
+        if resp.status_code == 200:
+            return resp
+        if resp.status_code != 429 and not (500 <= resp.status_code < 600):
+            return resp
+        if attempt >= _RATE_LIMIT_MAX_ATTEMPTS - 1:
+            break
+        retry_after = None
+        raw = resp.headers.get("Retry-After") if resp.headers else None
+        if raw:
+            try:
+                retry_after = float(raw)
+            except (TypeError, ValueError):
+                retry_after = None
+        delay = (
+            retry_after
+            if retry_after is not None
+            else random.uniform(_RATE_LIMIT_BACKOFF_MIN, _RATE_LIMIT_BACKOFF_MAX)
+        )
+        logger.warning(
+            "Armory rate-limited (status=%s) for url='%s', retrying (attempt %s/%s) in %.1fs",
+            resp.status_code,
+            url,
+            attempt + 1,
+            _RATE_LIMIT_MAX_ATTEMPTS,
+            delay,
+        )
+        time.sleep(delay)
+    return last_resp
 
 WOW_CLASSIC_CLASSES = {
     "Balance",
@@ -216,8 +265,8 @@ def get_specs(char_name: str, server: str) -> list[dict]:
         profile_url = (
             f"https://armory.warmane.com/character/{char_name}/{server}/profile"
         )
-        profile_resp = SESSION.get(profile_url, headers=HEADERS, timeout=8)
-        if profile_resp.status_code == 200:
+        profile_resp = _armory_get(profile_url)
+        if profile_resp is not None and profile_resp.status_code == 200:
             profile_soup = BeautifulSoup(profile_resp.text, "html.parser")
             profile_specs = []
             for text_node in profile_soup.select(
@@ -233,8 +282,8 @@ def get_specs(char_name: str, server: str) -> list[dict]:
                 return [{"name": profile_specs[0], "active": True}]
 
         url = f"https://armory.warmane.com/character/{char_name}/{server}/talents"
-        resp = SESSION.get(url, headers=HEADERS, timeout=8)
-        if resp.status_code != 200:
+        resp = _armory_get(url)
+        if resp is None or resp.status_code != 200:
             resp = None
         specs = []
         if resp is not None:
@@ -253,8 +302,8 @@ def get_specs(char_name: str, server: str) -> list[dict]:
         api_url = (
             f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
         )
-        api_resp = SESSION.get(api_url, headers=HEADERS, timeout=8)
-        if api_resp.status_code != 200:
+        api_resp = _armory_get(api_url)
+        if api_resp is None or api_resp.status_code != 200:
             return []
 
         payload = api_resp.json()
@@ -424,8 +473,8 @@ def parse_slot(slot):
 
 def get_gear_data(char_name: str, server: str = "Lordaeron"):
     url = f"http://armory.warmane.com/character/{char_name}/{server}"
-    resp = SESSION.get(url, headers=HEADERS, timeout=8)
-    if resp.status_code != 200:
+    resp = _armory_get(url)
+    if resp is None or resp.status_code != 200:
         return []
     soup = BeautifulSoup(resp.text, "html.parser")
     try:
@@ -576,8 +625,8 @@ def get_character_stats(
     """
     url = f"https://armory.warmane.com/character/{char_name}/{server}/summary"
     try:
-        resp = SESSION.get(url, headers=HEADERS, timeout=8)
-        if resp.status_code != 200:
+        resp = _armory_get(url)
+        if resp is None or resp.status_code != 200:
             return {}
         return _parse_character_stats_html(resp.text)
     except Exception:

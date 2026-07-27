@@ -1,5 +1,7 @@
 import logging
+import random
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote_plus
 
@@ -46,19 +48,66 @@ def _cache_get_stale(cache: dict, key):
     return entry[1]
 
 
+_RATE_LIMIT_MAX_ATTEMPTS = 3
+_RATE_LIMIT_BACKOFF_MIN = 3.0
+_RATE_LIMIT_BACKOFF_MAX = 5.0
+
+
+def _is_rate_limited(status_code: int) -> bool:
+    # Cloudflare returns 429 for both "Too Many Requests" and Error 1015
+    # (temporary IP ban). 5xx often means Cloudflare protecting the origin.
+    return status_code == 429 or 500 <= status_code < 600
+
+
+def _rate_limit_sleep(resp) -> None:
+    # Honor server-provided Retry-After when present, otherwise jittered 3-5s.
+    retry_after = None
+    if resp is not None:
+        raw = resp.headers.get("Retry-After") if resp.headers else None
+        if raw:
+            try:
+                retry_after = float(raw)
+            except (TypeError, ValueError):
+                retry_after = None
+    delay = (
+        retry_after
+        if retry_after is not None
+        else random.uniform(_RATE_LIMIT_BACKOFF_MIN, _RATE_LIMIT_BACKOFF_MAX)
+    )
+    time.sleep(delay)
+
+
 def _warmane_get_with_scheme_fallback(path: str, headers: dict):
     last_status = None
     last_error = None
-    for scheme in ("https", "http"):
-        url = f"{scheme}://armory.warmane.com{path}"
-        try:
-            resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
-        except Exception as exc:
-            last_error = str(exc)
-            continue
-        last_status = resp.status_code
-        if resp.status_code == 200:
-            return resp
+    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
+        rate_limited_resp = None
+        for scheme in ("https", "http"):
+            url = f"{scheme}://armory.warmane.com{path}"
+            try:
+                resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+            except Exception as exc:
+                last_error = str(exc)
+                continue
+            last_status = resp.status_code
+            if resp.status_code == 200:
+                return resp
+            if _is_rate_limited(resp.status_code):
+                rate_limited_resp = resp
+
+        if rate_limited_resp is None:
+            break
+
+        if attempt < _RATE_LIMIT_MAX_ATTEMPTS - 1:
+            logger.warning(
+                "Warmane rate-limited (status=%s) for path='%s', retrying (attempt %s/%s)",
+                last_status,
+                path,
+                attempt + 1,
+                _RATE_LIMIT_MAX_ATTEMPTS,
+            )
+            _rate_limit_sleep(rate_limited_resp)
+
     logger.warning(
         "Warmane request failed for path='%s' (last_status=%s, last_error=%s)",
         path,
@@ -71,7 +120,8 @@ def _warmane_get_with_scheme_fallback(path: str, headers: dict):
 def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict):
     last_status = None
     last_error = None
-    for _ in range(2):
+    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
+        rate_limited_resp = None
         for scheme in ("https", "http"):
             url = f"{scheme}://armory.warmane.com{path}"
             try:
@@ -83,6 +133,8 @@ def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict
                 continue
             last_status = resp.status_code
             if resp.status_code != 200:
+                if _is_rate_limited(resp.status_code):
+                    rate_limited_resp = resp
                 continue
             try:
                 payload = resp.json()
@@ -91,6 +143,20 @@ def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict
                 continue
             if isinstance(payload, dict):
                 return payload
+
+        if rate_limited_resp is None:
+            break
+
+        if attempt < _RATE_LIMIT_MAX_ATTEMPTS - 1:
+            logger.warning(
+                "Warmane POST rate-limited (status=%s) for path='%s', retrying (attempt %s/%s)",
+                last_status,
+                path,
+                attempt + 1,
+                _RATE_LIMIT_MAX_ATTEMPTS,
+            )
+            _rate_limit_sleep(rate_limited_resp)
+
     return None
 
 
