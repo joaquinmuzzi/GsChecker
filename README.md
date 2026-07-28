@@ -1,6 +1,6 @@
 # GsChecker
 
-Bot de Discord para consultar personajes de Warmane (WotLK), con foco en resumen de progreso PvE/PvP, calidad de equipo y DPS por boss.
+Bot de Discord para consultar personajes de Warmane (WotLK), con foco en resumen de progreso PvE, calidad de equipo y DPS por boss.
 
 Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 
@@ -19,7 +19,6 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
   - links a Armory y UwU Logs.
 - **DPS por boss** (máximo y promedio) vía uwu-logs.xyz, con overview rápido y tabla detallada.
 - **Trial of the Crusader**: logros 10N / 10H / 25N / 25H.
-- **Auditoría por IA**: análisis BiS + resumen de coach (Groq) sobre equipo actual.
 - **Cache en memoria + Postgres** (`external_api_cache`) para reducir requests al Armory / UwU.
 - **Retries con jittered backoff (3–5s)** para rate-limits Cloudflare del Armory (429 / 5xx).
 
@@ -31,7 +30,6 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 | `/p <nombre> [reino]`        | Alias corto de `/personaje`.                            | Configurable        |
 | `/dps <nombre> [spec]`       | DPS por boss desde UwU Logs.                            | Lordaeron           |
 | `/ptoc <nombre>`             | Logros ToC (10N/10H/25N/25H) en tabla.                  | Lordaeron           |
-| `/ia <nombre> [reino]`       | Auditoría BiS + coach summary por LLM (Groq).           | Configurable        |
 | `/ping`                      | Latencia actual del bot.                                | —                   |
 
 Reinos aceptados en `[reino]` (por defecto **Lordaeron**):
