@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import discord
 
@@ -47,6 +48,34 @@ from src.functions.embeds import (
 )
 from src.audit.integration import run_full_audit
 from src.audit.coach import build_fallback_summary
+
+logger = logging.getLogger("gschecker.commands")
+
+
+def _log_command_usage(
+    interaction: discord.Interaction,
+    command_name: str,
+    nombre: str,
+    realm: str,
+    **extra,
+) -> None:
+    # Single structured entry per command invocation. Appears in Railway Deploy Logs
+    # and in logs/bot.log via the root 'gschecker' logger configured in main.py.
+    user = interaction.user
+    guild = interaction.guild
+    extras = "".join(f" {key}={value!r}" for key, value in extra.items() if value is not None)
+    logger.info(
+        "command=%s user=%s(%s) guild=%s(%s) character=%r realm=%r%s",
+        command_name,
+        getattr(user, "name", "unknown"),
+        getattr(user, "id", "unknown"),
+        getattr(guild, "name", "DM"),
+        getattr(guild, "id", "dm"),
+        nombre,
+        realm,
+        extras,
+    )
+
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
 ITEM_SOURCE_TTL = 86400
@@ -722,14 +751,10 @@ async def _personaje_impl(
     command_name: str,
     reino: str | None = None,
 ):
-    server_name = interaction.guild.name if interaction.guild else "DM"
-    print(
-        f"[LOG] Comando '{command_name}' usado por {interaction.user} "
-        f"para personaje: {nombre} desde servidor: {server_name}"
-    )
     try:
         nombre = nombre.capitalize()
         realm = _normalize_character_realm(reino)
+        _log_command_usage(interaction, command_name, nombre, realm)
         await _safe_defer(interaction)
 
         personaje_cache_key = f"{_build_personaje_cache_key(nombre)}:{realm.lower()}"
@@ -1101,6 +1126,7 @@ async def _personaje_impl(
 def register_commands(bot):
     @bot.tree.command(name="ping", description="Muestra la latencia actual del bot.")
     async def ping(interaction: discord.Interaction):
+        _log_command_usage(interaction, "ping", "-", "-")
         await interaction.response.send_message(
             f"Pong! Latencia: {round(bot.latency * 1000)}ms"
         )
@@ -1146,13 +1172,9 @@ def register_commands(bot):
     async def dps(
         interaction: discord.Interaction, nombre: str, spec: str | None = None
     ):
-        server_name = interaction.guild.name if interaction.guild else "DM"
-        print(
-            f"[LOG] Comando 'dps' usado por {interaction.user} "
-            f"para personaje: {nombre} DESDE SERVIDOR: {server_name}"
-        )
         try:
             nombre = nombre.capitalize()
+            _log_command_usage(interaction, "dps", nombre, "Lordaeron", spec=spec)
             spec_display = f" [{spec.upper()}]" if spec else ""
             await _safe_defer(interaction)
 
@@ -1395,13 +1417,9 @@ def register_commands(bot):
     )
     @discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
     async def ptoc(interaction: discord.Interaction, nombre: str):
-        server_name = interaction.guild.name if interaction.guild else "DM"
-        print(
-            f"[LOG] Comando 'ptoc' usado por {interaction.user} "
-            f"para personaje: {nombre} DESDE SERVIDOR: {server_name}"
-        )
         try:
             nombre = nombre.capitalize()
+            _log_command_usage(interaction, "ptoc", nombre, "Lordaeron")
             await _safe_defer(interaction)
 
             loop = asyncio.get_running_loop()
@@ -1472,14 +1490,10 @@ def register_commands(bot):
         nombre: str,
         reino: str | None = None,
     ):
-        server_name = interaction.guild.name if interaction.guild else "DM"
-        print(
-            f"[LOG] Comando 'ia' usado por {interaction.user} "
-            f"para personaje: {nombre} desde servidor: {server_name}"
-        )
         try:
             nombre = nombre.capitalize()
             realm = _normalize_character_realm(reino)
+            _log_command_usage(interaction, "ia", nombre, realm)
             await _safe_defer(interaction)
 
             await _safe_edit_original_response(

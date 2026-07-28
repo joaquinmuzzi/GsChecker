@@ -12,5 +12,12 @@ def _cache_get(cache: dict, key, ttl: int):
     return value
 
 
+def _cache_get_stale(cache: dict, key):
+    entry = cache.get(key)
+    if not entry:
+        return None
+    return entry[1]
+
+
 def _cache_set(cache: dict, key, value):
     cache[key] = (time.time(), value)

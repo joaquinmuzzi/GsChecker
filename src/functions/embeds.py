@@ -165,69 +165,6 @@ def _extract_icc_boss_kills(stats_rows):
     return icc_10, icc_25
 
 
-def _extract_toc_boss_kills(stats_rows):
-    boss_patterns = {
-        "Beasts": ["Beasts of Northrend"],
-        "Jaraxxus": ["Lord Jaraxxus"],
-        "Faction Champs": ["Faction Champions"],
-        "Val'kyr Twins": ["Val'kyr Twins", "Valkyr Twins"],
-        "Anub'arak": ["Anub'arak", "Anubarak"],
-    }
-
-    def parse_value(val: str) -> int:
-        if not val or val.strip() in {"- -", "--"}:
-            return 0
-        numbers = re.findall(r"\d+", str(val).replace(",", ""))
-        if not numbers:
-            return 0
-        try:
-            return max(int(num) for num in numbers)
-        except Exception:
-            return 0
-
-    toc_10 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
-    toc_25 = {name: {"nm": 0, "hc": 0} for name in boss_patterns}
-
-    for desc, val in stats_rows:
-        if (
-            "Trial of the Crusader" not in desc
-            and "Trial of the Grand Crusader" not in desc
-        ):
-            continue
-        if "Trial of the Champion" in desc:
-            continue
-        value = parse_value(val)
-        if value <= 0:
-            continue
-        is_10 = "10 player" in desc
-        is_25 = "25 player" in desc
-        is_hc = "Trial of the Grand Crusader" in desc
-        if not (is_10 or is_25):
-            continue
-        if (
-            "Times completed the Trial of the Crusader" in desc
-            or "Times completed the Trial of the Grand Crusader" in desc
-        ):
-            if is_10:
-                key = "hc" if is_hc else "nm"
-                toc_10["Anub'arak"][key] = max(toc_10["Anub'arak"][key], value)
-            if is_25:
-                key = "hc" if is_hc else "nm"
-                toc_25["Anub'arak"][key] = max(toc_25["Anub'arak"][key], value)
-            continue
-        for boss_name, patterns in boss_patterns.items():
-            if any(pat in desc for pat in patterns):
-                if is_10:
-                    key = "hc" if is_hc else "nm"
-                    toc_10[boss_name][key] = max(toc_10[boss_name][key], value)
-                if is_25:
-                    key = "hc" if is_hc else "nm"
-                    toc_25[boss_name][key] = max(toc_25[boss_name][key], value)
-                break
-
-    return toc_10, toc_25
-
-
 def _format_boss_rows(
     bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, loading_symbol="?"
 ):

@@ -23,7 +23,7 @@ from src.schemas.constants import (
     GUILD_RANK_CACHE,
     GUILD_RANK_TTL,
 )
-from src.functions.cache import _cache_get, _cache_set
+from src.functions.cache import _cache_get, _cache_get_stale, _cache_set
 
 WOW_CLASSES = (
     "Death Knight",
@@ -39,13 +39,6 @@ WOW_CLASSES = (
 )
 
 logger = logging.getLogger("gschecker.warmane")
-
-
-def _cache_get_stale(cache: dict, key):
-    entry = cache.get(key)
-    if not entry:
-        return None
-    return entry[1]
 
 
 _RATE_LIMIT_MAX_ATTEMPTS = 3

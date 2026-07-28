@@ -1,9 +1,12 @@
 import asyncio
 import json
+import logging
 import os
 from contextlib import contextmanager
 
 import psycopg
+
+logger = logging.getLogger("gschecker.postgres")
 
 
 def get_database_url() -> str:
@@ -37,7 +40,7 @@ def _get_connection():
 
 def init_database() -> bool:
     if not db_enabled():
-        print("[INFO] Postgres no configurado. Se usará solo caché en memoria.")
+        logger.info("Postgres no configurado. Se usará solo caché en memoria.")
         return False
 
     with _get_connection() as conn:
@@ -58,7 +61,7 @@ def init_database() -> bool:
                 """)
         conn.commit()
 
-    print("[INFO] Postgres inicializado correctamente.")
+    logger.info("Postgres inicializado correctamente.")
     return True
 
 
@@ -85,7 +88,7 @@ def get_external_cache(source: str, cache_key: str, ttl_seconds: int):
                     return None
                 return json.loads(row[0])
     except Exception as exc:
-        print(f"[WARN] Error leyendo caché Postgres ({source}): {exc}")
+        logger.warning("Error leyendo caché Postgres (%s): %s", source, exc)
         return None
 
 
@@ -127,7 +130,7 @@ def set_external_cache(
                 )
             conn.commit()
     except Exception as exc:
-        print(f"[WARN] Error guardando caché Postgres ({source}): {exc}")
+        logger.warning("Error guardando caché Postgres (%s): %s", source, exc)
 
 
 def find_character_spec_gs_by_metadata(
@@ -191,8 +194,11 @@ def find_character_spec_gs_by_metadata(
                     return None
                 return json.loads(row[0])
     except Exception as exc:
-        print(
-            f"[WARN] Error buscando spec GS por metadata ({character_name}/{server}): {exc}"
+        logger.warning(
+            "Error buscando spec GS por metadata (%s/%s): %s",
+            character_name,
+            server,
+            exc,
         )
         return None
 

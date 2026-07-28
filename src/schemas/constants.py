@@ -72,17 +72,6 @@ UWU_BOSS_SHORT = {
 
 UWU_MODES_ALL = ("10N", "10H", "25N", "25H")
 
-UWU_PDPS_EXCLUDED_BOSSES = {
-    "Anub'arak",
-    "Halion",
-    "Valithria Dreamwalker",
-    "Blood Prince Council",
-    "Blood-Queen Lana'thel",
-    "Lady Deathwhisper",
-    "Sindragosa",
-    "Toravon the Ice Watcher",
-}
-
 UWU_PDPS_BOSS_ORDER = [
     "Lord Marrowgar",
     "Deathbringer Saurfang",

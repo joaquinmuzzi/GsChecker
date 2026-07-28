@@ -51,7 +51,7 @@ def configure_logging() -> logging.Logger:
     return logger
 
 
-def acquire_lock(lock_path: str) -> None:
+def acquire_lock(lock_path: str, log: logging.Logger) -> None:
     if os.path.exists(lock_path):
         try:
             with open(lock_path, "r", encoding="utf-8") as f:
@@ -59,7 +59,7 @@ def acquire_lock(lock_path: str) -> None:
             if pid_str:
                 pid = int(pid_str)
                 os.kill(pid, 0)
-                print(f"Otro proceso del bot ya esta corriendo (PID {pid}). Saliendo.")
+                log.warning("Otro proceso del bot ya esta corriendo (PID %s). Saliendo.", pid)
                 sys.exit(1)
         except ProcessLookupError:
             pass
@@ -80,9 +80,9 @@ def acquire_lock(lock_path: str) -> None:
 
 
 load_dotenv()
-init_database()
 logger = configure_logging()
-acquire_lock(LOCK_PATH)
+init_database()
+acquire_lock(LOCK_PATH, logger)
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
