@@ -171,7 +171,7 @@ Al escribir cache **nunca** se persiste una respuesta vacía — sólo respuesta
 
 ## Ejemplo
 
-![Ejemplo del bot](docs/ejemplo.png)
+![Ejemplo del bot](docs/ejemplo.jpeg)
 
 ## Code Reuse
 
