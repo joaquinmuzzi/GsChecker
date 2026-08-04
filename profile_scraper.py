@@ -240,7 +240,10 @@ def _load_socket_cache() -> dict:
     try:
         with open(CACHE_PATH, "r", encoding="utf-8") as f:
             _SOCKET_CACHE = json.load(f)
-    except Exception:
+    except FileNotFoundError:
+        _SOCKET_CACHE = {}
+    except (OSError, json.JSONDecodeError):
+        logger.exception("failed to load socket cache from %s", CACHE_PATH)
         _SOCKET_CACHE = {}
     return _SOCKET_CACHE
 
@@ -252,7 +255,10 @@ def _load_gem_data() -> dict:
     try:
         with open(GEM_DATA_PATH, "r", encoding="utf-8") as f:
             _GEM_DATA = json.load(f)
-    except Exception:
+    except FileNotFoundError:
+        _GEM_DATA = {}
+    except (OSError, json.JSONDecodeError):
+        logger.exception("failed to load gem data from %s", GEM_DATA_PATH)
         _GEM_DATA = {}
     return _GEM_DATA
 
@@ -284,8 +290,8 @@ def _save_socket_cache(cache: dict) -> None:
         os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
         with open(CACHE_PATH, "w", encoding="utf-8") as f:
             json.dump(cache, f)
-    except Exception:
-        pass
+    except OSError:
+        logger.exception("failed to persist socket cache to %s", CACHE_PATH)
 
 
 def get_specs(char_name: str, server: str) -> list[dict]:
@@ -354,7 +360,9 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             )
         return specs
     except Exception:
-        pass
+        logger.exception(
+            "get_specs failed for '%s'/%s", char_name, server
+        )
     return []
 
 
@@ -365,7 +373,10 @@ def _load_slot_cache() -> dict:
     try:
         with open(SLOT_CACHE_PATH, "r", encoding="utf-8") as f:
             _SLOT_CACHE = json.load(f)
-    except Exception:
+    except FileNotFoundError:
+        _SLOT_CACHE = {}
+    except (OSError, json.JSONDecodeError):
+        logger.exception("failed to load slot cache from %s", SLOT_CACHE_PATH)
         _SLOT_CACHE = {}
     return _SLOT_CACHE
 
@@ -375,8 +386,8 @@ def _save_slot_cache(cache: dict) -> None:
         os.makedirs(os.path.dirname(SLOT_CACHE_PATH), exist_ok=True)
         with open(SLOT_CACHE_PATH, "w", encoding="utf-8") as f:
             json.dump(cache, f)
-    except Exception:
-        pass
+    except OSError:
+        logger.exception("failed to persist slot cache to %s", SLOT_CACHE_PATH)
 
 
 def _get_raw_stats(page_text: str) -> str:
@@ -423,6 +434,7 @@ def get_item_equip_slot(item_id: str) -> str:
         _save_slot_cache(cache)
         return equip_slot
     except Exception:
+        logger.exception("get_item_equip_slot failed for item_id=%s", item_id)
         return ""
 
 
@@ -459,6 +471,7 @@ def get_item_socket_count(item_id: str) -> int:
         _save_socket_cache(cache)
         return count
     except Exception:
+        logger.exception("get_item_socket_count failed for item_id=%s", item_id)
         return 0
 
 
@@ -507,7 +520,12 @@ def get_gear_data(char_name: str, server: str = "Lordaeron"):
     soup = BeautifulSoup(resp.text, "html.parser")
     try:
         equipment = soup.find(class_="item-model").find_all("a")
-    except Exception:
+    except AttributeError:
+        logger.warning(
+            "get_gear_data: no .item-model in HTML for '%s'/%s (page changed or empty)",
+            char_name,
+            server,
+        )
         return []
     gear_data = []
     for idx, slot in enumerate(equipment):
@@ -658,6 +676,9 @@ def get_character_stats(
             return {}
         return _parse_character_stats_html(resp.text)
     except Exception:
+        logger.exception(
+            "get_character_stats failed for '%s'/%s", char_name, server
+        )
         return {}
 
 
@@ -678,6 +699,7 @@ def _parse_character_stats_html(html: str) -> dict[str, float]:
             return {}
         text = stats_div.get_text(" ", strip=True)
     except Exception:
+        logger.exception("_parse_character_stats_html failed")
         return {}
 
     result: dict[str, float] = {}
