@@ -288,6 +288,9 @@ def _fetch_item_source_hint(item_id: str) -> dict:
                 "deathwhisper": "lady deathwhisper" in lowered,
             }
     except Exception:
+        logger.exception(
+            "wowhead item-source hint failed for item_id=%s", clean_item_id
+        )
         payload = {"marrowgar": False, "deathwhisper": False}
 
     set_external_cache(
@@ -742,7 +745,7 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
             else:
                 await interaction.response.send_message(message)
         except Exception:
-            pass
+            logger.exception("_safe_send_error: retry send failed")
 
 
 async def _personaje_impl(
@@ -861,6 +864,11 @@ async def _personaje_impl(
             else:
                 gs = summary.get("gearScore", "N/A")
         except Exception:
+            logger.exception(
+                "gearscore calc failed for '%s'/%s — falling back to armory gearScore",
+                nombre_char,
+                realm,
+            )
             gs = summary.get("gearScore", "N/A")
 
         try:
@@ -868,6 +876,9 @@ async def _personaje_impl(
                 profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
             )
         except Exception:
+            logger.exception(
+                "missing enchants/gems calc failed for '%s'/%s", nombre_char, realm
+            )
             missing_enchants, missing_gems = [], []
 
         try:
@@ -875,6 +886,9 @@ async def _personaje_impl(
                 gear_data, clase, active_specs[0] if active_specs else ""
             )
         except Exception:
+            logger.exception(
+                "suboptimal gems calc failed for '%s'/%s", nombre_char, realm
+            )
             suboptimal_gems = []
 
         guild_obj = summary.get("guild")
@@ -890,6 +904,12 @@ async def _personaje_impl(
                     realm,
                 )
             except Exception:
+                logger.exception(
+                    "guild rank fetch failed for '%s' guild='%s'/%s",
+                    nombre_char,
+                    guild,
+                    realm,
+                )
                 guild_rank = None
 
         for active_spec in active_specs:
@@ -1027,6 +1047,9 @@ async def _personaje_impl(
         try:
             uwu_icc_kills = await uwu_icc_task
         except Exception:
+            logger.exception(
+                "uwu icc kills fetch failed for '%s'/%s", nombre_char, realm
+            )
             uwu_icc_kills = {}
 
         uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
