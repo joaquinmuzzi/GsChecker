@@ -21,5 +21,19 @@ build-backend = "poetry.core.masonry.api"
 
 [dependency-groups]
 dev = [
-    "black (>=26.1.0,<27.0.0)"
+    "black (>=26.1.0,<27.0.0)",
+    "pytest (>=8.0)",
+    "pytest-asyncio (>=0.23)",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+    "ignore::DeprecationWarning:discord.*",
 ]
