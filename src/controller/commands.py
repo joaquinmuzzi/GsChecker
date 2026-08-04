@@ -819,6 +819,25 @@ async def _personaje_impl(
             )
             return
 
+        stale_payload = await async_get_external_cache_stale(
+            "command_personaje", personaje_cache_key
+        )
+        if isinstance(stale_payload, dict):
+            logger.info(
+                "Serving stale DB cache for '%s'/%s (armory not tried yet)",
+                nombre,
+                realm,
+            )
+            embed_stale = _build_personaje_embed_from_cache(stale_payload)
+            view_stale = _build_personaje_view(
+                stale_payload["nombre_char"],
+                stale_payload.get("server", DEFAULT_CHARACTER_REALM),
+            )
+            await _safe_edit_original_response(
+                interaction, content=None, embed=embed_stale, view=view_stale
+            )
+            return
+
         await _safe_edit_original_response(
             interaction,
             content=f"⏳ Calculando perfil de {nombre} en {realm}...",
