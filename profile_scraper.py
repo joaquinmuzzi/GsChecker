@@ -8,33 +8,61 @@ from functools import lru_cache
 import requests
 from bs4 import BeautifulSoup
 
+from src.functions.rate_limit import is_cf_1015
+from src.schemas.constants import (
+    ARMORY_BACKOFF_MAX,
+    ARMORY_BACKOFF_MIN,
+    ARMORY_CIRCUIT,
+    ARMORY_LIMITER,
+    ARMORY_MAX_ATTEMPTS,
+    SESSION,
+)
+
 HEADERS = {"User-Agent": "GsChecker/1.0"}
-SESSION = requests.Session()
 ITEM_SESSION = requests.Session()
 
 logger = logging.getLogger("gschecker.profile_scraper")
 
-_RATE_LIMIT_MAX_ATTEMPTS = 3
-_RATE_LIMIT_BACKOFF_MIN = 3.0
-_RATE_LIMIT_BACKOFF_MAX = 5.0
-
 
 def _armory_get(url: str, timeout: int = 8):
-    # Retries armory requests up to 3 times on Cloudflare rate limits (429 / 5xx),
-    # sleeping the Retry-After header value or a jittered 3-5s otherwise.
+    """GET al armory con circuit breaker + token bucket + backoff 8-20s.
+
+    Idéntico contrato al de warmane._armory_request pero por URL absoluta,
+    para no romper los call-sites históricos de este módulo.
+    """
+    if ARMORY_CIRCUIT.is_open():
+        logger.info(
+            "armory circuit open (%.0fs left), skipping url='%s'",
+            ARMORY_CIRCUIT.seconds_until_close(),
+            url,
+        )
+        return None
+
     last_resp = None
-    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
+    for attempt in range(ARMORY_MAX_ATTEMPTS):
+        ARMORY_LIMITER.acquire()
         try:
             resp = SESSION.get(url, headers=HEADERS, timeout=timeout)
         except requests.RequestException:
             return None
+
         last_resp = resp
+
+        if is_cf_1015(resp.text):
+            ARMORY_CIRCUIT.record_failure(fatal=True, reason=f"1015 on {url}")
+            return None
+
         if resp.status_code == 200:
+            ARMORY_CIRCUIT.record_success()
             return resp
+
         if resp.status_code != 429 and not (500 <= resp.status_code < 600):
             return resp
-        if attempt >= _RATE_LIMIT_MAX_ATTEMPTS - 1:
+
+        ARMORY_CIRCUIT.record_failure(reason=f"status={resp.status_code} on {url}")
+        if ARMORY_CIRCUIT.is_open() or attempt >= ARMORY_MAX_ATTEMPTS - 1:
             break
+
         retry_after = None
         raw = resp.headers.get("Retry-After") if resp.headers else None
         if raw:
@@ -45,14 +73,14 @@ def _armory_get(url: str, timeout: int = 8):
         delay = (
             retry_after
             if retry_after is not None
-            else random.uniform(_RATE_LIMIT_BACKOFF_MIN, _RATE_LIMIT_BACKOFF_MAX)
+            else random.uniform(ARMORY_BACKOFF_MIN, ARMORY_BACKOFF_MAX)
         )
         logger.warning(
-            "Armory rate-limited (status=%s) for url='%s', retrying (attempt %s/%s) in %.1fs",
+            "armory rate-limited (status=%s) url='%s' retry %s/%s in %.1fs",
             resp.status_code,
             url,
             attempt + 1,
-            _RATE_LIMIT_MAX_ATTEMPTS,
+            ARMORY_MAX_ATTEMPTS,
             delay,
         )
         time.sleep(delay)
