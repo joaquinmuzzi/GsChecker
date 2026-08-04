@@ -8,7 +8,7 @@ Uso:
 Configurable por env vars:
     PRELOAD_TXT_PATH        Ruta al txt semilla (default: data/tracked_characters.txt)
     PRELOAD_DEFAULT_REALM   Reino asumido cuando el txt no lo especifica (default: Lordaeron)
-    PRELOAD_DELAY_SECONDS   Pausa entre personajes (default: 2.0)
+    PRELOAD_DELAY_SECONDS   Pausa entre personajes (default: 5.0)
     PRELOAD_MAX_CHARACTERS  Corte duro para tandas grandes (default: 0 = sin límite)
 """
 from __future__ import annotations
@@ -26,6 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from dotenv import load_dotenv
 
 from src.db.postgres import init_database, list_tracked_characters
+from src.schemas.constants import ARMORY_CIRCUIT
 from tools.preload_character_gs import (
     _calculate_character_gs,
     _normalize_name,
@@ -38,7 +39,7 @@ logger = logging.getLogger("gschecker.preload_cron")
 
 DEFAULT_TXT_PATH = "data/tracked_characters.txt"
 DEFAULT_REALM = "Lordaeron"
-DEFAULT_DELAY = 2.0
+DEFAULT_DELAY = 5.0
 
 
 def _configure_logging() -> None:
@@ -149,6 +150,13 @@ def main() -> int:
     run_start = time.time()
 
     for idx, (nombre, realm) in enumerate(all_pairs, start=1):
+        while ARMORY_CIRCUIT.is_open():
+            wait_s = int(ARMORY_CIRCUIT.seconds_until_close()) + 1
+            logger.warning(
+                "Circuit abierto, esperando %ss antes de continuar...", wait_s
+            )
+            time.sleep(min(wait_s, 30))
+
         elapsed = max(time.time() - run_start, 0.001)
         speed = (idx - 1) / elapsed if idx > 1 else 0
         remaining = max(len(all_pairs) - (idx - 1), 0)
