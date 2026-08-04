@@ -1150,9 +1150,12 @@ def register_commands(bot):
     @bot.tree.command(name="ping", description="Muestra la latencia actual del bot.")
     async def ping(interaction: discord.Interaction):
         _log_command_usage(interaction, "ping", "-", "-")
-        await interaction.response.send_message(
-            f"Pong! Latencia: {round(bot.latency * 1000)}ms"
-        )
+        latency = bot.latency
+        if not isinstance(latency, float) or latency != latency or latency < 0:
+            latency_display = "n/a"
+        else:
+            latency_display = f"{round(latency * 1000)}ms"
+        await interaction.response.send_message(f"Pong! Latencia: {latency_display}")
 
     @bot.tree.command(
         name="personaje",

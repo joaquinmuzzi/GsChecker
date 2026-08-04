@@ -44,3 +44,19 @@ async def test_ping_responds_with_latency(bot, interaction):
     assert sent.content is not None
     assert "Pong" in sent.content
     assert "42ms" in sent.content
+
+
+@pytest.mark.asyncio
+async def test_ping_handles_nan_latency_gracefully(bot, interaction):
+    """When bot isn't connected discord.py returns NaN — must not crash."""
+    ping_cmd = _find_command(bot, "ping")
+
+    with patch.object(
+        commands.Bot, "latency", new_callable=PropertyMock, return_value=float("nan")
+    ):
+        await ping_cmd.callback(interaction)
+
+    sent = interaction.last_sent()
+    assert sent is not None
+    assert sent.content is not None
+    assert "n/a" in sent.content.lower()
