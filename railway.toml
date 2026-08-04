@@ -2,6 +2,5 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "bash ./run_railway.sh"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
