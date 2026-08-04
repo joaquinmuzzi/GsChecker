@@ -2,6 +2,8 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from discord.ext import commands
 
+from src.functions.rate_limit import CircuitBreaker, TokenBucket
+
 PREFIX = commands.when_mentioned
 
 HTTP_TIMEOUT = 8
@@ -150,3 +152,24 @@ UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
 # ---------- Shared HTTP session / executor ----------
 SESSION = requests.Session()
 EXECUTOR = ThreadPoolExecutor(max_workers=6)
+
+# ---------- Armory throttle + circuit breaker ----------
+# Medición en vivo (Cloudflare del armory): ~5-6 requests / 10s por IP antes de 429.
+# Con rate=0.5 (1 req / 2s) y burst=3 nunca deberíamos disparar el rate limit.
+ARMORY_LIMITER = TokenBucket(rate=0.5, capacity=3)
+
+# El circuit se abre 60s tras 3× 429/5xx en 30s, o 90s inmediatamente si
+# detectamos "error code: 1015" en el body (IP baneada por Cloudflare).
+ARMORY_CIRCUIT = CircuitBreaker(
+    failure_threshold=3,
+    open_duration_s=60.0,
+    fatal_open_duration_s=90.0,
+    failure_window_s=30.0,
+)
+
+# ---------- Backoff cuando el armory devuelve 429 / 5xx ----------
+# Antes: 3-5s / 3 intentos. Medido en vivo: cuando llega 1015, el desbloqueo
+# tarda ~30-60s, así que reintentar rápido solo prolonga el ban.
+ARMORY_BACKOFF_MIN = 8.0
+ARMORY_BACKOFF_MAX = 20.0
+ARMORY_MAX_ATTEMPTS = 4
