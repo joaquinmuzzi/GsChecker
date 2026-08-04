@@ -209,6 +209,33 @@ def get_external_cache(source: str, cache_key: str, ttl_seconds: int):
         return None
 
 
+def get_external_cache_stale(source: str, cache_key: str):
+    if not db_enabled():
+        return None
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT payload_json, fetched_at
+                    FROM external_api_cache
+                    WHERE source = %s
+                      AND cache_key = %s
+                    ORDER BY fetched_at DESC
+                    LIMIT 1
+                    """,
+                    (source, cache_key),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                return json.loads(row[0])
+    except Exception as exc:
+        logger.warning("Error leyendo caché stale Postgres (%s): %s", source, exc)
+        return None
+
+
 def set_external_cache(
     source: str,
     endpoint: str,
@@ -327,6 +354,10 @@ def find_character_spec_gs_by_metadata(
 
 async def async_get_external_cache(source: str, cache_key: str, ttl_seconds: int):
     return await asyncio.to_thread(get_external_cache, source, cache_key, ttl_seconds)
+
+
+async def async_get_external_cache_stale(source: str, cache_key: str):
+    return await asyncio.to_thread(get_external_cache_stale, source, cache_key)
 
 
 async def async_set_external_cache(

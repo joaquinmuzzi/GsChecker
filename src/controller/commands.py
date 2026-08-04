@@ -7,6 +7,7 @@ import gearscore
 import profile_scraper
 from src.db.postgres import (
     async_get_external_cache,
+    async_get_external_cache_stale,
     async_set_external_cache,
     async_track_character_lookup,
     find_character_spec_gs_by_metadata,
@@ -14,6 +15,7 @@ from src.db.postgres import (
     set_external_cache,
 )
 from src.schemas.constants import (
+    ARMORY_CIRCUIT,
     CHARACTER_SPEC_GS_TTL,
     COMMAND_DPS_TTL,
     COMMAND_PERSONAJE_TTL,
@@ -783,6 +785,37 @@ async def _personaje_impl(
             )
             await _safe_edit_original_response(
                 interaction, content=None, embed=embed_cached, view=view_cached
+            )
+            return
+
+        if ARMORY_CIRCUIT.is_open():
+            stale_payload = await async_get_external_cache_stale(
+                "command_personaje", personaje_cache_key
+            )
+            if isinstance(stale_payload, dict):
+                logger.warning(
+                    "Armory circuit open — serving stale DB cache for '%s'/%s",
+                    nombre,
+                    realm,
+                )
+                embed_stale = _build_personaje_embed_from_cache(stale_payload)
+                view_stale = _build_personaje_view(
+                    stale_payload["nombre_char"],
+                    stale_payload.get("server", DEFAULT_CHARACTER_REALM),
+                )
+                await _safe_edit_original_response(
+                    interaction, content=None, embed=embed_stale, view=view_stale
+                )
+                return
+            logger.warning(
+                "Armory circuit open and no stale cache for '%s'/%s — showing error",
+                nombre,
+                realm,
+            )
+            await _safe_edit_original_response(
+                interaction,
+                content=f"⚠️ El armory de Warmane está rate-limitado. Intenta de nuevo en ~60s.",
+                embed=None,
             )
             return
 
