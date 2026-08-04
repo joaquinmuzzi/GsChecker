@@ -434,9 +434,6 @@ def _get_known_gs_by_spec(
         if not clean_name or clean_name == "N/A" or clean_name in seen:
             continue
         seen.add(clean_name)
-        if clean_name in active_specs and current_gs not in {None, "N/A"}:
-            result[clean_name] = current_gs
-            continue
 
         cache_payload = None
         for lookup_spec_name in _spec_lookup_candidates(clean_name):
@@ -478,6 +475,8 @@ def _get_known_gs_by_spec(
 
         if isinstance(cache_payload, dict):
             result[clean_name] = cache_payload.get("gs")
+        elif current_gs not in {None, "N/A"}:
+            result[clean_name] = current_gs
     return result
 
 
