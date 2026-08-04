@@ -207,7 +207,13 @@ def _fetch_api_summary(nombre: str, server: str) -> dict | None:
         return None
     try:
         payload = resp.json()
-    except Exception:
+    except ValueError:
+        logger.warning(
+            "api summary returned non-JSON for '%s'/%s (first 120 chars: %r)",
+            nombre,
+            server,
+            resp.text[:120] if resp.text else "",
+        )
         return None
 
     if not isinstance(payload, dict) or payload.get("error"):
