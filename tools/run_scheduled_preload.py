@@ -120,6 +120,23 @@ def main() -> int:
     delay = float(os.getenv("PRELOAD_DELAY_SECONDS", str(DEFAULT_DELAY)))
     max_characters = int(os.getenv("PRELOAD_MAX_CHARACTERS", "0"))
 
+    from datetime import datetime
+    today = datetime.now()
+    if today.day == 1:
+        logger.info("Día 1 del mes — ejecutando filter_high_gs primero...")
+        try:
+            from tools.filter_high_gs import main as filter_main
+            import sys
+            old_argv = sys.argv
+            sys.argv = ["filter_high_gs", "--delay", "2"]
+            try:
+                filter_main()
+            finally:
+                sys.argv = old_argv
+            logger.info("Filter completado, continuando con preload...")
+        except Exception as exc:
+            logger.warning("Filter falló (continuando con preload): %s", exc)
+
     init_database()
 
     txt_pairs = _load_from_txt(txt_path, default_realm)
