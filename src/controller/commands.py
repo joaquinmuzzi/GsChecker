@@ -568,6 +568,41 @@ def _serialize_personaje_payload(
     }
 
 
+def _is_valid_personaje_payload(payload: dict) -> bool:
+    """Return True if the payload has enough quality to be cached.
+
+    Rejects partial armory responses where critical fields are missing or
+    nonsensical (e.g. spec names containing GS values, empty boss counts
+    when data should exist).  This prevents corrupt data from being served
+    for the entire COMMAND_PERSONAJE_TTL window.
+    """
+    nombre = payload.get("nombre_char")
+    if not nombre or not isinstance(nombre, str) or not nombre.strip():
+        return False
+
+    nivel = payload.get("nivel")
+    if nivel != 80:
+        return False
+
+    gs = payload.get("gs")
+    if gs is None:
+        return False
+
+    clase = payload.get("clase")
+    if not clase or not isinstance(clase, str) or clase == "N/A":
+        return False
+
+    raza = payload.get("raza")
+    if not raza or not isinstance(raza, str) or raza == "N/A":
+        return False
+
+    spec_display = payload.get("spec_display")
+    if spec_display is None:
+        return False
+
+    return True
+
+
 def _build_personaje_embed_from_cache(payload: dict):
     return _build_personaje_embed(
         payload["nombre_char"],
@@ -816,25 +851,6 @@ async def _personaje_impl(
                 interaction,
                 content=f"⚠️ El armory de Warmane está rate-limitado. Intenta de nuevo en ~60s.",
                 embed=None,
-            )
-            return
-
-        stale_payload = await async_get_external_cache_stale(
-            "command_personaje", personaje_cache_key
-        )
-        if isinstance(stale_payload, dict):
-            logger.info(
-                "Serving stale DB cache for '%s'/%s (armory not tried yet)",
-                nombre,
-                realm,
-            )
-            embed_stale = _build_personaje_embed_from_cache(stale_payload)
-            view_stale = _build_personaje_view(
-                stale_payload["nombre_char"],
-                stale_payload.get("server", DEFAULT_CHARACTER_REALM),
-            )
-            await _safe_edit_original_response(
-                interaction, content=None, embed=embed_stale, view=view_stale
             )
             return
 
@@ -1176,36 +1192,44 @@ async def _personaje_impl(
             active_spec_name=active_spec_name,
             suboptimal_gems=suboptimal_gems,
         )
-        await async_set_external_cache(
-            "command_personaje",
-            f"/{command_name}",
-            personaje_cache_key,
-            _serialize_personaje_payload(
+        _payload_to_cache = _serialize_personaje_payload(
+            nombre_char,
+            realm,
+            gs,
+            nivel,
+            raza,
+            clase,
+            spec_display,
+            guild_display,
+            guild_rank,
+            halion_10n_achieved,
+            halion_10h_achieved,
+            halion_25n_achieved,
+            halion_25h_achieved,
+            icc_10,
+            icc_25,
+            missing_enchants,
+            missing_gems,
+            uwu_icc_kills,
+            spec_gs_entries,
+            active_spec_name,
+            professions,
+            suboptimal_gems,
+        )
+        if _is_valid_personaje_payload(_payload_to_cache):
+            await async_set_external_cache(
+                "command_personaje",
+                f"/{command_name}",
+                personaje_cache_key,
+                _payload_to_cache,
+                {"character": nombre_char, "command": command_name, "server": realm},
+            )
+        else:
+            logger.warning(
+                "Skipping cache write for '%s'/%s — payload failed validation",
                 nombre_char,
                 realm,
-                gs,
-                nivel,
-                raza,
-                clase,
-                spec_display,
-                guild_display,
-                guild_rank,
-                halion_10n_achieved,
-                halion_10h_achieved,
-                halion_25n_achieved,
-                halion_25h_achieved,
-                icc_10,
-                icc_25,
-                missing_enchants,
-                missing_gems,
-                uwu_icc_kills,
-                spec_gs_entries,
-                active_spec_name,
-                professions,
-                suboptimal_gems,
-            ),
-            {"character": nombre_char, "command": command_name, "server": realm},
-        )
+            )
         await _safe_edit_original_response(
             interaction, content=None, embed=embed_final, view=personaje_view
         )
