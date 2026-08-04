@@ -92,10 +92,94 @@ def init_database() -> bool:
                 CREATE INDEX IF NOT EXISTS idx_external_api_cache_source_fetched_at
                 ON external_api_cache (source, fetched_at DESC)
                 """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tracked_characters (
+                    character_name TEXT NOT NULL,
+                    server TEXT NOT NULL,
+                    first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    lookup_count INTEGER NOT NULL DEFAULT 1,
+                    PRIMARY KEY (character_name, server)
+                )
+                """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tracked_characters_last_seen
+                ON tracked_characters (last_seen_at DESC)
+                """)
         conn.commit()
 
     logger.info("Postgres inicializado correctamente.")
     return True
+
+
+def track_character_lookup(character_name: str, server: str) -> None:
+    if not db_enabled():
+        return
+
+    clean_name = str(character_name or "").strip()
+    clean_server = str(server or "").strip()
+    if not clean_name or not clean_server or clean_name == "-" or clean_server == "-":
+        return
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO tracked_characters (character_name, server)
+                    VALUES (%s, %s)
+                    ON CONFLICT (character_name, server)
+                    DO UPDATE SET
+                        last_seen_at = NOW(),
+                        lookup_count = tracked_characters.lookup_count + 1
+                    """,
+                    (clean_name, clean_server),
+                )
+            conn.commit()
+    except Exception as exc:
+        logger.warning(
+            "Error registrando lookup para '%s'/%s: %s", clean_name, clean_server, exc
+        )
+
+
+def list_tracked_characters(
+    server: str | None = None, limit: int | None = None
+) -> list[tuple[str, str]]:
+    if not db_enabled():
+        return []
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                if server:
+                    cur.execute(
+                        """
+                        SELECT character_name, server
+                        FROM tracked_characters
+                        WHERE LOWER(server) = LOWER(%s)
+                        ORDER BY last_seen_at DESC, lookup_count DESC
+                        LIMIT %s
+                        """,
+                        (server, limit if limit and limit > 0 else 100000),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT character_name, server
+                        FROM tracked_characters
+                        ORDER BY last_seen_at DESC, lookup_count DESC
+                        LIMIT %s
+                        """,
+                        (limit if limit and limit > 0 else 100000,),
+                    )
+                return [(row[0], row[1]) for row in cur.fetchall()]
+    except Exception as exc:
+        logger.warning("Error listando tracked_characters: %s", exc)
+        return []
+
+
+async def async_track_character_lookup(character_name: str, server: str) -> None:
+    await asyncio.to_thread(track_character_lookup, character_name, server)
 
 
 def get_external_cache(source: str, cache_key: str, ttl_seconds: int):

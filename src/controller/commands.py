@@ -8,6 +8,7 @@ import profile_scraper
 from src.db.postgres import (
     async_get_external_cache,
     async_set_external_cache,
+    async_track_character_lookup,
     find_character_spec_gs_by_metadata,
     get_external_cache,
     set_external_cache,
@@ -75,6 +76,17 @@ def _log_command_usage(
         realm,
         extras,
     )
+
+    # Fire-and-forget: register the character in Postgres so the cron job
+    # includes it in the next preload batch. DB errors never block the command.
+    clean_nombre = str(nombre or "").strip()
+    clean_realm = str(realm or "").strip()
+    if clean_nombre and clean_nombre != "-" and clean_realm and clean_realm != "-":
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(async_track_character_lookup(clean_nombre, clean_realm))
+        except RuntimeError:
+            pass
 
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45

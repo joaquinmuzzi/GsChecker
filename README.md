@@ -93,6 +93,50 @@ Variables recomendadas en Railway:
 
 Este servicio es worker: no expone puerto HTTP.
 
+## Cron: precarga de GearScore por spec
+
+El bot depende de armory.warmane.com, que a menudo devuelve 429 (rate limit de Cloudflare). Para que `/personaje` muestre GS incluso cuando el armory está caído, un cron precarga y cachea en Postgres el GS de cada personaje **rastreado**.
+
+### Fuentes de personajes
+
+El cron combina dos fuentes y deduplica:
+
+1. **`data/tracked_characters.txt`** — lista semilla editable manualmente y versionada en git. Un personaje por línea, con reino opcional después de una coma:
+
+   ```text
+   Samsara
+   Algoritmo, Lordaeron
+   Frodo, Icecrown
+   ```
+
+2. **Tabla `tracked_characters` en Postgres** — auto-populada por el bot cada vez que se usa un comando de personaje (`/p`, `/personaje`, `/dps`, `/ptoc`, `/ia`). Sobrevive restarts y deploys porque el filesystem de Railway es efímero.
+
+### Setup en Railway (segundo service)
+
+En el mismo proyecto de Railway, creá un **service nuevo** apuntando al mismo repo:
+
+1. **Settings → Service Type**: seleccioná el mismo repo/branch que el bot
+2. **Settings → Start Command**:
+   ```
+   python -m tools.run_scheduled_preload
+   ```
+3. **Settings → Cron Schedule**: `0 */12 * * *` (cada 12 horas)
+4. **Settings → Restart Policy**: `Never` (el cron termina y el container se apaga)
+5. **Variables**: compartí `DATABASE_URL` con el service del bot (link al mismo Postgres)
+
+Variables opcionales del cron:
+
+- `PRELOAD_TXT_PATH` — ruta al txt semilla (default: `data/tracked_characters.txt`)
+- `PRELOAD_DEFAULT_REALM` — reino asumido cuando el txt no lo especifica (default: `Lordaeron`)
+- `PRELOAD_DELAY_SECONDS` — pausa entre personajes para evitar 429 (default: `2.0`)
+- `PRELOAD_MAX_CHARACTERS` — corte duro por batch (default: `0` = sin límite)
+
+### Flujo end-to-end
+
+1. Un usuario ejecuta `/p Samsara Lordaeron` → el bot registra `(Samsara, Lordaeron)` en `tracked_characters`.
+2. A la próxima corrida del cron, `run_scheduled_preload` toma ese par, calcula GS por spec activa consultando armory, y lo guarda en `external_api_cache` con `source='character_spec_gs'`.
+3. Si en el futuro el armory devuelve 429 cuando alguien consulta a Samsara, `/p` cae al cache Postgres y muestra el GS conocido en vez de `?`.
+
 ## Logging
 
 Cada invocación de comando emite una línea estructurada en el logger `gschecker.commands`:

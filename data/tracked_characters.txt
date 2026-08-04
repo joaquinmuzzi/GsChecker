@@ -1,0 +1,37 @@
+# tracked_characters.txt
+#
+# Lista semilla de personajes que el cron job precarga en Postgres cada 12h.
+# Formato: un personaje por línea. Reino opcional después de una coma.
+#
+# Ejemplos válidos:
+#   Samsara
+#   Algoritmo, Lordaeron
+#   Frodo, Icecrown
+#
+# Si no ponés reino, se asume Lordaeron.
+# Líneas vacías y las que empiezan con # se ignoran.
+#
+# Este archivo es editable manualmente. En runtime, el bot también agrega
+# automáticamente cada personaje consultado a la tabla `tracked_characters`
+# en Postgres, y el cron lee de ambas fuentes (deduplicadas).
+#
+# ─── Agregá tus personajes acá ───────────────────────────────────────────
+
+Samsara
+Algoritmo
+Frodouwu
+Yavana
+Novatizimu
+Zolan
+Veletriel
+Hofdog
+Noedzobot
+Athennaie
+Mozkova
+Estharos
+Ammelie
+Vegel
+Mamapucha
+Bettybeia
+Durendall
+Durendal
