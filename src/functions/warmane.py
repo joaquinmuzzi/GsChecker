@@ -2,7 +2,6 @@ import logging
 import random
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
@@ -842,8 +841,14 @@ def _fetch_achievements(nombre: str, server: str):
                 ids.append(ach_id_full.replace("ach", ""))
         return ids
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        results = list(pool.map(fetch_category, raid_categories))
+    # Fetch sequentially to avoid 429s from parallel armory requests.
+    # Each category POST gets its own rate-limit token + small inter-request delay.
+    results = []
+    for category_id in raid_categories:
+        results.append(fetch_category(category_id))
+        if category_id != raid_categories[-1]:
+            ARMORY_LIMITER.acquire()
+            time.sleep(random.uniform(1.0, 2.0))
 
     for ids in results:
         for ach_id in ids:
@@ -874,6 +879,8 @@ def _fetch_achievements(nombre: str, server: str):
     # while still returning partial achievements in other categories.
     if not any(ach_id in completed_ids for ach_id in target_achievements):
         for category_id in [14922, 14923]:
+            ARMORY_LIMITER.acquire()
+            time.sleep(random.uniform(1.0, 2.0))
             for ach_id in fetch_category(category_id):
                 completed_ids.add(ach_id)
                 if ach_id in target_achievements:
@@ -903,19 +910,32 @@ def _fetch_achievements(nombre: str, server: str):
         "storming_25h_achieved": "4632" in completed_ids,
     }
 
-    # If every target flag is false due to transient issues, prefer stale cached data.
-    if not any(
-        [
-            payload["halion_10n_achieved"],
-            payload["halion_10h_achieved"],
-            payload["halion_25n_achieved"],
-            payload["halion_25h_achieved"],
-            payload["storming_10n_achieved"],
-            payload["storming_10h_achieved"],
-            payload["storming_25n_achieved"],
-            payload["storming_25h_achieved"],
-        ]
-    ):
+    halion_any = any(
+        payload[k]
+        for k in (
+            "halion_10n_achieved",
+            "halion_10h_achieved",
+            "halion_25n_achieved",
+            "halion_25h_achieved",
+        )
+    )
+    storming_any = any(
+        payload[k]
+        for k in (
+            "storming_10n_achieved",
+            "storming_10h_achieved",
+            "storming_25n_achieved",
+            "storming_25h_achieved",
+        )
+    )
+    rs_categories_tried = set(raid_categories) & {14922, 14923}
+    rs_got_empty = not any(
+        ach_id in completed_ids for ach_id in target_achievements
+    )
+    # Prefer stale cache when ICC succeeded but RS failed (partial transient failure),
+    # or when every target flag is false due to complete upstream failure.
+    prefer_stale = (storming_any and rs_got_empty) or (not halion_any and not storming_any)
+    if prefer_stale:
         stale = _cache_get_stale(ACHIEVEMENTS_CACHE, cache_key)
         if isinstance(stale, dict) and any(
             bool(stale.get(key))
@@ -931,9 +951,10 @@ def _fetch_achievements(nombre: str, server: str):
             )
         ):
             logger.warning(
-                "Using stale achievements cache for '%s'/%s after empty achievements fetch",
+                "Using stale achievements cache for '%s'/%s after %s",
                 nombre,
                 server,
+                "RS empty + ICC succeeded" if storming_any else "empty fetch",
             )
             return stale
 
