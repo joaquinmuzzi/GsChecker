@@ -1,7 +1,9 @@
 import asyncio
+import atexit
 import json
 import logging
 import os
+import threading
 from contextlib import contextmanager
 
 import psycopg
@@ -29,13 +31,44 @@ def db_enabled() -> bool:
     return bool(get_database_url())
 
 
+_POOL = None
+_POOL_LOCK = threading.Lock()
+
+
+def _get_pool():
+    """Devuelve el ConnectionPool global, creándolo lazy en el primer uso.
+
+    Antes se abría 1 conexión TCP por cada get/set (5-10 por comando).
+    Con el pool: max 5 conexiones vivas reutilizadas, con reconexión automática.
+    Import lazy de psycopg_pool: si DATABASE_URL no está seteado, nunca se
+    importa (útil en dev sin postgres).
+    """
+    global _POOL
+    if _POOL is not None:
+        return _POOL
+    with _POOL_LOCK:
+        if _POOL is not None:
+            return _POOL
+        from psycopg_pool import ConnectionPool
+
+        _POOL = ConnectionPool(
+            conninfo=get_database_url(),
+            min_size=1,
+            max_size=5,
+            timeout=10,
+            kwargs={"connect_timeout": 10},
+        )
+        atexit.register(_POOL.close)
+        return _POOL
+
+
 @contextmanager
 def _get_connection():
-    conn = psycopg.connect(get_database_url(), connect_timeout=10)
-    try:
+    if not db_enabled():
+        raise RuntimeError("postgres not configured")
+    pool = _get_pool()
+    with pool.connection() as conn:
         yield conn
-    finally:
-        conn.close()
 
 
 def init_database() -> bool:
