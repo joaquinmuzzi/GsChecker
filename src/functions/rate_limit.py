@@ -108,6 +108,13 @@ class CircuitBreaker:
             remaining = self._open_until - time.monotonic()
             return max(remaining, 0.0)
 
+    def recent_failure_count(self) -> int:
+        """Cuenta de failures dentro de la ventana actual (para diferenciar
+        'no hubo respuesta por rate limit' de 'la respuesta dijo que no existe')."""
+        with self._lock:
+            cutoff = time.monotonic() - self._failure_window_s
+            return sum(1 for ts in self._failures if ts >= cutoff)
+
     def record_success(self) -> None:
         with self._lock:
             self._failures.clear()

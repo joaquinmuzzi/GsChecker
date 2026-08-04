@@ -429,6 +429,30 @@ def _fetch_summary(nombre: str, server: str):
         _cache_set(SUMMARY_CACHE, cache_key, summary)
         return summary
 
+    stale = _cache_get_stale(SUMMARY_CACHE, cache_key)
+    if isinstance(stale, dict) and stale.get("name"):
+        logger.warning(
+            "Using stale summary for '%s'/%s (armory unreachable)", nombre, server
+        )
+        return stale
+
+    if ARMORY_CIRCUIT.is_open():
+        wait_s = int(ARMORY_CIRCUIT.seconds_until_close()) + 1
+        return {
+            "__error__": (
+                f"⚠️ El Armory de Warmane nos rate-limitó. "
+                f"Reintentá en ~{wait_s}s."
+            )
+        }
+
+    if ARMORY_CIRCUIT.recent_failure_count() > 0:
+        return {
+            "__error__": (
+                "⚠️ El Armory de Warmane está respondiendo con errores. "
+                "Reintentá en unos segundos."
+            )
+        }
+
     return {"__error__": f"⚠️ No se encontró el personaje '{nombre}' en {server}."}
 
 
