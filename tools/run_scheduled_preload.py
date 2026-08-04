@@ -122,8 +122,9 @@ def main() -> int:
 
     from datetime import datetime
     today = datetime.now()
-    if today.day == 1:
-        logger.info("Día 1 del mes — ejecutando filter_high_gs primero...")
+    force_filter = os.getenv("FORCE_FILTER", "").strip() in ("1", "true", "yes")
+    if today.day == 1 or force_filter:
+        logger.info("Ejecutando filter_high_gs (día=%d, force=%s)...", today.day, force_filter)
         try:
             from tools.filter_high_gs import main as filter_main
             import sys
