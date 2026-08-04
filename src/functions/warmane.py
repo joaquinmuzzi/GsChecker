@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 import gearscore
 import profile_scraper
+from src.functions.rate_limit import is_cf_1015
 from src.schemas.constants import (
     SESSION,
     HTTP_TIMEOUT,
@@ -22,6 +23,11 @@ from src.schemas.constants import (
     STATS_TTL,
     GUILD_RANK_CACHE,
     GUILD_RANK_TTL,
+    ARMORY_LIMITER,
+    ARMORY_CIRCUIT,
+    ARMORY_BACKOFF_MIN,
+    ARMORY_BACKOFF_MAX,
+    ARMORY_MAX_ATTEMPTS,
 )
 from src.functions.cache import _cache_get, _cache_get_stale, _cache_set
 
@@ -41,19 +47,11 @@ WOW_CLASSES = (
 logger = logging.getLogger("gschecker.warmane")
 
 
-_RATE_LIMIT_MAX_ATTEMPTS = 3
-_RATE_LIMIT_BACKOFF_MIN = 3.0
-_RATE_LIMIT_BACKOFF_MAX = 5.0
-
-
 def _is_rate_limited(status_code: int) -> bool:
-    # Cloudflare returns 429 for both "Too Many Requests" and Error 1015
-    # (temporary IP ban). 5xx often means Cloudflare protecting the origin.
     return status_code == 429 or 500 <= status_code < 600
 
 
-def _rate_limit_sleep(resp) -> None:
-    # Honor server-provided Retry-After when present, otherwise jittered 3-5s.
+def _sleep_backoff(resp) -> None:
     retry_after = None
     if resp is not None:
         raw = resp.headers.get("Retry-After") if resp.headers else None
@@ -65,44 +63,102 @@ def _rate_limit_sleep(resp) -> None:
     delay = (
         retry_after
         if retry_after is not None
-        else random.uniform(_RATE_LIMIT_BACKOFF_MIN, _RATE_LIMIT_BACKOFF_MAX)
+        else random.uniform(ARMORY_BACKOFF_MIN, ARMORY_BACKOFF_MAX)
     )
     time.sleep(delay)
 
 
-def _warmane_get_with_scheme_fallback(path: str, headers: dict):
+def _armory_request(
+    method: str,
+    path: str,
+    headers: dict,
+    *,
+    data: dict | None = None,
+    parse_json: bool = False,
+):
+    """Punto único de entrada para todo tráfico al armory.
+
+    Aplica en orden:
+      1. Circuit breaker: si está abierto (por 1015 o burst de 429), devuelve None sin tocar la red.
+      2. Token bucket: bloquea hasta tener 1 token (~1 request cada 2s).
+      3. Reintento con backoff 8-20s ante 429/5xx; scheme fallback https→http.
+      4. Detección de "error code: 1015" en body → fatal → abre circuit 90s.
+
+    Devuelve el `Response` (si parse_json=False) o el dict parseado (si True),
+    o None si todos los intentos fallaron / circuit abierto.
+    """
+    if ARMORY_CIRCUIT.is_open():
+        logger.info(
+            "armory circuit open (%.0fs left), skipping request path='%s'",
+            ARMORY_CIRCUIT.seconds_until_close(),
+            path,
+        )
+        return None
+
     last_status = None
     last_error = None
-    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
+
+    for attempt in range(ARMORY_MAX_ATTEMPTS):
         rate_limited_resp = None
+
         for scheme in ("https", "http"):
             url = f"{scheme}://armory.warmane.com{path}"
+            ARMORY_LIMITER.acquire()
             try:
-                resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+                if method == "GET":
+                    resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+                else:
+                    resp = SESSION.post(
+                        url, headers=headers, data=data, timeout=HTTP_TIMEOUT
+                    )
             except Exception as exc:
                 last_error = str(exc)
                 continue
+
             last_status = resp.status_code
+
+            if is_cf_1015(resp.text):
+                ARMORY_CIRCUIT.record_failure(fatal=True, reason=f"1015 on {path}")
+                return None
+
             if resp.status_code == 200:
-                return resp
+                if not parse_json:
+                    ARMORY_CIRCUIT.record_success()
+                    return resp
+                try:
+                    payload = resp.json()
+                except Exception as exc:
+                    last_error = f"json error: {exc}"
+                    continue
+                if isinstance(payload, dict):
+                    ARMORY_CIRCUIT.record_success()
+                    return payload
+                continue
+
             if _is_rate_limited(resp.status_code):
                 rate_limited_resp = resp
+                ARMORY_CIRCUIT.record_failure(
+                    reason=f"status={resp.status_code} on {path}"
+                )
+                if ARMORY_CIRCUIT.is_open():
+                    return None
 
         if rate_limited_resp is None:
             break
 
-        if attempt < _RATE_LIMIT_MAX_ATTEMPTS - 1:
+        if attempt < ARMORY_MAX_ATTEMPTS - 1:
             logger.warning(
-                "Warmane rate-limited (status=%s) for path='%s', retrying (attempt %s/%s)",
+                "armory rate-limited (status=%s) path='%s', retry %s/%s",
                 last_status,
                 path,
                 attempt + 1,
-                _RATE_LIMIT_MAX_ATTEMPTS,
+                ARMORY_MAX_ATTEMPTS,
             )
-            _rate_limit_sleep(rate_limited_resp)
+            _sleep_backoff(rate_limited_resp)
 
     logger.warning(
-        "Warmane request failed for path='%s' (last_status=%s, last_error=%s)",
+        "armory %s failed path='%s' last_status=%s last_error=%s",
+        method,
         path,
         last_status,
         last_error,
@@ -110,47 +166,12 @@ def _warmane_get_with_scheme_fallback(path: str, headers: dict):
     return None
 
 
+def _warmane_get_with_scheme_fallback(path: str, headers: dict):
+    return _armory_request("GET", path, headers)
+
+
 def _warmane_post_json_with_scheme_fallback(path: str, headers: dict, data: dict):
-    last_status = None
-    last_error = None
-    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
-        rate_limited_resp = None
-        for scheme in ("https", "http"):
-            url = f"{scheme}://armory.warmane.com{path}"
-            try:
-                resp = SESSION.post(
-                    url, headers=headers, data=data, timeout=HTTP_TIMEOUT
-                )
-            except Exception as exc:
-                last_error = str(exc)
-                continue
-            last_status = resp.status_code
-            if resp.status_code != 200:
-                if _is_rate_limited(resp.status_code):
-                    rate_limited_resp = resp
-                continue
-            try:
-                payload = resp.json()
-            except Exception as exc:
-                last_error = f"json error: {exc}"
-                continue
-            if isinstance(payload, dict):
-                return payload
-
-        if rate_limited_resp is None:
-            break
-
-        if attempt < _RATE_LIMIT_MAX_ATTEMPTS - 1:
-            logger.warning(
-                "Warmane POST rate-limited (status=%s) for path='%s', retrying (attempt %s/%s)",
-                last_status,
-                path,
-                attempt + 1,
-                _RATE_LIMIT_MAX_ATTEMPTS,
-            )
-            _rate_limit_sleep(rate_limited_resp)
-
-    return None
+    return _armory_request("POST", path, headers, data=data, parse_json=True)
 
 
 _PROFILE_HEADERS = {
