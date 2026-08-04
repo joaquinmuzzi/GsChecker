@@ -181,6 +181,45 @@ _PROFILE_HEADERS = {
     "Referer": "https://armory.warmane.com/",
 }
 
+_API_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "application/json,text/plain,*/*",
+    "Referer": "https://armory.warmane.com/",
+}
+
+
+def _fetch_api_summary(nombre: str, server: str) -> dict | None:
+    """Un solo hit a /api/character/<n>/<s>/summary. Cachea el payload completo.
+
+    Este endpoint devuelve en un solo request: level, class, race, guild, name,
+    professions, talents (con árboles y puntos), equipment (con item IDs).
+    Es la fuente preferida de datos — evita 3-4 requests HTML adicionales.
+    """
+    cache_key = ("api_summary", nombre.lower(), server.lower())
+    cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
+    if cached is not None:
+        return cached if cached else None
+
+    resp = _warmane_get_with_scheme_fallback(
+        f"/api/character/{nombre}/{server}/summary", _API_HEADERS
+    )
+    if resp is None:
+        return None
+    try:
+        payload = resp.json()
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict) or payload.get("error"):
+        return None
+
+    server_name = str(payload.get("realmName") or payload.get("realm") or "").strip()
+    if server_name and server_name.lower() != (server or "").strip().lower():
+        return None
+
+    _cache_set(SUMMARY_CACHE, cache_key, payload)
+    return payload
+
 
 def _fetch_profile_page_html(nombre: str, server: str) -> str:
     """Fetch and cache the profile page HTML in-memory (shared between summary,
@@ -344,28 +383,8 @@ def _summary_from_profile_html(nombre: str, server: str):
 
 
 def _summary_from_api(nombre: str, server: str):
-    api_path = f"/api/character/{nombre}/{server}/summary"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "application/json,text/plain,*/*",
-        "Referer": "https://armory.warmane.com/",
-    }
-    resp = _warmane_get_with_scheme_fallback(api_path, headers)
-    if resp is None:
-        return None
-
-    try:
-        payload = resp.json()
-    except Exception:
-        return None
-
-    if not isinstance(payload, dict):
-        return None
-    if payload.get("error"):
-        return None
-
-    server_name = str(payload.get("realmName") or payload.get("realm") or "").strip()
-    if server_name and server_name.lower() != (server or "").strip().lower():
+    payload = _fetch_api_summary(nombre, server)
+    if payload is None:
         return None
 
     char_name = str(payload.get("name") or "").strip()
@@ -390,28 +409,15 @@ def _fetch_summary(nombre: str, server: str):
     if cached is not None:
         return cached
 
-    # Fetch API summary and profile HTML in parallel — both are needed but independent
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        api_future = pool.submit(_summary_from_api, nombre, server)
-        html_future = pool.submit(_fetch_profile_page_html, nombre, server)
-        summary = api_future.result()
-        html_future.result()  # ensures HTML is cached; _summary_from_profile_html will reuse it
-
-    profile_summary = _summary_from_profile_html(nombre, server)  # instant: HTML already in cache
+    summary = _summary_from_api(nombre, server)
 
     if summary is None:
+        profile_summary = _summary_from_profile_html(nombre, server)
         if profile_summary is not None:
             logger.warning(
-                "Falling back to profile summary for '%s'/%s", nombre, server
+                "Falling back to profile HTML summary for '%s'/%s", nombre, server
             )
             summary = profile_summary
-    elif isinstance(profile_summary, dict):
-        if not summary.get("guild") or summary.get("guild") == "Sin guild":
-            summary["guild"] = profile_summary.get("guild") or summary.get("guild")
-        if summary.get("gearScore") in {None, "", "N/A"}:
-            summary["gearScore"] = profile_summary.get("gearScore") or summary.get(
-                "gearScore"
-            )
 
     if summary is not None:
         _cache_set(SUMMARY_CACHE, cache_key, summary)
@@ -515,6 +521,40 @@ def _parse_specs_from_html(html: str) -> list[dict]:
     return result
 
 
+def _specs_from_api_payload(payload: dict) -> list[dict]:
+    """Deriva specs de talents[]. Marca activa la que más puntos totales tiene."""
+    talents = payload.get("talents") if isinstance(payload, dict) else None
+    if not isinstance(talents, list) or not talents:
+        return []
+
+    parsed: list[dict] = []
+    for t in talents:
+        if not isinstance(t, dict):
+            continue
+        name = _normalize_spec_name(str(t.get("tree") or "").strip())
+        if name not in WOW_CLASSIC_SPEC_NAMES:
+            continue
+        points_list = t.get("points") or []
+        total_points = sum(int(p) for p in points_list if isinstance(p, int))
+        parsed.append({"name": name, "_points": total_points})
+
+    if not parsed:
+        return []
+
+    max_pts = max(entry["_points"] for entry in parsed)
+    active_idx = 0
+    if max_pts > 0:
+        for idx, entry in enumerate(parsed):
+            if entry["_points"] == max_pts:
+                active_idx = idx
+                break
+
+    return [
+        {"name": entry["name"], "active": idx == active_idx}
+        for idx, entry in enumerate(parsed)
+    ]
+
+
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
     nombre = (nombre or "").strip()
     server = (server or "").strip()
@@ -523,10 +563,16 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
     if cached is not None:
         return cached
 
-    # 1st attempt: dedicated talents page (has explicit "selected" class per spec)
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    payload = _fetch_api_summary(nombre, server)
+    if payload is not None:
+        result = _specs_from_api_payload(payload)
+        if result:
+            _cache_set(SUMMARY_CACHE, cache_key, result)
+            return result
+
     resp = _warmane_get_with_scheme_fallback(
-        f"/character/{nombre}/{server}/talents", headers
+        f"/character/{nombre}/{server}/talents",
+        {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
     )
     if resp is not None:
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -544,35 +590,11 @@ def _fetch_specs(nombre: str, server: str) -> list[dict]:
             _cache_set(SUMMARY_CACHE, cache_key, result)
             return result
 
-    # 2nd attempt: reuse profile HTML (fallback heuristic when talents page is unavailable)
     html = _fetch_profile_page_html(nombre, server)
     result = _parse_specs_from_html(html)
     if result:
         _cache_set(SUMMARY_CACHE, cache_key, result)
         return result
-
-    # 3rd attempt: JSON API
-    api_resp = _warmane_get_with_scheme_fallback(
-        f"/api/character/{nombre}/{server}/talents",
-        {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-         "Accept": "application/json"},
-    )
-    if api_resp is not None:
-        try:
-            payload = api_resp.json()
-            talents = payload.get("talents") if isinstance(payload, dict) else None
-            if isinstance(talents, list):
-                result = [
-                    {"name": _normalize_spec_name(str(t.get("tree") or "").strip()), "active": idx == 0}
-                    for idx, t in enumerate(talents)
-                    if isinstance(t, dict)
-                    and _normalize_spec_name(str(t.get("tree") or "").strip()) in WOW_CLASSIC_SPEC_NAMES
-                ]
-                if result:
-                    _cache_set(SUMMARY_CACHE, cache_key, result)
-                    return result
-        except Exception:
-            pass
 
     return []
 
@@ -584,6 +606,22 @@ def _fetch_professions(nombre: str, server: str) -> list[str]:
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
     if cached is not None:
         return cached
+
+    payload = _fetch_api_summary(nombre, server)
+    if payload is not None:
+        professions = payload.get("professions")
+        if isinstance(professions, list):
+            result = []
+            for prof in professions:
+                if not isinstance(prof, dict):
+                    continue
+                name = str(prof.get("name") or "").strip().capitalize()
+                skill = str(prof.get("skill") or "").strip()
+                if name and skill:
+                    result.append(f"{name} {skill}")
+            if result:
+                _cache_set(SUMMARY_CACHE, cache_key, result)
+                return result
 
     html = _fetch_profile_page_html(nombre, server)
     if not html:
@@ -931,6 +969,48 @@ def _fetch_toc_achievements(nombre: str, server: str):
     return payload
 
 
+_SLOT_FALLBACK_ORDER = [
+    "Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard", "Wrist",
+    "Hands", "Waist", "Legs", "Feet", "Finger 1", "Finger 2", "Trinket 1",
+    "Trinket 2", "Main Hand", "Off Hand", "Ranged",
+]
+
+
+def _gear_stubs_from_api(nombre: str, server: str) -> list[dict]:
+    """Fallback pobre desde el API summary: item IDs por slot, sin gems/enchants.
+
+    Se usa cuando `get_gear_data` (scraping HTML) falla o el circuit está abierto.
+    Alcanza para calcular GearScore pero no detecta gemas/enchants faltantes.
+    """
+    payload = _fetch_api_summary(nombre, server)
+    if payload is None:
+        return []
+    equipment = payload.get("equipment")
+    if not isinstance(equipment, list):
+        return []
+
+    stubs: list[dict] = []
+    for idx, item in enumerate(equipment):
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("item") or "").strip()
+        if not item_id.isdigit():
+            continue
+        slot_name = (
+            _SLOT_FALLBACK_ORDER[idx] if idx < len(_SLOT_FALLBACK_ORDER) else f"Slot {idx + 1}"
+        )
+        stubs.append(
+            {
+                "item": item_id,
+                "slot": slot_name,
+                "gems": ["0", "0", "0"],
+                "ench": "0",
+                "name": item.get("name") or "",
+            }
+        )
+    return stubs
+
+
 def _fetch_gear_data(nombre: str, server: str):
     cache_key = (nombre, server)
     cached = _cache_get(GEAR_CACHE, cache_key, GEAR_TTL)
@@ -948,7 +1028,16 @@ def _fetch_gear_data(nombre: str, server: str):
                 server,
             )
             return stale
-        # Don't cache empty results — let the next request try again.
+
+        stubs = _gear_stubs_from_api(nombre, server)
+        if stubs:
+            logger.warning(
+                "Using API-derived gear stubs for '%s'/%s (no gem/enchant data)",
+                nombre,
+                server,
+            )
+            return stubs
+
         return gear_data
 
     _cache_set(GEAR_CACHE, cache_key, gear_data)
