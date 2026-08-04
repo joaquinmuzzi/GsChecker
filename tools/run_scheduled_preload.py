@@ -37,9 +37,9 @@ from tools.preload_character_gs import (
 logger = logging.getLogger("gschecker.preload_cron")
 
 
-DEFAULT_TXT_PATH = "data/tracked_characters.txt"
+DEFAULT_TXT_PATH = "data/tracked_high_gs.txt"
 DEFAULT_REALM = "Lordaeron"
-DEFAULT_DELAY = 5.0
+DEFAULT_DELAY = 2.0
 
 
 def _configure_logging() -> None:
