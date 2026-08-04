@@ -883,25 +883,38 @@ async def _personaje_impl(
             )
             gs = summary.get("gearScore", "N/A")
 
-        try:
-            missing_enchants, missing_gems = (
-                profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
-            )
-        except Exception:
-            logger.exception(
-                "missing enchants/gems calc failed for '%s'/%s", nombre_char, realm
-            )
-            missing_enchants, missing_gems = [], []
+        # Detect whether gear_data came from API stubs (item IDs only,
+        # no real gem/enchant data).  In that case, skip ench/gems checks
+        # to avoid false positives where stubs use ench="0" and gems=["0"].
+        is_stubs = (
+            isinstance(gear_data, list)
+            and len(gear_data) > 0
+            and all(isinstance(item, dict) and item.get("_source") == "api_stubs" for item in gear_data)
+        )
 
-        try:
-            suboptimal_gems = profile_scraper.get_suboptimal_gems_from_gear_data(
-                gear_data, clase, active_specs[0] if active_specs else ""
-            )
-        except Exception:
-            logger.exception(
-                "suboptimal gems calc failed for '%s'/%s", nombre_char, realm
-            )
+        if is_stubs:
+            missing_enchants, missing_gems = [], []
             suboptimal_gems = []
+        else:
+            try:
+                missing_enchants, missing_gems = (
+                    profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
+                )
+            except Exception:
+                logger.exception(
+                    "missing enchants/gems calc failed for '%s'/%s", nombre_char, realm
+                )
+                missing_enchants, missing_gems = [], []
+
+            try:
+                suboptimal_gems = profile_scraper.get_suboptimal_gems_from_gear_data(
+                    gear_data, clase, active_specs[0] if active_specs else ""
+                )
+            except Exception:
+                logger.exception(
+                    "suboptimal gems calc failed for '%s'/%s", nombre_char, realm
+                )
+                suboptimal_gems = []
 
         guild_obj = summary.get("guild")
         guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"

@@ -1036,6 +1036,7 @@ def _gear_stubs_from_api(nombre: str, server: str) -> list[dict]:
                 "gems": ["0", "0", "0"],
                 "ench": "0",
                 "name": item.get("name") or "",
+                "_source": "api_stubs",
             }
         )
     return stubs
