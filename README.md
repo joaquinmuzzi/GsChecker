@@ -130,6 +130,96 @@ Variables opcionales del cron:
 - `PRELOAD_DEFAULT_REALM` — reino asumido cuando el txt no lo especifica (default: `Lordaeron`)
 - `PRELOAD_DELAY_SECONDS` — pausa entre personajes para evitar 429 (default: `2.0`)
 - `PRELOAD_MAX_CHARACTERS` — corte duro por batch (default: `0` = sin límite)
+- `PRELOAD_ROTATION_SIZE` — personajes no-filtrados por run (default: `500`)
+- `FORCE_FILTER` — `1` para forzar el filter_high_gs en cualquier día
+
+### Diagrama de flujo de los cron jobs
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     GsChecker-Cron (Railway)                            │
+│                Cada 12h: bash run_preload_12h.sh                        │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                      ┌──────────────────────────┐
+                      │  ¿Día 1 del mes o        │
+                      │  FORCE_FILTER=1?         │
+                      └──────────────────────────┘
+                        │                   │
+                       SÍ                   NO
+                        │                   │
+                        ▼                   │
+       ┌────────────────────────────────────┐│
+       │  filter_high_gs.py                ││
+       │                                    ││
+       │  • Lee 20k names de               ││
+       │    tracked_characters.txt          ││
+       │  • Fetch summary API por cada uno ││
+       │  • Calcula GS desde gear IDs      ││
+       │  • Filtra >5k GS                  ││
+       │  • Escribe a                      ││
+       │    tracked_high_gs.txt            ││
+       │                                    ││
+       │  ~11h (20k × 2s delay)            ││
+       └────────────────────────────────────┘│
+                        │                   │
+                        ▼                   ▼
+       ┌────────────────────────────────────────────────┐
+       │          run_scheduled_preload.py              │
+       │                                                │
+       │  PASO 1 — Filtrados (prioridad alta)           │
+       │  ─────────────────────────────────────────     │
+       │  • Lee tracked_high_gs.txt (~1-3k chars)       │
+       │  • Para cada uno: fetch armory → GS spec       │
+       │  • Guarda en Postgres (external_api_cache)     │
+       │  • ~1-2h con delay 2s                          │
+       │                                                │
+       │  PASO 2 — Lote rotativo (exploración)          │
+       │  ─────────────────────────────────────────     │
+       │  • Lee tracked_characters.txt (~20k chars)     │
+       │  • Excluye los que ya están en filtered        │
+       │  • Procesa 500 chars no-filtrados              │
+       │  • Avanza índice rotativo (0→500→1000→...)     │
+       │  • Wrap-around: al final vuelve a 0            │
+       │  • ~17min extra (500 × 2s)                     │
+       │                                                │
+       │  TOTAL por run: ~1.5-2.5h                      │
+       └────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+       ┌────────────────────────────────────────────────┐
+       │         Postgres (external_api_cache)          │
+       │                                                │
+       │  key: personaje + spec + reino                 │
+       │  TTL: 30 días                                  │
+       └────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+       ┌────────────────────────────────────────────────┐
+       │              Bot (GsChecker)                   │
+       │                                                │
+       │  /personaje → cache Postgres primero           │
+       │  Si hit → GS al toque                          │
+       │  Si miss → fetch armory (puede 429)            │
+       └────────────────────────────────────────────────┘
+```
+
+### Cobertura mensual del lote rotativo
+
+Con ~20k personajes y 500 por run (2 runs/día):
+
+- **Filtrados** (~1-3k): se procesan **2x/día** → siempre frescos
+- **No-filtrados** (~17-19k): 500 × 2 runs × 30 días = **30k slots/mes** → todos cubiertos al menos 1x
+
+```
+Día 1:   [filtrados] + [rotativo 0–499]
+Día 1:   [filtrados] + [rotativo 500–999]
+Día 2:   [filtrados] + [rotativo 1000–1499]
+Día 2:   [filtrados] + [rotativo 1500–1999]
+...
+Día 20:  [filtrados] + [rotativo wrap → 0–499 de nuevo]
+```
 
 ### Flujo end-to-end
 
