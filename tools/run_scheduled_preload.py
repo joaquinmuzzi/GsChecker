@@ -8,8 +8,9 @@ Uso:
 Configurable por env vars:
     PRELOAD_TXT_PATH        Ruta al txt semilla (default: data/tracked_characters.txt)
     PRELOAD_DEFAULT_REALM   Reino asumido cuando el txt no lo especifica (default: Lordaeron)
-    PRELOAD_DELAY_SECONDS   Pausa entre personajes (default: 5.0)
+    PRELOAD_DELAY_SECONDS   Pausa entre personajes (default: 2.0)
     PRELOAD_MAX_CHARACTERS  Corte duro para tandas grandes (default: 0 = sin límite)
+    PRELOAD_ROTATION_SIZE   Personajes no-filtrados por run (default: 500)
 """
 from __future__ import annotations
 
@@ -37,9 +38,12 @@ from tools.preload_character_gs import (
 logger = logging.getLogger("gschecker.preload_cron")
 
 
-DEFAULT_TXT_PATH = "data/tracked_high_gs.txt"
+DEFAULT_TXT_PATH = "data/tracked_characters.txt"
+FILTERED_TXT_PATH = "data/tracked_high_gs.txt"
+ROTATION_INDEX_PATH = "data/preload_rotation_index.txt"
 DEFAULT_REALM = "Lordaeron"
 DEFAULT_DELAY = 2.0
+DEFAULT_ROTATION_SIZE = 500
 
 
 def _configure_logging() -> None:
@@ -108,6 +112,53 @@ def _process_one(nombre: str, realm: str) -> tuple[bool, int]:
     return (True, stored)
 
 
+def _read_rotation_index() -> int:
+    idx_path = PROJECT_ROOT / ROTATION_INDEX_PATH
+    if not idx_path.exists():
+        return 0
+    try:
+        return int(idx_path.read_text(encoding="utf-8").strip())
+    except (ValueError, OSError):
+        return 0
+
+
+def _save_rotation_index(idx: int) -> None:
+    idx_path = PROJECT_ROOT / ROTATION_INDEX_PATH
+    idx_path.parent.mkdir(parents=True, exist_ok=True)
+    idx_path.write_text(str(idx), encoding="utf-8")
+
+
+def _load_rotation_batch(
+    all_names: list[tuple[str, str]],
+    filtered_set: set[tuple[str, str]],
+    rotation_size: int,
+) -> list[tuple[str, str]]:
+    if rotation_size <= 0:
+        return []
+
+    unfiltered = [p for p in all_names if (p[0].lower(), p[1].lower()) not in filtered_set]
+    if not unfiltered:
+        return []
+
+    start = _read_rotation_index()
+    if start >= len(unfiltered):
+        start = 0
+
+    end = min(start + rotation_size, len(unfiltered))
+    batch = unfiltered[start:end]
+
+    _save_rotation_index(end)
+
+    logger.info(
+        "Lote rotativo: %d personajes no-filtrados (índice %d→%d de %d)",
+        len(batch),
+        start,
+        end,
+        len(unfiltered),
+    )
+    return batch
+
+
 def main() -> int:
     _configure_logging()
     load_dotenv()
@@ -116,9 +167,14 @@ def main() -> int:
     if not txt_path.is_absolute():
         txt_path = PROJECT_ROOT / txt_path
 
+    filtered_path = Path(FILTERED_TXT_PATH)
+    if not filtered_path.is_absolute():
+        filtered_path = PROJECT_ROOT / filtered_path
+
     default_realm = os.getenv("PRELOAD_DEFAULT_REALM", DEFAULT_REALM).strip() or DEFAULT_REALM
     delay = float(os.getenv("PRELOAD_DELAY_SECONDS", str(DEFAULT_DELAY)))
     max_characters = int(os.getenv("PRELOAD_MAX_CHARACTERS", "0"))
+    rotation_size = int(os.getenv("PRELOAD_ROTATION_SIZE", str(DEFAULT_ROTATION_SIZE)))
 
     from datetime import datetime
     today = datetime.now()
@@ -140,10 +196,21 @@ def main() -> int:
 
     init_database()
 
-    txt_pairs = _load_from_txt(txt_path, default_realm)
-    db_pairs = _load_from_db()
+    # Load filtered high-GS characters
+    filtered_pairs = _load_from_txt(filtered_path, default_realm)
+    filtered_set = {(p[0].lower(), p[1].lower()) for p in filtered_pairs}
 
-    all_pairs = _dedupe_preserving_order(txt_pairs + db_pairs)
+    # Load all characters from full list + DB
+    all_names = _load_from_txt(txt_path, default_realm)
+    db_pairs = _load_from_db()
+    all_names = _dedupe_preserving_order(all_names + db_pairs)
+
+    # Rotating batch of unfiltered characters
+    rotation_batch = _load_rotation_batch(all_names, filtered_set, rotation_size)
+
+    # Combine: filtered first, then rotating batch (deduped)
+    all_pairs = _dedupe_preserving_order(filtered_pairs + rotation_batch)
+
     if max_characters and max_characters > 0:
         all_pairs = all_pairs[:max_characters]
 
@@ -155,11 +222,11 @@ def main() -> int:
         return 0
 
     logger.info(
-        "Iniciando preload de %s personajes (delay=%.1fs, max=%s, txt=%s)",
+        "Preload: %d filtrados + %d rotativos = %d total (delay=%.1fs)",
+        len(filtered_pairs),
+        len(rotation_batch),
         len(all_pairs),
         delay,
-        max_characters or "sin límite",
-        txt_path,
     )
 
     ok = 0
