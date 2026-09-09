@@ -292,7 +292,10 @@ def _summary_from_profile_html(nombre: str, server: str):
                     key: " ".join(value.split())
                     for key, value in level_match.groupdict().items()
                 }
-                if level_data.get("server", "").lower() == target_server_lower:
+                if (
+                    level_data.get("server", "").lower() == target_server_lower
+                    and (parsed_name or "").strip().lower() == lower_name
+                ):
                     race_class = level_data.get("race_class") or ""
                     parsed_race = "N/A"
                     parsed_class = race_class or "N/A"
