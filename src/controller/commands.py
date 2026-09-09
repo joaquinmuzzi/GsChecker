@@ -477,7 +477,10 @@ def _get_known_gs_by_spec(
 
         if isinstance(cache_payload, dict):
             result[clean_name] = cache_payload.get("gs")
-        elif current_gs not in {None, "N/A"}:
+        elif clean_name in active_specs and current_gs not in {None, "N/A"}:
+            # current_gs reflects the gear currently equipped, which only
+            # represents the spec that is actually active right now — never
+            # an offspec, which may have been worn with different gear.
             result[clean_name] = current_gs
     return result
 
