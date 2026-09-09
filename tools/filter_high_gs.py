@@ -79,9 +79,15 @@ def _fetch_summary_gs(nombre: str, server: str) -> int | None:
         equipment = data.get("equipment", [])
         if not equipment:
             return None
-        gear_ids = [str(item.get("item", "")) for item in equipment]
-        gear_ids = [gid for gid in gear_ids if gid and gid.isdigit()]
-        if not gear_ids:
+        # gearscore.main() is positional (zips armor slots against a fixed
+        # SLOT_TYPES template and unpacks the last 3 as main/off/ranged) — do
+        # NOT filter out blank slots or every item after them scores against
+        # the wrong slot category.
+        gear_ids = [
+            str(item.get("item", "")) if str(item.get("item", "")).isdigit() else ""
+            for item in equipment
+        ]
+        if not any(gear_ids):
             return None
         gs_values = gearscore.main(gear_ids)
         return sum(gs_values)

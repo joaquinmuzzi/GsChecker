@@ -120,8 +120,11 @@ def _calculate_character_gs(nombre: str, server: str) -> dict | None:
 
     gear_data = _fetch_gear_data(nombre_char, server)
     try:
+        # gearscore.main() is positional (zips armor slots against a fixed
+        # SLOT_TYPES template and unpacks the last 3 as main/off/ranged) — do
+        # NOT filter out blank slots (e.g. empty Tabard) or every item after
+        # them scores against the wrong slot category.
         gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
-        gear_ids = [gid for gid in gear_ids if gid]
         gs = (
             sum(gearscore.main(gear_ids))
             if gear_ids

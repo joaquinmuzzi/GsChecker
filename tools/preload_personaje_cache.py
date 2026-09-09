@@ -120,8 +120,11 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
         inactive_specs = _fallback_spec_names_for_class(clase)
 
     try:
+        # gearscore.main() is positional (zips armor slots against a fixed
+        # SLOT_TYPES template and unpacks the last 3 as main/off/ranged) — do
+        # NOT filter out blank slots (e.g. empty Tabard) or every item after
+        # them scores against the wrong slot category.
         gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
-        gear_ids = [gid for gid in gear_ids if gid]
         gs = sum(gearscore.main(gear_ids)) if gear_ids else summary.get("gearScore", "N/A")
     except Exception:
         logger.exception(
@@ -245,6 +248,7 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
         active_spec_name,
         professions,
         suboptimal_gems,
+        gear_item_count=len(gear_data) if isinstance(gear_data, list) else 0,
     )
 
     if not _is_valid_personaje_payload(payload):

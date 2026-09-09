@@ -544,6 +544,7 @@ def _serialize_personaje_payload(
     active_spec_name,
     professions=None,
     suboptimal_gems=None,
+    gear_item_count=None,
 ):
     return {
         "nombre_char": nombre_char,
@@ -568,6 +569,7 @@ def _serialize_personaje_payload(
         "spec_gs_entries": spec_gs_entries,
         "active_spec_name": active_spec_name,
         "professions": professions or [],
+        "gear_item_count": gear_item_count,
     }
 
 
@@ -601,6 +603,15 @@ def _is_valid_personaje_payload(payload: dict) -> bool:
 
     spec_display = payload.get("spec_display")
     if spec_display is None:
+        return False
+
+    # A WotLK character has ~18 equippable slots (Tabard/Shirt aside). A page
+    # scrape that comes back with far fewer items is a sign of a partial/corrupt
+    # armory response (Cloudflare interference, page hiccup) — the GS computed
+    # from it undercounts and would otherwise get cached as fact for the whole
+    # COMMAND_PERSONAJE_TTL window.
+    gear_item_count = payload.get("gear_item_count")
+    if gear_item_count is not None and gear_item_count < 15:
         return False
 
     return True
@@ -1218,6 +1229,7 @@ async def _personaje_impl(
             active_spec_name,
             professions,
             suboptimal_gems,
+            gear_item_count=len(gear_data) if isinstance(gear_data, list) else 0,
         )
         if _is_valid_personaje_payload(_payload_to_cache):
             await async_set_external_cache(
