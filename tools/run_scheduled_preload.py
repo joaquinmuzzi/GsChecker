@@ -288,6 +288,15 @@ def main() -> int:
         stored_specs,
         duration,
     )
+
+    try:
+        from tools.preload_personaje_cache import main as preload_personaje_cache_main
+
+        logger.info("Precargando cache completo de /personaje para personajes trackeados...")
+        preload_personaje_cache_main()
+    except Exception:
+        logger.exception("Precarga de command_personaje falló (no bloquea el resto del cron)")
+
     return 0
 
 

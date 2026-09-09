@@ -33,7 +33,9 @@ UWU_CHARACTER_TTL = 120
 UWU_TOP_TTL = 180
 UWU_PDPS_SUMMARY_TTL = 180
 UWU_ICC_KILLS_TTL = 180
-COMMAND_PERSONAJE_TTL = 180
+# 25h: cubre el ciclo diario de tools/preload_personaje_cache.py con margen,
+# así el cache que deja el cron sigue vivo hasta que corre de nuevo al día siguiente.
+COMMAND_PERSONAJE_TTL = 90000
 COMMAND_DPS_TTL = 180
 CHARACTER_SPEC_GS_TTL = 2592000
 
