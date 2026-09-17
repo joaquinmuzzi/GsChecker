@@ -231,3 +231,91 @@ async def test_personaje_non_80_short_circuits(
     assert edit.embed is None
     assert edit.content is not None
     assert "no es nivel 80" in edit.content.lower()
+
+
+def _ruby_sanctum_field_value(embed):
+    for field in embed.fields:
+        if field.name == "Ruby Sanctum":
+            return field.value
+    raise LookupError("Ruby Sanctum field not found in embed")
+
+
+def _shonau_statistics_rows() -> list[list[str]]:
+    """Reproduces the real armory statistics page for Shonau/Lordaeron: the
+    Halion (Ruby Sanctum) rows all report zero kills."""
+    return [
+        ["Halion kills (Ruby Sanctum 25 player)", "- -"],
+        ["Halion kills (Ruby Sanctum 10 player)", "- -"],
+        ["Halion kills (Heroic Ruby Sanctum 10 player)", "- -"],
+        ["Halion kills (Heroic Ruby Sanctum 25 player)", "- -"],
+    ]
+
+
+class TestHalionAchievementStatsCrossCheck:
+    """Regression for the reported bug: armory.warmane.com's own /statistics
+    page shows zero Halion kills for Shonau (all "- -"), but the character's
+    achievements were bugged/granted anyway, and the bot trusted them blindly
+    and showed ✅. It must now cross-check against the real kill count."""
+
+    @pytest.mark.asyncio
+    async def test_bugged_achievement_without_real_kill_shows_x(
+        self, bot, interaction, patched_fetchers
+    ):
+        patched_fetchers["achievements"].return_value = {
+            **_happy_achievements(),
+            "halion_25n_achieved": True,
+            "halion_25h_achieved": True,
+        }
+        patched_fetchers["statistics"].return_value = _shonau_statistics_rows()
+
+        p_cmd = _find_command(bot, "p")
+        await p_cmd.callback(interaction, nombre="Shonau")
+
+        edit = interaction.last_edit()
+        assert edit is not None and edit.embed is not None
+        rs_value = _ruby_sanctum_field_value(edit.embed)
+        assert "✅" not in rs_value, (
+            f"achievement without a confirmed real kill must not show ✅: {rs_value!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_real_kill_confirmed_by_statistics_still_shows_check(
+        self, bot, interaction, patched_fetchers
+    ):
+        """Guard against overcorrecting: a genuinely earned kill (achievement
+        AND a real kill count in statistics) must still render ✅."""
+        patched_fetchers["achievements"].return_value = {
+            **_happy_achievements(),
+            "halion_25n_achieved": True,
+        }
+        patched_fetchers["statistics"].return_value = [
+            ["Halion kills (Ruby Sanctum 25 player)", "3"],
+        ]
+
+        p_cmd = _find_command(bot, "p")
+        await p_cmd.callback(interaction, nombre="Samsara")
+
+        edit = interaction.last_edit()
+        assert edit is not None and edit.embed is not None
+        rs_value = _ruby_sanctum_field_value(edit.embed)
+        assert "✅" in rs_value
+
+    @pytest.mark.asyncio
+    async def test_achievement_trusted_when_statistics_unavailable(
+        self, bot, interaction, patched_fetchers
+    ):
+        """When /statistics has no Halion rows at all (fetch failure, not a
+        confirmed zero), fall back to trusting the achievement as before."""
+        patched_fetchers["achievements"].return_value = {
+            **_happy_achievements(),
+            "halion_10n_achieved": True,
+        }
+        patched_fetchers["statistics"].return_value = []
+
+        p_cmd = _find_command(bot, "p")
+        await p_cmd.callback(interaction, nombre="Samsara")
+
+        edit = interaction.last_edit()
+        assert edit is not None and edit.embed is not None
+        rs_value = _ruby_sanctum_field_value(edit.embed)
+        assert "✅" in rs_value

@@ -165,6 +165,46 @@ def _extract_icc_boss_kills(stats_rows):
     return icc_10, icc_25
 
 
+def _extract_halion_kills(stats_rows):
+    """Lee el conteo real de kills de Halion desde las estadísticas del armory
+    (categoría 15062, misma fuente que `_extract_icc_boss_kills`).
+
+    Devuelve {"10n": bool|None, "10h": bool|None, "25n": bool|None, "25h": bool|None}.
+    None significa que la fila no apareció en stats_rows (sin dato, no "no lo mató").
+    """
+    labels = {
+        "10n": "halion kills (ruby sanctum 10 player)",
+        "10h": "halion kills (heroic ruby sanctum 10 player)",
+        "25n": "halion kills (ruby sanctum 25 player)",
+        "25h": "halion kills (heroic ruby sanctum 25 player)",
+    }
+    result = {key: None for key in labels}
+
+    for row in stats_rows or []:
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
+            continue
+        desc = str(row[0] or "").strip().lower()
+        val = str(row[1] or "")
+        for key, label in labels.items():
+            if desc == label:
+                numbers = re.findall(r"\d+", val.replace(",", ""))
+                result[key] = any(int(n) > 0 for n in numbers)
+                break
+
+    return result
+
+
+def _confirm_halion_kill(achieved: bool, stats_confirmed) -> bool:
+    """El logro de Halion en Warmane a veces se otorga sin el kill real
+    (mismo tipo de bug que Marrowgar/Deathwhisper en ICC). Si tenemos el dato
+    de estadísticas, exigimos que ambas fuentes coincidan; sin dato, confiamos
+    en el achievement como antes.
+    """
+    if stats_confirmed is None:
+        return bool(achieved)
+    return bool(achieved) and bool(stats_confirmed)
+
+
 def _format_boss_rows(
     bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, loading_symbol="?"
 ):

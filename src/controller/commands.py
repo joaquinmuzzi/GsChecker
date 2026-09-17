@@ -44,8 +44,10 @@ from src.functions.uwu import (
 from src.functions.embeds import (
     _build_personaje_embed,
     _build_personaje_view,
+    _confirm_halion_kill,
     _format_uwu_dps_table,
     _format_uwu_overview_table,
+    _extract_halion_kills,
     _extract_icc_boss_kills,
     _render_table,
 )
@@ -1066,10 +1068,19 @@ async def _personaje_impl(
                 spec_gs_entries[0]["gearscore"] = gs
         active_spec_name = active_specs[0] if active_specs else None
 
-        halion_10n_achieved = achi_payload["halion_10n_achieved"]
-        halion_10h_achieved = achi_payload["halion_10h_achieved"]
-        halion_25n_achieved = achi_payload["halion_25n_achieved"]
-        halion_25h_achieved = achi_payload["halion_25h_achieved"]
+        halion_stats = _extract_halion_kills(stats_rows)
+        halion_10n_achieved = _confirm_halion_kill(
+            achi_payload["halion_10n_achieved"], halion_stats["10n"]
+        )
+        halion_10h_achieved = _confirm_halion_kill(
+            achi_payload["halion_10h_achieved"], halion_stats["10h"]
+        )
+        halion_25n_achieved = _confirm_halion_kill(
+            achi_payload["halion_25n_achieved"], halion_stats["25n"]
+        )
+        halion_25h_achieved = _confirm_halion_kill(
+            achi_payload["halion_25h_achieved"], halion_stats["25h"]
+        )
 
         icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
 
