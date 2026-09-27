@@ -1,8 +1,10 @@
-discord.py>=2.0
-requests>=2.28
-beautifulsoup4>=4.11
-python-dotenv>=1.0
-psycopg[binary]>=3.2
-psycopg-pool>=3.2
-pydantic>=2.6
-groq>=0.9
+# Versiones fijas = las que corre producción (build de Railway 2026-09-27).
+# Actualizar a propósito: subir la versión, correr pytest y dejar que el CI lo valide.
+discord.py==2.7.1
+requests==2.34.2
+beautifulsoup4==4.15.0
+python-dotenv==1.2.3
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
+pydantic==2.13.5
+groq==1.7.0

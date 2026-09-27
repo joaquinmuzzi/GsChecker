@@ -19,8 +19,9 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
   - links a Armory y UwU Logs.
 - **DPS por boss** (máximo y promedio) vía uwu-logs.xyz, con overview rápido y tabla detallada.
 - **Trial of the Crusader**: logros 10N / 10H / 25N / 25H.
+- **Análisis BiS + coach por IA** (Groq) con `/ia`.
 - **Cache en memoria + Postgres** (`external_api_cache`) para reducir requests al Armory / UwU.
-- **Retries con jittered backoff (3–5s)** para rate-limits Cloudflare del Armory (429 / 5xx).
+- **Rate limit propio + circuit breaker** para no gatillar el 429 / ban de Cloudflare del Armory.
 
 ## Comandos
 
@@ -30,6 +31,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 | `/p <nombre> [reino]`        | Alias corto de `/personaje`.                            | Configurable        |
 | `/dps <nombre> [spec]`       | DPS por boss desde UwU Logs.                            | Lordaeron           |
 | `/ptoc <nombre>`             | Logros ToC (10N/10H/25N/25H) en tabla.                  | Lordaeron           |
+| `/ia <nombre> [reino]`       | Análisis BiS + resumen de coach por IA (requiere `GROQ_API_KEY`). | Configurable |
 | `/ping`                      | Latencia actual del bot.                                | —                   |
 
 Reinos aceptados en `[reino]` (por defecto **Lordaeron**):
@@ -60,6 +62,14 @@ DATABASE_URL=postgres://...
 GROQ_API_KEY=...
 ```
 
+### Dependencias
+
+`requirements.txt` es la fuente de verdad (es lo que instala Railway) y tiene las versiones **fijas** que corre producción. Para actualizar una librería: subí la versión ahí, corré los tests y dejá que el CI lo valide antes del deploy.
+
+`requirements-dev.txt` agrega `pytest` y `pytest-asyncio`.
+
+> `pyproject.toml` / `poetry.lock` están desactualizados respecto de `requirements.txt` (por ejemplo, piden `groq ^0.9` y producción usa `groq 1.7.0`). Usá pip.
+
 ### Ejecutar
 
 ```bash
@@ -71,19 +81,24 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
-
-# C) Poetry
-poetry install
-poetry run python main.py
 ```
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+El CI (`.github/workflows/tests.yml`) corre los tests en cada push a `master` y en cada PR, y Railway espera a que pase antes de deployar.
 
 ## Deploy en Railway
 
-El repo incluye lo necesario para correrlo como **worker**:
+El proyecto tiene tres servicios: el bot (`GsChecker`), el cron (`GsChecker-Cron`) y `Postgres`.
 
-- `Procfile` — `worker: bash ./run_railway.sh`
-- `.railway/railway.py` — infraestructura como código: Nixpacks, cron del preload (restart on failure ×10 es el default de Railway). Ver `.railway/README.md`
+- `Procfile` — `worker: bash ./run_railway.sh` (start del bot)
 - `run_railway.sh` — carga `.env` y ejecuta `python3 main.py`
+- `.railway/railway.py` — infraestructura como código: builder Nixpacks, cron del preload, espera al CI (`checkSuites`). Railway **no** lo lee en cada deploy: los cambios se aplican con `railway config plan` / `railway config apply`. Ver [`.railway/README.md`](.railway/README.md).
 
 Variables recomendadas en Railway:
 
@@ -91,38 +106,20 @@ Variables recomendadas en Railway:
 - `DATABASE_URL` (opcional — pero muy recomendado para cache de GS por spec)
 - `GROQ_API_KEY` (opcional — solo para `/ia`)
 
-Este servicio es worker: no expone puerto HTTP.
+El bot es worker: no expone puerto HTTP. Restart policy: la default de Railway (on failure, 10 reintentos).
 
-## Cron: precarga de GearScore por spec
+## Cron: precarga de datos
 
-El bot depende de armory.warmane.com, que a menudo devuelve 429 (rate limit de Cloudflare). Para que `/personaje` muestre GS incluso cuando el armory está caído, un cron precarga y cachea en Postgres el GS de cada personaje **rastreado**.
+El bot depende de armory.warmane.com, que a menudo devuelve 429 (rate limit de Cloudflare). Para que `/personaje` responda aunque el armory esté caído, un cron precarga en Postgres el GS por spec de miles de personajes y el perfil completo de los que la gente consulta.
 
-### Fuentes de personajes
+### Configuración (servicio `GsChecker-Cron`)
 
-El cron combina dos fuentes y deduplica:
+Declarada en `.railway/railway.py`:
 
-1. **`data/tracked_characters.txt`** — lista semilla editable manualmente y versionada en git. Un personaje por línea, con reino opcional después de una coma:
-
-   ```text
-   Samsara
-   Algoritmo, Lordaeron
-   Frodo, Icecrown
-   ```
-
-2. **Tabla `tracked_characters` en Postgres** — auto-populada por el bot cada vez que se usa un comando de personaje (`/p`, `/personaje`, `/dps`, `/ptoc`, `/ia`). Sobrevive restarts y deploys porque el filesystem de Railway es efímero.
-
-### Setup en Railway (segundo service)
-
-En el mismo proyecto de Railway, creá un **service nuevo** apuntando al mismo repo:
-
-1. **Settings → Service Type**: seleccioná el mismo repo/branch que el bot
-2. **Settings → Start Command**:
-   ```
-   python -m tools.run_scheduled_preload
-   ```
-3. **Settings → Cron Schedule**: `0 */12 * * *` (cada 12 horas)
-4. **Settings → Restart Policy**: `Never` (el cron termina y el container se apaga)
-5. **Variables**: compartí `DATABASE_URL` con el service del bot (link al mismo Postgres)
+- **Start command**: `python -m tools.run_scheduled_preload`
+- **Cron schedule**: `0 3 * * *` — una vez por día a las 03:00 UTC (00:00 en Argentina)
+- **Restart policy**: `Never` (el cron termina y el container se apaga)
+- **Variables**: `DATABASE_URL` compartida con el bot (mismo Postgres)
 
 Variables opcionales del cron:
 
@@ -131,101 +128,95 @@ Variables opcionales del cron:
 - `PRELOAD_DELAY_SECONDS` — pausa entre personajes para evitar 429 (default: `2.0`)
 - `PRELOAD_MAX_CHARACTERS` — corte duro por batch (default: `0` = sin límite)
 - `PRELOAD_ROTATION_SIZE` — personajes no-filtrados por run (default: `500`)
-- `FORCE_FILTER` — `1` para forzar el filter_high_gs en cualquier día
+- `PERSONAJE_CACHE_DELAY_SECONDS` / `PERSONAJE_CACHE_MAX_CHARACTERS` — lo mismo para la precarga de perfiles completos
+- `FORCE_FILTER` — `1` para forzar el `filter_high_gs` en cualquier día
 
-### Diagrama de flujo de los cron jobs
+### Fuentes de personajes
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     GsChecker-Cron (Railway)                            │
-│                Cada 12h: bash run_preload_12h.sh                        │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-                      ┌──────────────────────────┐
-                      │  ¿Día 1 del mes o        │
-                      │  FORCE_FILTER=1?         │
-                      └──────────────────────────┘
-                        │                   │
-                       SÍ                   NO
-                        │                   │
-                        ▼                   │
-       ┌────────────────────────────────────┐│
-       │  filter_high_gs.py                ││
-       │                                    ││
-       │  • Lee 20k names de               ││
-       │    tracked_characters.txt          ││
-       │  • Fetch summary API por cada uno ││
-       │  • Calcula GS desde gear IDs      ││
-       │  • Filtra >5k GS                  ││
-       │  • Escribe a                      ││
-       │    tracked_high_gs.txt            ││
-       │                                    ││
-       │  ~11h (20k × 2s delay)            ││
-       └────────────────────────────────────┘│
-                        │                   │
-                        ▼                   ▼
-       ┌────────────────────────────────────────────────┐
-       │          run_scheduled_preload.py              │
-       │                                                │
-       │  PASO 1 — Filtrados (prioridad alta)           │
-       │  ─────────────────────────────────────────     │
-       │  • Lee tracked_high_gs.txt (~1-3k chars)       │
-       │  • Para cada uno: fetch armory → GS spec       │
-       │  • Guarda en Postgres (external_api_cache)     │
-       │  • ~1-2h con delay 2s                          │
-       │                                                │
-       │  PASO 2 — Lote rotativo (exploración)          │
-       │  ─────────────────────────────────────────     │
-       │  • Lee tracked_characters.txt (~20k chars)     │
-       │  • Excluye los que ya están en filtered        │
-       │  • Procesa 500 chars no-filtrados              │
-       │  • Avanza índice rotativo (0→500→1000→...)     │
-       │  • Wrap-around: al final vuelve a 0            │
-       │  • ~17min extra (500 × 2s)                     │
-       │                                                │
-       │  TOTAL por run: ~1.5-2.5h                      │
-       └────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-       ┌────────────────────────────────────────────────┐
-       │         Postgres (external_api_cache)          │
-       │                                                │
-       │  key: personaje + spec + reino                 │
-       │  TTL: 30 días                                  │
-       └────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-       ┌────────────────────────────────────────────────┐
-       │              Bot (GsChecker)                   │
-       │                                                │
-       │  /personaje → cache Postgres primero           │
-       │  Si hit → GS al toque                          │
-       │  Si miss → fetch armory (puede 429)            │
-       └────────────────────────────────────────────────┘
-```
+El cron combina dos fuentes y deduplica:
 
-### Cobertura mensual del lote rotativo
+1. **`data/tracked_characters.txt`** — lista semilla (~19.6k nombres de Lordaeron) versionada en git. Un personaje por línea, con reino opcional después de una coma:
 
-Con ~20k personajes y 500 por run (2 runs/día):
+   ```text
+   Samsara
+   Algoritmo, Lordaeron
+   Frodo, Icecrown
+   ```
 
-- **Filtrados** (~1-3k): se procesan **2x/día** → siempre frescos
-- **No-filtrados** (~17-19k): 500 × 2 runs × 30 días = **30k slots/mes** → todos cubiertos al menos 1x
+2. **Tabla `tracked_characters` en Postgres** — auto-populada por el bot cada vez que se usa un comando de personaje (`/p`, `/personaje`, `/dps`, `/ptoc`, `/ia`).
+
+Los nombres se validan en todos los puntos de entrada (`src/functions/names.py`: solo letras, 2–12 caracteres), así que basura como los placeholders `C_1234567` de uwu-logs no entra ni se consulta.
+
+### Estado persistente
+
+El filesystem de Railway se resetea en cada deploy, así que el estado del cron vive en la tabla **`app_state`** de Postgres (con el archivo local como fallback si no hay base):
+
+- `preload_rotation_index` — por dónde va el lote rotativo.
+- `tracked_high_gs` — la lista de personajes con GS alto que genera `filter_high_gs`.
+
+### Flujo de una corrida
+
+Duraciones medidas en los logs de Railway (septiembre 2026).
 
 ```
-Día 1:   [filtrados] + [rotativo 0–499]
-Día 1:   [filtrados] + [rotativo 500–999]
-Día 2:   [filtrados] + [rotativo 1000–1499]
-Día 2:   [filtrados] + [rotativo 1500–1999]
-...
-Día 20:  [filtrados] + [rotativo wrap → 0–499 de nuevo]
+   ┌───────────────────────────────────────┐
+   │ GsChecker-Cron (Railway)              │
+   │ Todos los días 03:00 UTC:             │
+   │ python -m tools.run_scheduled_preload │
+   └───────────────────────────────────────┘
+                              │
+                              ▼
+   ┌──────────────────────────────────┐
+   │ ¿Día 1 del mes o FORCE_FILTER=1? │
+   └──────────────────────────────────┘
+             SÍ │                                   │ NO
+                ▼                                   │
+   ┌──────────────────────────────────────────┐     │
+   │ filter_high_gs.py                        │     │
+   │ • summary API de cada nombre de la lista │     │
+   │ • GS desde gear IDs                      │     │
+   │ • guarda los ≥5000 GS en                 │     │
+   │   app_state.tracked_high_gs              │     │
+   │ • 1 request cada 2s + delay: más de 12h  │     │
+   └──────────────────────────────────────────┘     │
+                │                                   │
+                └─────────────┬─────────────────────┘
+                              ▼
+   ┌────────────────────────────────────────────────┐
+   │ run_scheduled_preload.py — GS por spec         │
+   │                                                │
+   │ PASO 1 — Filtrados (app_state.tracked_high_gs) │
+   │ PASO 2 — Lote rotativo: 500 no-filtrados desde │
+   │          app_state.preload_rotation_index      │
+   │          (vuelve a 0 al llegar al final)       │
+   │ → external_api_cache, source=character_spec_gs │
+   │   TTL 30 días                                  │
+   │ ~50 min por 500 personajes                     │
+   └────────────────────────────────────────────────┘
+                              │
+                              ▼
+   ┌──────────────────────────────────────────────────┐
+   │ preload_personaje_cache.py — perfil completo     │
+   │                                                  │
+   │ • personajes de la tabla tracked_characters      │
+   │   (los que la gente consultó, ~95)               │
+   │ • mismo cálculo que /p (_compute_personaje_base) │
+   │ → external_api_cache, source=command_personaje   │
+   │   TTL 25h                                        │
+   │ • no guarda perfiles incompletos                 │
+   │ ~55 min                                          │
+   └──────────────────────────────────────────────────┘
 ```
+
+### Cobertura del lote rotativo
+
+Con ~19.6k nombres, 500 por corrida y una corrida por día, la lista completa se recorre en **~40 días**. Los filtrados (GS alto) se refrescan todos los días.
 
 ### Flujo end-to-end
 
 1. Un usuario ejecuta `/p Samsara Lordaeron` → el bot registra `(Samsara, Lordaeron)` en `tracked_characters`.
-2. A la próxima corrida del cron, `run_scheduled_preload` toma ese par, calcula GS por spec activa consultando armory, y lo guarda en `external_api_cache` con `source='character_spec_gs'`.
-3. Si en el futuro el armory devuelve 429 cuando alguien consulta a Samsara, `/p` cae al cache Postgres y muestra el GS conocido en vez de `?`.
+2. En la próxima corrida, el cron recalcula el perfil completo y lo guarda como `command_personaje` (y el GS por spec como `character_spec_gs`).
+3. La próxima vez que alguien consulte a Samsara, `/p` responde desde Postgres al instante. Si el cache venció y el armory está rate-limitado, sirve el último perfil bueno (stale) en vez de fallar.
 
 ## Logging
 
@@ -247,6 +238,7 @@ Los sub-loggers heredan del logger raíz `gschecker` (configurado en `main.py`):
 - `gschecker.warmane` — integración Armory.
 - `gschecker.profile_scraper` — parsing de gear.
 - `gschecker.postgres` — cache externa.
+- `gschecker.preload_cron` / `gschecker.preload_personaje_cache` — cron.
 
 ## Arquitectura
 
@@ -257,11 +249,14 @@ profile_scraper.py             # scraping HTML de armory.warmane.com (gear, ench
 
 src/
 ├── controller/
-│   └── commands.py            # /personaje /p /dps /ptoc /ia /ping — orquestación
+│   └── commands.py            # slash commands + cálculo del perfil compartido con el cron
+│                              #   (_compute_personaje_base, _resolve_uwu_icc_kills)
 ├── functions/
 │   ├── warmane.py             # summary/specs/achievements/gear/stats/guild-rank
 │   ├── uwu.py                 # integración uwu-logs.xyz (overview + DPS por boss)
 │   ├── embeds.py              # armado de embeds y tablas monoespaciadas
+│   ├── names.py               # validación de nombres de personaje
+│   ├── rate_limit.py          # token bucket + circuit breaker del Armory
 │   └── cache.py               # get/set/get_stale in-memory
 ├── audit/
 │   ├── auditor.py             # comparación equipo vs BiS guide
@@ -270,9 +265,9 @@ src/
 │   ├── integration.py         # bridge scraper → audit
 │   └── models.py              # Pydantic models
 ├── db/
-│   └── postgres.py            # cache externa (tabla external_api_cache)
+│   └── postgres.py            # external_api_cache, tracked_characters, app_state
 └── schemas/
-    └── constants.py           # TTLs, caches in-memory, mapeos de boss/spec
+    └── constants.py           # TTLs, caches in-memory, rate limit, mapeos de boss/spec
 
 static/
 ├── GS.json                    # tabla WotLK: item_id → ilvl bucket → GS por slot type
@@ -281,8 +276,15 @@ static/
 └── raid_items_extra.json      # IDs extra para precarga
 
 tools/
-├── preload_character_gs.py    # precarga GS por spec desde UwU Logs
-└── preload_item_sockets_cache.py  # precarga sockets de items de raid
+├── run_scheduled_preload.py   # entrypoint del cron (filtro + GS por spec + perfiles)
+├── filter_high_gs.py          # genera la lista de GS alto (día 1 del mes)
+├── preload_character_gs.py    # cálculo y guardado de GS por spec
+├── preload_personaje_cache.py # precarga del perfil completo de /personaje
+├── preload_item_sockets_cache.py  # precarga sockets de items de raid
+└── seed_names.py              # arma data/tracked_characters.txt desde rosters / uwu-logs
+
+.railway/railway.py            # infraestructura de Railway como código
+.github/workflows/tests.yml    # CI: pytest en cada push / PR
 ```
 
 ## Cache
@@ -290,13 +292,14 @@ tools/
 Dos niveles:
 
 - **In-memory** (`src/schemas/constants.py`): dicts `{key: (timestamp, value)}` por dominio (SUMMARY, GEAR, ACHIEVEMENTS, STATS, …) con TTLs entre 120 s y 300 s. Se pierde al reiniciar el proceso.
-- **Postgres** (`external_api_cache`): persiste comandos completos y GS por spec (`CHARACTER_SPEC_GS_TTL = 30 días`). Requiere `DATABASE_URL`.
+- **Postgres** (`external_api_cache`): perfiles completos de `/personaje` (`COMMAND_PERSONAJE_TTL = 25h`) y GS por spec (`CHARACTER_SPEC_GS_TTL = 30 días`). Requiere `DATABASE_URL`.
 
-Al escribir cache **nunca** se persiste una respuesta vacía — sólo respuestas completas. Si el Armory falla, se cae a stale cache si existe, y si no, se retorna vacío sin envenenar el TTL.
+Nunca se persiste una respuesta incompleta. Si el Armory falla a mitad de un perfil (por ejemplo, 429 en una categoría de logros), los ❌ resultantes significarían "no pudimos leerlo", no "no lo hizo": ese perfil no se guarda, y `/p` muestra el último perfil bueno de Postgres si existe.
 
 ## Diagnóstico y notas conocidas
 
-- El Armory de Warmane responde con 429 / 5xx bajo carga; hay retry con jittered backoff 3–5 s (`_armory_get` y `_warmane_get_with_scheme_fallback`).
+- El Armory de Warmane rate-limita por IP (~5-6 requests / 10 s → 429; abuso sostenido → "error code: 1015"). Todo el tráfico pasa por `_armory_request`: token bucket de 1 request cada 2 s (ráfaga de 3), hasta 4 intentos con backoff de 8–20 s ante 429/5xx, y circuit breaker (60 s tras 3 fallos en 30 s, 90 s si aparece 1015).
+- **Halion**: la página de estadísticas de Warmane muestra `- -` en todas las filas "Halion kills (...)", incluso para personajes con el logro ganado. Por eso Ruby Sanctum se basa sólo en los logros.
 - `/dps` depende 100% de uwu-logs.xyz; si están lentos, el timeout es 45 s.
 - El GS por spec se sirve desde Postgres una vez que el bot vio al personaje en esa spec; primera vez muestra `?` en las specs no activas.
 - La API JSON del Armory (`/api/character/.../summary`) no devuelve `gearScore` — se calcula siempre localmente desde el equipo scrapeado.
