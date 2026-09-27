@@ -165,6 +165,22 @@ SPEC_SYNONYM_GROUPS = [
 ]
 
 
+# Muestra del armory (2026-09-27): DKs tanque 23-29 % de esquivar, DKs DPS
+# (Unholy, Frost y Blood DPS) 6-13 %. 18 % queda en el medio del hueco.
+TANK_DODGE_PCT = 18.0
+
+
+def _is_tanking_blood_dk(char_class: str, spec: str, dodge_pct) -> bool:
+    """La única guía de Blood es de DPS: evaluar un tanque con ella le recomienda
+    cambiar todo su set de tanque y le da score 0."""
+    return (
+        char_class == "Death Knight"
+        and spec == "Blood"
+        and isinstance(dodge_pct, (int, float))
+        and dodge_pct >= TANK_DODGE_PCT
+    )
+
+
 def _normalize_character_name(nombre: str | None) -> str:
     """Capitaliza y valida el nombre antes de tocar el armory: un nombre imposible
     (ej. "C_123") no existe en Warmane y consultarlo gasta ~15 requests del
@@ -1716,6 +1732,19 @@ def register_commands(bot):
             if active_spec in _IA_SPELL_SPECS and spell_hit is not None:
                 char_stats["hit_rating"] = spell_hit
 
+            if _is_tanking_blood_dk(char_class, active_spec, char_stats.get("dodge_pct")):
+                await _safe_edit_original_response(
+                    interaction,
+                    content=(
+                        f"🛡️ **{nombre_char}** juega Blood como **tanque** "
+                        f"({char_stats['dodge_pct']:.1f}% de esquivar).\n"
+                        "Todavía no hay guía BiS de tanque, y la de Blood es de DPS: "
+                        "no te voy a recomendar cambiar tu set de tanque por uno de daño."
+                    ),
+                    embed=None,
+                )
+                return
+
             # Ejecutar auditoría + Groq
             import os as _os
             report = await run_full_audit(
@@ -1734,7 +1763,7 @@ def register_commands(bot):
                     interaction,
                     content=(
                         f"⚠️ No hay guía BiS para **{char_class} {active_spec}** todavía.\n"
-                        "Guías disponibles: Warrior Fury · Death Knight Blood · "
+                        "Guías disponibles: Warrior Fury · Death Knight Blood (DPS) · "
                         "Mage Arcane · Paladin Retribution."
                     ),
                     embed=None,

@@ -162,6 +162,16 @@ def _extract_icc_boss_kills(stats_rows):
                     icc_25[boss_name][key] = max(icc_25[boss_name][key], value)
                 break
 
+    # Warmane tiene cruzadas las etiquetas de Deathbringer "Heroic 10" y
+    # "Normal 25": Dapko figura con 120 kills de Saurfang 10H y 38 de Gunship
+    # 10H (el boss anterior del mismo ala). En 6 de 8 personajes revisados
+    # (2026-09-27) los valores tal cual dan más Saurfangs que Gunships; cruzados
+    # quedan consistentes salvo diferencias de ±1.
+    icc_10["Saurfang"]["hc"], icc_25["Saurfang"]["nm"] = (
+        icc_25["Saurfang"]["nm"],
+        icc_10["Saurfang"]["hc"],
+    )
+
     return icc_10, icc_25
 
 

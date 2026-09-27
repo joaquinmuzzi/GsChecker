@@ -741,4 +741,11 @@ def _parse_character_stats_html(html: str) -> dict[str, float]:
     if m:
         result["spell_power"] = float(m.group(1))
 
+    # Dodge / Parry – sección Defense, en porcentaje (el armory no muestra la
+    # defensa). Sirven para distinguir un tanque de un DPS de la misma spec.
+    for key, label in (("dodge_pct", "Dodge"), ("parry_pct", "Parry")):
+        m = re.search(label + r":\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE)
+        if m:
+            result[key] = float(m.group(1))
+
     return result
