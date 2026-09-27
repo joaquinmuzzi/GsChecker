@@ -167,7 +167,7 @@ class GemRequirement(BaseModel):
     """
 
     gem_item_id:    str
-    """Item ID of the required gem, e.g. '44342' for Nightmare Tear."""
+    """Item ID of the required gem, e.g. '49110' for Nightmare Tear."""
 
     gem_name:       str
     required_count: int = 1
@@ -198,7 +198,12 @@ class BisGuide(BaseModel):
     """Short strategy note shown in the coach summary."""
 
     nightmare_tear_required: bool = True
-    """Whether Nightmare Tear (44342) is mandatory for meta activation."""
+    """Whether Nightmare Tear (49110) is mandatory for meta activation."""
+
+    meta_gem_name: str = ""
+
+    item_names: dict[str, str] = Field(default_factory=dict)
+    """item_id → nombre, para mostrar el ítem equipado por nombre y no por ID."""
 
 
 # ─────────────────────────── audit result ────────────────────────────────────

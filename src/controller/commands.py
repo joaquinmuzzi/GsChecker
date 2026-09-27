@@ -50,6 +50,13 @@ from src.functions.embeds import (
     _extract_icc_boss_kills,
     _render_table,
 )
+from src.audit.bis_guides import (
+    GUIDE_REALMS,
+    available_guides,
+    detect_role,
+    is_caster,
+    normalize_realm,
+)
 from src.audit.integration import run_full_audit
 from src.audit.coach import build_fallback_summary
 
@@ -163,22 +170,6 @@ SPEC_SYNONYM_GROUPS = [
     ("Frost", "FDK"),
     ("Unholy", "UDK"),
 ]
-
-
-# Muestra del armory (2026-09-27): DKs tanque 23-29 % de esquivar, DKs DPS
-# (Unholy, Frost y Blood DPS) 6-13 %. 18 % queda en el medio del hueco.
-TANK_DODGE_PCT = 18.0
-
-
-def _is_tanking_blood_dk(char_class: str, spec: str, dodge_pct) -> bool:
-    """La única guía de Blood es de DPS: evaluar un tanque con ella le recomienda
-    cambiar todo su set de tanque y le da score 0."""
-    return (
-        char_class == "Death Knight"
-        and spec == "Blood"
-        and isinstance(dodge_pct, (int, float))
-        and dodge_pct >= TANK_DODGE_PCT
-    )
 
 
 def _normalize_character_name(nombre: str | None) -> str:
@@ -1658,6 +1649,18 @@ def register_commands(bot):
             _log_command_usage(interaction, "ia", nombre, realm)
             await _safe_defer(interaction)
 
+            if normalize_realm(realm) is None:
+                await _safe_edit_original_response(
+                    interaction,
+                    content=(
+                        f"⚠️ Todavía no hay guías BiS para {realm}: solo para "
+                        f"{' e '.join(GUIDE_REALMS)}, armadas con lo que usan los "
+                        "mejores jugadores de cada reino."
+                    ),
+                    embed=None,
+                )
+                return
+
             await _safe_edit_original_response(
                 interaction,
                 content=f"⏳ Analizando a **{nombre}** en {realm} con IA...",
@@ -1720,30 +1723,13 @@ def register_commands(bot):
                 if not active_spec and specs_raw:
                     active_spec = str(specs_raw[0].get("name") or "")
 
-            # Para specs caster/healer, usar el hit de la sección Spell (último)
-            _IA_SPELL_SPECS = frozenset({
-                "Arcane", "Fire", "Frost",
-                "Affliction", "Demonology", "Destruction",
-                "Balance", "Shadow", "Elemental",
-                "Holy", "Discipline", "Restoration",
-            })
+            # Casters: el hit que importa es el de la sección Spell. Se decide por
+            # clase + spec ("Frost" es caster para Mage pero no para Death Knight).
             char_stats: dict = dict(raw_stats or {})
             spell_hit = char_stats.pop("spell_hit_rating", None)
-            if active_spec in _IA_SPELL_SPECS and spell_hit is not None:
+            if is_caster(char_class, active_spec) and spell_hit is not None:
                 char_stats["hit_rating"] = spell_hit
-
-            if _is_tanking_blood_dk(char_class, active_spec, char_stats.get("dodge_pct")):
-                await _safe_edit_original_response(
-                    interaction,
-                    content=(
-                        f"🛡️ **{nombre_char}** juega Blood como **tanque** "
-                        f"({char_stats['dodge_pct']:.1f}% de esquivar).\n"
-                        "Todavía no hay guía BiS de tanque, y la de Blood es de DPS: "
-                        "no te voy a recomendar cambiar tu set de tanque por uno de daño."
-                    ),
-                    embed=None,
-                )
-                return
+            role = detect_role(char_class, active_spec, char_stats)
 
             # Ejecutar auditoría + Groq
             import os as _os
@@ -1756,15 +1742,17 @@ def register_commands(bot):
                 gear_data=gear_data or [],
                 generate_summary=True,
                 groq_api_key=_os.getenv("GROQ_API_KEY"),
+                role=role,
             )
 
             if report is None:
                 await _safe_edit_original_response(
                     interaction,
                     content=(
-                        f"⚠️ No hay guía BiS para **{char_class} {active_spec}** todavía.\n"
-                        "Guías disponibles: Warrior Fury · Death Knight Blood (DPS) · "
-                        "Mage Arcane · Paladin Retribution."
+                        f"⚠️ Todavía no hay suficientes jugadores de **{char_class} "
+                        f"{active_spec}{f' ({role})' if role else ''}** con buen equipo "
+                        f"en {realm} para armar su BiS.\n"
+                        f"Hay guías para {len(available_guides(realm))} specs de {realm}."
                     ),
                     embed=None,
                 )

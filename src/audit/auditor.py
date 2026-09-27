@@ -112,10 +112,18 @@ def _audit_items(
             bis = bis_slot.bis_item
             if bis is None:
                 continue
-            msg = (
-                f"{slot_name}: equipado '{equipped.item_id}' → "
-                f"BiS recomendado '{bis.item_name}' ({bis.item_id}) [{bis.tier_note}]"
-            )
+            equipped_name = guide.item_names.get(equipped.item_id, equipped.item_id)
+            if equipped_name == bis.item_name:
+                # Mismo ítem, otra versión (normal vs heroico).
+                msg = (
+                    f"{slot_name}: tenés '{equipped_name}', los top usan la versión "
+                    f"de mayor nivel ({bis.item_id}) [{bis.tier_note}]"
+                )
+            else:
+                msg = (
+                    f"{slot_name}: equipado '{equipped_name}' → "
+                    f"BiS recomendado '{bis.item_name}' ({bis.item_id}) [{bis.tier_note}]"
+                )
             issues.append(
                 ItemAuditIssue(
                     slot=slot_name,
@@ -246,7 +254,7 @@ def _audit_gems(
                 gem_id="",
                 gem_name="(ninguna)",
                 issue="No hay meta gema equipada",
-                suggestion=f"Equipa Chaotic Skyflare Diamond (item {guide.meta_gem_id})",
+                suggestion=f"Equipa {guide.meta_gem_name or 'la meta gema'} (item {guide.meta_gem_id})",
                 severity=AuditSeverity.CRITICAL,
             ))
             penalty += 10
@@ -256,13 +264,13 @@ def _audit_gems(
                 gem_id=meta_gem_found,
                 gem_name=f"item:{meta_gem_found}",
                 issue=f"Meta gema incorrecta (encontrada: {meta_gem_found})",
-                suggestion=f"Reemplaza por el item {guide.meta_gem_id}",
+                suggestion=f"Reemplaza por {guide.meta_gem_name or 'el item'} ({guide.meta_gem_id})",
                 severity=AuditSeverity.WARNING,
             ))
             penalty += 5
 
     # ── 3b. Nightmare Tear (meta activation) ────────────────────────────────
-    NIGHTMARE_TEAR_ID = "44342"
+    NIGHTMARE_TEAR_ID = "49110"
     if guide.nightmare_tear_required and gem_counter.get(NIGHTMARE_TEAR_ID, 0) == 0:
         issues.append(GemAuditIssue(
             slot="Socket (blue/prismático)",
@@ -270,8 +278,8 @@ def _audit_gems(
             gem_name="Nightmare Tear",
             issue="Falta Nightmare Tear para activar la meta gema",
             suggestion=(
-                "Coloca 1× Nightmare Tear (44342) en un socket azul o prismático. "
-                "Esto activa el Chaotic Skyflare Diamond sin sacrificar slots rojos."
+                "Coloca 1× Nightmare Tear (49110) en un socket azul o prismático "
+                "para activar la meta gema, como la mayoría de los top."
             ),
             severity=AuditSeverity.CRITICAL,
         ))

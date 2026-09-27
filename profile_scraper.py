@@ -268,6 +268,12 @@ def _load_gem_data() -> dict:
     return _GEM_DATA
 
 
+def _is_meta_only(colors: dict) -> bool:
+    return bool(colors.get("meta")) and not any(
+        colors.get(c) for c in ("red", "blue", "yellow")
+    )
+
+
 def _load_gem_by_enchant() -> dict:
     """Build and cache a reverse lookup: enchant_id → gem info dict."""
     global _GEM_BY_ENCHANT
@@ -285,7 +291,9 @@ def _load_gem_by_enchant() -> dict:
             "item_id": item_id,
             "name": info.get("name", item_id),
             "effect": info.get("effect", ""),
-            "meta": bool(info.get("colors", {}).get("meta", False)),
+            # Las prismáticas (Nightmare Tear) tienen todos los colores, meta
+            # incluido, pero van en sockets normales: meta es sólo "meta y nada más".
+            "meta": _is_meta_only(info.get("colors", {})),
         }
     return _GEM_BY_ENCHANT
 
@@ -747,5 +755,10 @@ def _parse_character_stats_html(html: str) -> dict[str, float]:
         m = re.search(label + r":\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE)
         if m:
             result[key] = float(m.group(1))
+
+    # Aguante: separa un Feral oso (tanque) de un Feral gato con el mismo árbol.
+    m = re.search(r"Stamina:\s*([0-9]+)", text, re.IGNORECASE)
+    if m:
+        result["stamina"] = float(m.group(1))
 
     return result

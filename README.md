@@ -19,7 +19,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
   - links a Armory y UwU Logs.
 - **DPS por boss** (máximo y promedio) vía uwu-logs.xyz, con overview rápido y tabla detallada.
 - **Trial of the Crusader**: logros 10N / 10H / 25N / 25H.
-- **Análisis BiS + coach por IA** (Groq) con `/ia`.
+- **Análisis BiS + coach por IA** (Groq) con `/ia`, contra un BiS **por reino** (Lordaeron / Icecrown) armado con lo que equipan los mejores jugadores de cada spec en Warmane.
 - **Cache en memoria + Postgres** (`external_api_cache`) para reducir requests al Armory / UwU.
 - **Rate limit propio + circuit breaker** para no gatillar el 429 / ban de Cloudflare del Armory.
 
@@ -31,7 +31,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 | `/p <nombre> [reino]`        | Alias corto de `/personaje`.                            | Configurable        |
 | `/dps <nombre> [spec]`       | DPS por boss desde UwU Logs.                            | Lordaeron           |
 | `/ptoc <nombre>`             | Logros ToC (10N/10H/25N/25H) en tabla.                  | Lordaeron           |
-| `/ia <nombre> [reino]`       | Análisis BiS + resumen de coach por IA (requiere `GROQ_API_KEY`). | Configurable |
+| `/ia <nombre> [reino]`       | Análisis BiS + resumen de coach por IA (requiere `GROQ_API_KEY`). | Lordaeron / Icecrown |
 | `/ping`                      | Latencia actual del bot.                                | —                   |
 
 Reinos aceptados en `[reino]` (por defecto **Lordaeron**):
@@ -216,6 +216,25 @@ Con ~19.6k nombres, 500 por corrida y una corrida por día, la lista completa se
 2. En la próxima corrida, el cron recalcula el perfil completo y lo guarda como `command_personaje` (y el GS por spec como `character_spec_gs`).
 3. La próxima vez que alguien consulte a Samsara, `/p` responde desde Postgres al instante. Si el cache venció y el armory está rate-limitado, sirve el último perfil bueno (stale) en vez de fallar.
 
+## BiS por reino (`/ia`)
+
+Warmane no es blizzlike en todos lados: **Lordaeron** tiene los jefes reforzados (más vida y daño, enrage más corto, sin buff de ICC) e **Icecrown** es como el original con el buff del 30 %. Por eso `/ia` no usa guías genéricas de WotLK: compara contra lo que realmente equipan los mejores jugadores de cada spec **en ese reino**.
+
+`tools/build_bis_from_armory.py` lo genera en dos pasos:
+
+```bash
+python -m tools.build_bis_from_armory collect --realm Lordaeron   # ~45 min, retoma si se corta
+python -m tools.build_bis_from_armory collect --realm Icecrown
+python -m tools.build_bis_from_armory aggregate                   # escribe static/bis/<reino>.json
+```
+
+1. **Candidatos**: jugadores de cada clase/spec en los rankings ICC 25H de uwu-logs del reino (con logs del último año).
+2. **Equipo real**: del armory, ítems + encantamientos + gemas, spec activa y stats (esquivar, aguante, hit, expertise).
+3. **Rol**: DK con ≥18 % de esquivar → tanque (muestra: tanques 23-29 %, DPS 6-13 %); Feral con ≥3300 de aguante → oso; Protection siempre tanque.
+4. **Guía**: con los 12 de más GS de cada spec/rol, por slot los ítems más usados (sin PvP), los encantamientos que lleva la mayoría (mostrados por su efecto, vía tooltips de Wowhead), la gema meta y Nightmare Tear si la usa la mayoría, y como cap de hit/expertise lo que alcanzan 3 de cada 4 top.
+
+Las specs con menos de 5 jugadores en el reino quedan sin guía y `/ia` lo avisa. Conviene regenerar cada tanto (cambios de meta, nuevos ítems) y commitear `static/bis/`; los datos crudos (`data/bis_raw/`) no se versionan.
+
 ## Logging
 
 Cada invocación de comando emite una línea estructurada en el logger `gschecker.commands`:
@@ -258,7 +277,7 @@ src/
 │   └── cache.py               # get/set/get_stale in-memory
 ├── audit/
 │   ├── auditor.py             # comparación equipo vs BiS guide
-│   ├── bis_guides.py          # guías BiS hardcoded por class+spec
+│   ├── bis_guides.py          # carga el BiS por reino (static/bis/) + roles
 │   ├── coach.py               # resumen narrativo vía Groq
 │   ├── integration.py         # bridge scraper → audit
 │   └── models.py              # Pydantic models
@@ -271,7 +290,8 @@ static/
 ├── GS.json                    # tabla WotLK: item_id → ilvl bucket → GS por slot type
 ├── gem_data.json              # mapeos gem enchant_id → item info
 ├── item_sockets_cache.json    # sockets por item_id (evita hits a evowow)
-└── raid_items_extra.json      # IDs extra para precarga
+├── raid_items_extra.json      # IDs extra para precarga
+└── bis/                        # BiS por reino (tools/build_bis_from_armory.py)
 
 tools/
 ├── run_scheduled_preload.py   # entrypoint del cron (filtro + GS por spec + perfiles)
@@ -279,6 +299,7 @@ tools/
 ├── preload_character_gs.py    # cálculo y guardado de GS por spec
 ├── preload_personaje_cache.py # precarga del perfil completo de /personaje
 ├── preload_item_sockets_cache.py  # precarga sockets de items de raid
+├── build_bis_from_armory.py  # genera el BiS por reino para /ia (static/bis/)
 └── seed_names.py              # arma data/tracked_characters.txt desde rosters / uwu-logs
 
 .railway/railway.py            # infraestructura de Railway como código

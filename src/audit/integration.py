@@ -33,6 +33,28 @@ from src.audit.models import AuditReport
 
 log = logging.getLogger(__name__)
 
+_ITEM_NAME_CACHE: dict[str, str] = {}
+
+
+def _lookup_item_names(item_ids: list[str]) -> dict[str, str]:
+    """Nombres de ítems vía tooltips de Wowhead WotLK (Warmane usa los IDs
+    originales). Cacheado y tolerante a fallos: si no responde, queda el ID."""
+    import requests  # noqa: PLC0415
+
+    for item_id in item_ids:
+        if item_id in _ITEM_NAME_CACHE:
+            continue
+        try:
+            resp = requests.get(
+                f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}", timeout=4
+            )
+            name = resp.json().get("name") if resp.ok else None
+        except Exception:
+            name = None
+        if name:
+            _ITEM_NAME_CACHE[item_id] = name
+    return {i: _ITEM_NAME_CACHE[i] for i in item_ids if i in _ITEM_NAME_CACHE}
+
 
 def _gear_data_to_equipped_items(gear_data: list[dict]) -> list[EquippedItem]:
     """
@@ -79,6 +101,7 @@ async def run_full_audit(
     gear_data: list[dict] | None = None,
     groq_api_key: str | None = None,
     generate_summary: bool = True,
+    role: str = "",
 ) -> AuditReport | None:
     """
     High-level coroutine that:
@@ -128,15 +151,24 @@ async def run_full_audit(
             gear_data = []
 
     # 2. Resolve BiS guide
-    guide = get_bis_guide(char_class, spec)
+    guide = get_bis_guide(char_class, spec, realm=server, role=role)
     if guide is None:
         log.warning(
-            "No BiS guide found for class='%s' spec='%s'. Available: %s",
+            "No BiS guide for class='%s' spec='%s' role='%s' realm='%s'",
             char_class,
             spec,
-            list(__import__("src.audit.bis_guides", fromlist=["BIS_GUIDES"]).BIS_GUIDES),
+            role,
+            server,
         )
         return None
+
+    # 2b. Nombres de lo que tiene puesto y la guía no conoce (items fuera del
+    #     equipo de los top), para no mostrar "equipado '51133'".
+    equipped_ids = [str(g.get("item")) for g in (gear_data or []) if g.get("item")]
+    missing = [i for i in equipped_ids if i not in guide.item_names]
+    if missing:
+        found = await asyncio.to_thread(_lookup_item_names, missing)
+        guide.item_names = {**guide.item_names, **found}
 
     # 3. Build CharacterData
     char = CharacterData(

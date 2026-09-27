@@ -21,7 +21,7 @@ from .models import (
     ItemAuditIssue,
     StatCapAuditResult,
 )
-from .bis_guides import BIS_GUIDES, get_bis_guide
+from .bis_guides import available_guides, get_bis_guide
 from .auditor import audit_character
 from .coach import generate_coach_summary
 
@@ -29,7 +29,7 @@ __all__ = [
     "audit_character",
     "generate_coach_summary",
     "get_bis_guide",
-    "BIS_GUIDES",
+    "available_guides",
     # models
     "AuditReport",
     "AuditSeverity",

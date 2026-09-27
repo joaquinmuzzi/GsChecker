@@ -32,6 +32,9 @@ wheels/
 # Backup
 _backup/
 
+# Datos crudos del generador de BiS (se regeneran; se versiona static/bis/)
+data/bis_raw/
+
 # IDE
 .vscode/
 .idea/
