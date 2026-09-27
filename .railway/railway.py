@@ -50,11 +50,9 @@ def main(ctx=None):
         source=repo,
         replicas={"us-west2": 1},
         build={"builder": "NIXPACKS"},
-        deploy={
-            "limitOverride": {"containers": {"cpu": 2, "memoryBytes": 2000000000}},
-            "restartPolicyType": "ON_FAILURE",
-            "restartPolicyMaxRetries": 10,
-        },
+        # Sin restartPolicy: el default de Railway ya es ON_FAILURE con 10
+        # reintentos (lo que pedía el railway.toml) y Railway no lo persiste.
+        deploy={"limitOverride": {"containers": {"cpu": 2, "memoryBytes": 2000000000}}},
         networking={"privateNetworkEndpoint": "gschecker"},
         env={"DATABASE_URL": preserve(), "DISCORD_TOKEN": preserve(), "START_COMMAND": preserve()},
     )

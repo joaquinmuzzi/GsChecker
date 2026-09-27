@@ -82,7 +82,7 @@ poetry run python main.py
 El repo incluye lo necesario para correrlo como **worker**:
 
 - `Procfile` — `worker: bash ./run_railway.sh`
-- `.railway/railway.py` — infraestructura como código: Nixpacks + restart on failure (10 reintentos) para el bot, cron del preload. Ver `.railway/README.md`
+- `.railway/railway.py` — infraestructura como código: Nixpacks, cron del preload (restart on failure ×10 es el default de Railway). Ver `.railway/README.md`
 - `run_railway.sh` — carga `.env` y ejecuta `python3 main.py`
 
 Variables recomendadas en Railway:
