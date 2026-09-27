@@ -24,12 +24,6 @@ def main(ctx=None):
         "postgres-volume-NNcI",
         {"alerts": usage_alerts, "allowOnlineResize": True, "region": "us-west2", "sizeMB": 5000},
     )
-    # Volumen huérfano (no está montado en ningún servicio). Se declara para que
-    # aplicar este archivo no lo borre; eliminarlo es una decisión aparte.
-    mysql_volume = volume(
-        "mysql-volume",
-        {"alerts": usage_alerts, "allowOnlineResize": True, "region": "us-west2", "sizeMB": 5000},
-    )
 
     cron = service(
         "GsChecker-Cron",
@@ -61,5 +55,5 @@ def main(ctx=None):
 
     return project(
         "alluring-integrity",
-        resources=[db, cron, bot, postgres_volume, mysql_volume],
+        resources=[db, cron, bot, postgres_volume],
     )
