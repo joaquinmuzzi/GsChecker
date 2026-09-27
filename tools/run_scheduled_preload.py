@@ -26,7 +26,12 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from dotenv import load_dotenv
 
-from src.db.postgres import init_database, list_tracked_characters
+from src.db.postgres import (
+    get_app_state,
+    init_database,
+    list_tracked_characters,
+    set_app_state,
+)
 from src.schemas.constants import ARMORY_CIRCUIT
 from tools.preload_character_gs import (
     _calculate_character_gs,
@@ -44,6 +49,8 @@ ROTATION_INDEX_PATH = "data/preload_rotation_index.txt"
 DEFAULT_REALM = "Lordaeron"
 DEFAULT_DELAY = 2.0
 DEFAULT_ROTATION_SIZE = 500
+ROTATION_INDEX_STATE_KEY = "preload_rotation_index"
+HIGH_GS_STATE_KEY = "tracked_high_gs"
 
 
 def _configure_logging() -> None:
@@ -112,7 +119,26 @@ def _process_one(nombre: str, realm: str) -> tuple[bool, int]:
     return (True, stored)
 
 
+def _load_filtered(path: Path, default_realm: str) -> list[tuple[str, str]]:
+    stored = get_app_state(HIGH_GS_STATE_KEY)
+    if isinstance(stored, list):
+        pairs = [
+            (_normalize_name(item[0]), str(item[1]).strip())
+            for item in stored
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        ]
+        pairs = [(n, r) for n, r in pairs if n and r]
+        logger.info("Leídos %s personajes filtrados de Postgres (app_state)", len(pairs))
+        return pairs
+    return _load_from_txt(path, default_realm)
+
+
 def _read_rotation_index() -> int:
+    # Postgres primero: el filesystem de Railway se resetea en cada deploy y el
+    # índice volvía a 0, recorriendo siempre los mismos primeros nombres.
+    stored = get_app_state(ROTATION_INDEX_STATE_KEY)
+    if isinstance(stored, int) and stored >= 0:
+        return stored
     idx_path = PROJECT_ROOT / ROTATION_INDEX_PATH
     if not idx_path.exists():
         return 0
@@ -123,6 +149,7 @@ def _read_rotation_index() -> int:
 
 
 def _save_rotation_index(idx: int) -> None:
+    set_app_state(ROTATION_INDEX_STATE_KEY, idx)
     idx_path = PROJECT_ROOT / ROTATION_INDEX_PATH
     idx_path.parent.mkdir(parents=True, exist_ok=True)
     idx_path.write_text(str(idx), encoding="utf-8")
@@ -176,6 +203,8 @@ def main() -> int:
     max_characters = int(os.getenv("PRELOAD_MAX_CHARACTERS", "0"))
     rotation_size = int(os.getenv("PRELOAD_ROTATION_SIZE", str(DEFAULT_ROTATION_SIZE)))
 
+    init_database()
+
     from datetime import datetime
     today = datetime.now()
     force_filter = os.getenv("FORCE_FILTER", "").strip() in ("1", "true", "yes")
@@ -194,10 +223,8 @@ def main() -> int:
         except Exception as exc:
             logger.warning("Filter falló (continuando con preload): %s", exc)
 
-    init_database()
-
     # Load filtered high-GS characters
-    filtered_pairs = _load_from_txt(filtered_path, default_realm)
+    filtered_pairs = _load_filtered(filtered_path, default_realm)
     filtered_set = {(p[0].lower(), p[1].lower()) for p in filtered_pairs}
 
     # Load all characters from full list + DB

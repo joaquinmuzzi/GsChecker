@@ -817,10 +817,10 @@ def _fetch_achievements(nombre: str, server: str):
             headers,
             {"category": category_id},
         )
-        if not isinstance(achi_json, dict):
-            return []
-        if "content" not in achi_json:
-            return []
+        # None = el armory no respondió (429/5xx/circuit abierto); distinto de
+        # [] = respondió pero no hay logros completados en la categoría.
+        if not isinstance(achi_json, dict) or "content" not in achi_json:
+            return None
         soup = BeautifulSoup(achi_json["content"], "html.parser")
         all_achievements = soup.find_all("div", class_="achievement")
         completed_achievements = []
@@ -847,8 +847,13 @@ def _fetch_achievements(nombre: str, server: str):
     # Fetch sequentially to avoid 429s from parallel armory requests.
     # Each category POST gets its own rate-limit token + small inter-request delay.
     results = []
+    failed_categories = set()
     for category_id in raid_categories:
-        results.append(fetch_category(category_id))
+        ids = fetch_category(category_id)
+        if ids is None:
+            failed_categories.add(category_id)
+            ids = []
+        results.append(ids)
         if category_id != raid_categories[-1]:
             ARMORY_LIMITER.acquire()
             time.sleep(random.uniform(1.0, 2.0))
@@ -884,7 +889,11 @@ def _fetch_achievements(nombre: str, server: str):
         for category_id in [14922, 14923]:
             ARMORY_LIMITER.acquire()
             time.sleep(random.uniform(1.0, 2.0))
-            for ach_id in fetch_category(category_id):
+            ids = fetch_category(category_id)
+            if ids is None:
+                continue
+            failed_categories.discard(category_id)
+            for ach_id in ids:
                 completed_ids.add(ach_id)
                 if ach_id in target_achievements:
                     key = target_achievements[ach_id][0]
@@ -911,7 +920,28 @@ def _fetch_achievements(nombre: str, server: str):
         "storming_10h_achieved": "4628" in completed_ids,
         "storming_25n_achieved": "4604" in completed_ids,
         "storming_25h_achieved": "4632" in completed_ids,
+        # False si alguna categoría no respondió: los flags en False pueden ser
+        # "no pudimos leerlo", no "no lo hizo". No se debe persistir como verdad.
+        "complete": not failed_categories,
     }
+
+    if failed_categories:
+        stale = _cache_get_stale(ACHIEVEMENTS_CACHE, cache_key)
+        if isinstance(stale, dict) and stale.get("complete", True):
+            logger.warning(
+                "Achievements incompletos para '%s'/%s (fallaron %s), usando cache stale",
+                nombre,
+                server,
+                sorted(failed_categories),
+            )
+            return stale
+        logger.warning(
+            "Achievements incompletos para '%s'/%s (fallaron %s), sin cache stale",
+            nombre,
+            server,
+            sorted(failed_categories),
+        )
+        return payload
 
     halion_any = any(
         payload[k]

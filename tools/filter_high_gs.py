@@ -29,7 +29,10 @@ from src.schemas.constants import (
     ARMORY_LIMITER,
     ARMORY_CIRCUIT,
 )
+from src.db.postgres import init_database, set_app_state
 from tools.preload_character_gs import _normalize_name
+
+HIGH_GS_STATE_KEY = "tracked_high_gs"
 
 TRACKED_FILE = Path(__file__).resolve().parent.parent / "data" / "tracked_characters.txt"
 HIGH_GS_FILE = Path(__file__).resolve().parent.parent / "data" / "tracked_high_gs.txt"
@@ -204,6 +207,10 @@ def main():
 
     _write_high_gs(output_path, high_gs)
     print(f"[OK] {len(high_gs)} personajes guardados en {output_path}")
+    # El txt se pierde en el próximo deploy de Railway; Postgres es la fuente real.
+    init_database()
+    if set_app_state(HIGH_GS_STATE_KEY, [list(pair) for pair in sorted(high_gs)]):
+        print(f"[OK] {len(high_gs)} personajes guardados en Postgres (app_state)")
 
 
 if __name__ == "__main__":

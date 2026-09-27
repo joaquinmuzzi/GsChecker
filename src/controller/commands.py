@@ -545,6 +545,7 @@ def _serialize_personaje_payload(
     professions=None,
     suboptimal_gems=None,
     gear_item_count=None,
+    data_complete=True,
 ):
     return {
         "nombre_char": nombre_char,
@@ -570,7 +571,15 @@ def _serialize_personaje_payload(
         "active_spec_name": active_spec_name,
         "professions": professions or [],
         "gear_item_count": gear_item_count,
+        "data_complete": data_complete,
     }
+
+
+def _is_personaje_data_complete(achi_payload, stats_rows) -> bool:
+    """False cuando el armory falló a mitad de camino: con logros o estadísticas
+    faltantes el embed mostraría ❌ que en realidad son "no pudimos leerlo"."""
+    achievements_ok = isinstance(achi_payload, dict) and achi_payload.get("complete", True)
+    return bool(achievements_ok) and bool(stats_rows)
 
 
 def _is_valid_personaje_payload(payload: dict) -> bool:
@@ -610,6 +619,9 @@ def _is_valid_personaje_payload(payload: dict) -> bool:
     # armory response (Cloudflare interference, page hiccup) — the GS computed
     # from it undercounts and would otherwise get cached as fact for the whole
     # COMMAND_PERSONAJE_TTL window.
+    if payload.get("data_complete") is False:
+        return False
+
     gear_item_count = payload.get("gear_item_count")
     if gear_item_count is not None and gear_item_count < 15:
         return False
@@ -1230,6 +1242,7 @@ async def _personaje_impl(
             professions,
             suboptimal_gems,
             gear_item_count=len(gear_data) if isinstance(gear_data, list) else 0,
+            data_complete=_is_personaje_data_complete(achi_payload, stats_rows),
         )
         if _is_valid_personaje_payload(_payload_to_cache):
             await async_set_external_cache(
@@ -1245,6 +1258,18 @@ async def _personaje_impl(
                 nombre_char,
                 realm,
             )
+            if not _payload_to_cache["data_complete"]:
+                # Mejor mostrar el último perfil bueno que ❌ falsos por un 429.
+                stale_payload = await async_get_external_cache_stale(
+                    "command_personaje", personaje_cache_key
+                )
+                if isinstance(stale_payload, dict):
+                    logger.warning(
+                        "Armory respondió incompleto — serving stale DB cache for '%s'/%s",
+                        nombre_char,
+                        realm,
+                    )
+                    embed_final = _build_personaje_embed_from_cache(stale_payload)
         await _safe_edit_original_response(
             interaction, content=None, embed=embed_final, view=personaje_view
         )

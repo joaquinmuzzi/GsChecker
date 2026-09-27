@@ -127,7 +127,7 @@ class TestPreloadPersonajeCacheDoesNotFilter:
             "storming_10h_achieved": False, "storming_25n_achieved": False,
             "storming_25h_achieved": False,
         }
-        mock_stats.return_value = []
+        mock_stats.return_value = [["Lord Marrowgar kills (Icecrown 25 player)", "- -"]]
         mock_prof.return_value = []
         mock_specs.return_value = [{"name": "Discipline", "active": True}]
         mock_uwu.return_value = {}

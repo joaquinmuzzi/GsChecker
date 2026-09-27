@@ -42,6 +42,7 @@ from src.controller.commands import (
     _fallback_spec_names_for_class,
     _finalize_special_uwu_kills,
     _get_known_gs_by_spec,
+    _is_personaje_data_complete,
     _is_valid_personaje_payload,
     _load_confirmed_icc_kills,
     _normalize_character_realm,
@@ -254,6 +255,7 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
         professions,
         suboptimal_gems,
         gear_item_count=len(gear_data) if isinstance(gear_data, list) else 0,
+        data_complete=_is_personaje_data_complete(achi_payload, stats_rows),
     )
 
     if not _is_valid_personaje_payload(payload):

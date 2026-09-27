@@ -103,6 +103,13 @@ def init_database() -> bool:
                 )
                 """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_state (
+                    key TEXT PRIMARY KEY,
+                    value_json TEXT NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_tracked_characters_last_seen
                 ON tracked_characters (last_seen_at DESC)
                 """)
@@ -176,6 +183,46 @@ def list_tracked_characters(
     except Exception as exc:
         logger.warning("Error listando tracked_characters: %s", exc)
         return []
+
+
+def get_app_state(key: str):
+    """Estado persistente del cron (índice rotativo, lista de GS alto). El
+    filesystem de Railway se resetea en cada deploy, así que vive en Postgres."""
+    if not db_enabled():
+        return None
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT value_json FROM app_state WHERE key = %s", (key,))
+                row = cur.fetchone()
+                return json.loads(row[0]) if row else None
+    except Exception as exc:
+        logger.warning("Error leyendo app_state '%s': %s", key, exc)
+        return None
+
+
+def set_app_state(key: str, value) -> bool:
+    if not db_enabled():
+        return False
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO app_state (key, value_json, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (key)
+                    DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = NOW()
+                    """,
+                    (key, json.dumps(value, ensure_ascii=False)),
+                )
+            conn.commit()
+        return True
+    except Exception as exc:
+        logger.warning("Error guardando app_state '%s': %s", key, exc)
+        return False
 
 
 async def async_track_character_lookup(character_name: str, server: str) -> None:
