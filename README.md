@@ -66,9 +66,7 @@ GROQ_API_KEY=...
 
 `requirements.txt` es la fuente de verdad (es lo que instala Railway) y tiene las versiones **fijas** que corre producción. Para actualizar una librería: subí la versión ahí, corré los tests y dejá que el CI lo valide antes del deploy.
 
-`requirements-dev.txt` agrega `pytest` y `pytest-asyncio`.
-
-> `pyproject.toml` / `poetry.lock` están desactualizados respecto de `requirements.txt` (por ejemplo, piden `groq ^0.9` y producción usa `groq 1.7.0`). Usá pip.
+`requirements-dev.txt` agrega `pytest` y `pytest-asyncio` (configuración en `pytest.ini`).
 
 ### Ejecutar
 
