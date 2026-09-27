@@ -36,6 +36,7 @@ from src.functions.warmane import (
     _fetch_statistics,
     _fetch_guild_rank,
 )
+from src.functions.names import is_valid_character_name
 from src.functions.uwu import (
     _uwu_icc_bugfix_kills,
     _build_uwu_dps_summary,
@@ -162,6 +163,19 @@ SPEC_SYNONYM_GROUPS = [
     ("Frost", "FDK"),
     ("Unholy", "UDK"),
 ]
+
+
+def _normalize_character_name(nombre: str | None) -> str:
+    """Capitaliza y valida el nombre antes de tocar el armory: un nombre imposible
+    (ej. "C_123") no existe en Warmane y consultarlo gasta ~15 requests del
+    rate limit compartido por todos los usuarios."""
+    clean_name = str(nombre or "").strip().capitalize()
+    if not is_valid_character_name(clean_name):
+        raise ValueError(
+            f"⚠️ '{str(nombre or '').strip()}' no es un nombre de personaje válido "
+            "(solo letras, entre 2 y 12)."
+        )
+    return clean_name
 
 
 def _normalize_character_realm(reino: str | None) -> str:
@@ -1044,7 +1058,7 @@ async def _personaje_impl(
     reino: str | None = None,
 ):
     try:
-        nombre = nombre.capitalize()
+        nombre = _normalize_character_name(nombre)
         realm = _normalize_character_realm(reino)
         _log_command_usage(interaction, command_name, nombre, realm)
         await _safe_defer(interaction)
@@ -1106,20 +1120,9 @@ async def _personaje_impl(
         uwu_icc_task = loop.run_in_executor(
             EXECUTOR, _uwu_icc_bugfix_kills, nombre, realm
         )
-        prof_task = loop.run_in_executor(EXECUTOR, _fetch_professions, nombre, realm)
-        summary_task = loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
-        gear_task = loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre, realm)
-        achi_task = loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre, realm)
-        stats_task = loop.run_in_executor(
-            EXECUTOR, _fetch_statistics, nombre, realm, 15062
-        )
-        specs_task = loop.run_in_executor(EXECUTOR, _fetch_specs, nombre, realm)
-
-        summary, gear_data, achi_payload, stats_rows, professions, talents = (
-            await asyncio.gather(
-                summary_task, gear_task, achi_task, stats_task, prof_task, specs_task
-            )
-        )
+        # Summary primero: si el personaje no existe o no es 80 se responde en
+        # segundos, sin gastar ~15 requests del armory en logros/estadísticas.
+        summary = await loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
 
         if isinstance(summary, dict) and summary.get("__error__"):
             await _safe_edit_original_response(
@@ -1145,6 +1148,14 @@ async def _personaje_impl(
                 embed=None,
             )
             return
+
+        gear_data, achi_payload, stats_rows, professions, talents = await asyncio.gather(
+            loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre_char, realm),
+            loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre_char, realm),
+            loop.run_in_executor(EXECUTOR, _fetch_statistics, nombre_char, realm, 15062),
+            loop.run_in_executor(EXECUTOR, _fetch_professions, nombre_char, realm),
+            loop.run_in_executor(EXECUTOR, _fetch_specs, nombre_char, realm),
+        )
 
         base = await asyncio.to_thread(
             _compute_personaje_base,
@@ -1304,7 +1315,7 @@ def register_commands(bot):
         interaction: discord.Interaction, nombre: str, spec: str | None = None
     ):
         try:
-            nombre = nombre.capitalize()
+            nombre = _normalize_character_name(nombre)
             _log_command_usage(interaction, "dps", nombre, "Lordaeron", spec=spec)
             spec_display = f" [{spec.upper()}]" if spec else ""
             await _safe_defer(interaction)
@@ -1539,6 +1550,8 @@ def register_commands(bot):
             if _is_expired_token(e):
                 return
             await _safe_send_error(interaction, f"❌ Error de red: {e}")
+        except ValueError as e:
+            await _safe_send_error(interaction, str(e))
         except Exception as e:
             await _safe_send_error(interaction, f"❌ Error al obtener DPS: {e}")
 
@@ -1549,7 +1562,7 @@ def register_commands(bot):
     @discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
     async def ptoc(interaction: discord.Interaction, nombre: str):
         try:
-            nombre = nombre.capitalize()
+            nombre = _normalize_character_name(nombre)
             _log_command_usage(interaction, "ptoc", nombre, "Lordaeron")
             await _safe_defer(interaction)
 
@@ -1605,6 +1618,8 @@ def register_commands(bot):
             if _is_expired_token(e):
                 return
             await _safe_send_error(interaction, f"❌ Error de red: {e}")
+        except ValueError as e:
+            await _safe_send_error(interaction, str(e))
         except Exception as e:
             await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
 
@@ -1622,7 +1637,7 @@ def register_commands(bot):
         reino: str | None = None,
     ):
         try:
-            nombre = nombre.capitalize()
+            nombre = _normalize_character_name(nombre)
             realm = _normalize_character_realm(reino)
             _log_command_usage(interaction, "ia", nombre, realm)
             await _safe_defer(interaction)
@@ -1797,5 +1812,7 @@ def register_commands(bot):
             if _is_expired_token(e):
                 return
             await _safe_send_error(interaction, f"❌ Error de red: {e}")
+        except ValueError as e:
+            await _safe_send_error(interaction, str(e))
         except Exception as e:
             await _safe_send_error(interaction, f"❌ Error en /ia: {e}")
