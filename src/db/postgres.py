@@ -8,6 +8,8 @@ from contextlib import contextmanager
 
 import psycopg
 
+from src.functions.names import is_valid_character_name
+
 logger = logging.getLogger("gschecker.postgres")
 
 
@@ -125,7 +127,7 @@ def track_character_lookup(character_name: str, server: str) -> None:
 
     clean_name = str(character_name or "").strip()
     clean_server = str(server or "").strip()
-    if not clean_name or not clean_server or clean_name == "-" or clean_server == "-":
+    if not is_valid_character_name(clean_name) or not clean_server or clean_server == "-":
         return
 
     try:

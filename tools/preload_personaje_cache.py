@@ -57,6 +57,7 @@ from src.db.postgres import (
     set_external_cache,
 )
 from src.functions.embeds import _extract_icc_boss_kills
+from src.functions.names import is_valid_character_name
 from src.functions.uwu import _uwu_icc_bugfix_kills
 from src.functions.warmane import (
     _fetch_achievements,
@@ -284,7 +285,7 @@ def main() -> int:
 
     init_database()
 
-    pairs = list_tracked_characters()
+    pairs = [(n, r) for n, r in list_tracked_characters() if is_valid_character_name(n)]
     if max_characters and max_characters > 0:
         pairs = pairs[:max_characters]
 

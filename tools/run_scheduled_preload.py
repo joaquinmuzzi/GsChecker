@@ -32,6 +32,7 @@ from src.db.postgres import (
     list_tracked_characters,
     set_app_state,
 )
+from src.functions.names import is_valid_character_name
 from src.schemas.constants import ARMORY_CIRCUIT
 from tools.preload_character_gs import (
     _calculate_character_gs,
@@ -72,7 +73,7 @@ def _parse_txt_line(raw_line: str, default_realm: str) -> tuple[str, str] | None
 
     name = _normalize_name(name_part)
     realm = str(realm_part or default_realm).strip() or default_realm
-    if not name:
+    if not is_valid_character_name(name):
         return None
     return (name, realm)
 
@@ -94,7 +95,7 @@ def _load_from_txt(path: Path, default_realm: str) -> list[tuple[str, str]]:
 def _load_from_db() -> list[tuple[str, str]]:
     rows = list_tracked_characters()
     pairs = [(_normalize_name(name), realm.strip()) for name, realm in rows]
-    pairs = [(n, r) for n, r in pairs if n and r]
+    pairs = [(n, r) for n, r in pairs if is_valid_character_name(n) and r]
     logger.info("Leídos %s personajes de la tabla tracked_characters", len(pairs))
     return pairs
 

@@ -30,6 +30,7 @@ from src.schemas.constants import (
     ARMORY_CIRCUIT,
 )
 from src.db.postgres import init_database, set_app_state
+from src.functions.names import is_valid_character_name
 from tools.preload_character_gs import _normalize_name
 
 HIGH_GS_STATE_KEY = "tracked_high_gs"
@@ -59,7 +60,7 @@ def _load_names(file_path: Path, default_realm: str = "Lordaeron") -> list[tuple
             name_part, realm_part = line, default_realm
         name = _normalize_name(name_part)
         realm = str(realm_part or default_realm).strip()
-        if name:
+        if is_valid_character_name(name):
             pairs.append((name, realm))
     return pairs
 

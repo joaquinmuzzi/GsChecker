@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bs4 import BeautifulSoup
 from src.schemas.constants import SESSION, HTTP_TIMEOUT
+from src.functions.names import is_valid_character_name
 from tools.preload_character_gs import _normalize_name
 
 TRACKED_FILE = Path(__file__).resolve().parent.parent / "data" / "tracked_characters.txt"
@@ -64,7 +65,8 @@ def _write_names(file_path: Path, names: set[str], header: str = "") -> None:
         lines.append(f"# Generado: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
     for name in sorted(names):
-        lines.append(name)
+        if is_valid_character_name(name):
+            lines.append(name)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
