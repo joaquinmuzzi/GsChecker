@@ -12,7 +12,9 @@ from railway_sdk import define_railway, github, postgres, preserve, project, ser
 
 @define_railway
 def main(ctx=None):
-    repo = github("joaquinmuzzi/GsChecker", branch="master", checkSuites=False)
+    # checkSuites: Railway espera a que pase el CI de GitHub (tests.yml)
+    # antes de deployar un push.
+    repo = github("joaquinmuzzi/GsChecker", branch="master", checkSuites=True)
 
     db = postgres("Postgres", region="us-west2")
     db.networking = {"privateNetworkEndpoint": "postgres", "tcpProxies": {"5432": {}}}

@@ -629,7 +629,7 @@ def _is_valid_personaje_payload(payload: dict) -> bool:
     return True
 
 
-def _build_personaje_embed_from_cache(payload: dict):
+def _build_personaje_embed_from_cache(payload: dict, loading_symbol: str = "?"):
     return _build_personaje_embed(
         payload["nombre_char"],
         payload["gs"],
@@ -647,12 +647,227 @@ def _build_personaje_embed_from_cache(payload: dict):
         payload["missing_enchants"],
         payload["missing_gems"],
         payload.get("uwu_icc_kills"),
+        loading_symbol=loading_symbol,
         spec_gs_value=_format_spec_gs_value(payload.get("spec_gs_entries", [])),
         guild_rank=payload.get("guild_rank"),
         professions=payload.get("professions"),
         active_spec_name=payload.get("active_spec_name"),
         suboptimal_gems=payload.get("suboptimal_gems"),
     )
+
+
+def _split_active_inactive_specs(talents, clase):
+    if isinstance(talents, list) and len(talents) > 0:
+        sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
+        active_specs = [
+            t.get("name", "N/A") for t in sorted_talents if t.get("active", False)
+        ]
+        inactive_specs = [
+            t.get("name", "N/A")
+            for t in sorted_talents
+            if not t.get("active", False)
+        ]
+        # Warmane sometimes returns talents without an explicit active marker.
+        # If no active spec is flagged, promote the first valid talent as active.
+        if not active_specs:
+            for talent in sorted_talents:
+                candidate = str(talent.get("name") or "").strip()
+                if not candidate or candidate == "N/A":
+                    continue
+                active_specs = [candidate]
+                inactive_specs = [
+                    name
+                    for name in inactive_specs
+                    if str(name or "").strip() != candidate
+                ]
+                break
+        return active_specs, inactive_specs
+    return [], _fallback_spec_names_for_class(clase)
+
+
+def _compute_personaje_base(
+    summary: dict,
+    realm: str,
+    gear_data,
+    achi_payload,
+    stats_rows,
+    professions,
+    talents,
+    cache_endpoint: str,
+) -> dict:
+    """Todo el perfil de /personaje salvo las kills de uwu-logs, a partir de los
+    datos crudos del armory. Sincrónica (hace I/O de guild rank y Postgres): la
+    usan /p (en un thread) y el cron de preload, así un arreglo se hace una vez.
+
+    Devuelve los kwargs de `_serialize_personaje_payload` menos `uwu_icc_kills`.
+    """
+    nombre_char = summary.get("name")
+    clase = summary.get("class", "N/A")
+    active_specs, inactive_specs = _split_active_inactive_specs(talents, clase)
+
+    try:
+        # gearscore.main() is positional (zips armor slots against a fixed
+        # SLOT_TYPES template and unpacks the last 3 as main/off/ranged) — do
+        # NOT filter out blank slots (e.g. empty Tabard) or every item after
+        # them scores against the wrong slot category.
+        gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
+        if gear_ids:
+            gs = sum(gearscore.main(gear_ids))
+        else:
+            gs = summary.get("gearScore", "N/A")
+    except Exception:
+        logger.exception(
+            "gearscore calc failed for '%s'/%s — falling back to armory gearScore",
+            nombre_char,
+            realm,
+        )
+        gs = summary.get("gearScore", "N/A")
+
+    # Detect whether gear_data came from API stubs (item IDs only,
+    # no real gem/enchant data).  In that case, skip ench/gems checks
+    # to avoid false positives where stubs use ench="0" and gems=["0"].
+    is_stubs = (
+        isinstance(gear_data, list)
+        and len(gear_data) > 0
+        and all(isinstance(item, dict) and item.get("_source") == "api_stubs" for item in gear_data)
+    )
+
+    if is_stubs:
+        missing_enchants, missing_gems = [], []
+        suboptimal_gems = []
+    else:
+        try:
+            missing_enchants, missing_gems = (
+                profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
+            )
+        except Exception:
+            logger.exception(
+                "missing enchants/gems calc failed for '%s'/%s", nombre_char, realm
+            )
+            missing_enchants, missing_gems = [], []
+
+        try:
+            suboptimal_gems = profile_scraper.get_suboptimal_gems_from_gear_data(
+                gear_data, clase, active_specs[0] if active_specs else ""
+            )
+        except Exception:
+            logger.exception(
+                "suboptimal gems calc failed for '%s'/%s", nombre_char, realm
+            )
+            suboptimal_gems = []
+
+    guild_obj = summary.get("guild")
+    guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
+    guild_rank = None
+    if guild and guild != "Sin guild":
+        try:
+            guild_rank = _fetch_guild_rank(nombre_char, guild, realm)
+        except Exception:
+            logger.exception(
+                "guild rank fetch failed for '%s' guild='%s'/%s",
+                nombre_char,
+                guild,
+                realm,
+            )
+            guild_rank = None
+
+    for active_spec in active_specs:
+        clean_active_spec = str(active_spec or "").strip()
+        if not clean_active_spec or clean_active_spec == "N/A":
+            continue
+        set_external_cache(
+            "character_spec_gs",
+            cache_endpoint,
+            _build_character_spec_gs_key(nombre_char, realm, clean_active_spec),
+            {"character": nombre_char, "spec": clean_active_spec, "gs": gs},
+            {"character": nombre_char, "spec": clean_active_spec, "server": realm},
+        )
+
+    gs_by_spec = _get_known_gs_by_spec(
+        nombre_char,
+        realm,
+        active_specs + inactive_specs,
+        gs,
+        active_specs,
+    )
+
+    # If current gear fetch failed (gs unknown), but we have any cached GS for
+    # this character/spec set, reuse it for the active spec instead of showing '?'.
+    if active_specs and gs in {None, "N/A", "?"}:
+        active_name = str(active_specs[0] or "").strip()
+        if active_name and gs_by_spec.get(active_name) in {None, "N/A", "?"}:
+            fallback_gs = next(
+                (
+                    value
+                    for value in gs_by_spec.values()
+                    if value not in {None, "N/A", "?"}
+                ),
+                None,
+            )
+            if fallback_gs is not None:
+                gs_by_spec[active_name] = fallback_gs
+
+    spec_gs_entries = _build_spec_gs_entries(
+        active_specs + inactive_specs,
+        gs_by_spec,
+        active_specs,
+    )
+    if spec_gs_entries and not any(entry.get("main") for entry in spec_gs_entries):
+        if gs not in {None, "N/A", "?"}:
+            spec_gs_entries[0]["main"] = True
+            spec_gs_entries[0]["gearscore"] = gs
+
+    # Avoid synthetic ICC counts when statistics are temporarily unavailable.
+    # Storming achievements are handled in the special UwU section only.
+    icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
+
+    return {
+        "nombre_char": nombre_char,
+        "server": realm,
+        "gs": gs,
+        "nivel": summary.get("level", "N/A"),
+        "raza": summary.get("race", "N/A"),
+        "clase": clase,
+        "spec_display": " - ".join(
+            f"**{spec}**" if spec in active_specs else spec
+            for spec in active_specs + inactive_specs
+        ),
+        "guild_display": f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild",
+        "guild_rank": guild_rank,
+        # Warmane's Halion statistics are always empty, so trust the achievements.
+        "halion_10n_achieved": achi_payload["halion_10n_achieved"],
+        "halion_10h_achieved": achi_payload["halion_10h_achieved"],
+        "halion_25n_achieved": achi_payload["halion_25n_achieved"],
+        "halion_25h_achieved": achi_payload["halion_25h_achieved"],
+        "icc_10": icc_10,
+        "icc_25": icc_25,
+        "missing_enchants": missing_enchants,
+        "missing_gems": missing_gems,
+        "spec_gs_entries": spec_gs_entries,
+        "active_spec_name": active_specs[0] if active_specs else None,
+        "professions": professions,
+        "suboptimal_gems": suboptimal_gems,
+        "gear_item_count": len(gear_data) if isinstance(gear_data, list) else 0,
+        "data_complete": _is_personaje_data_complete(achi_payload, stats_rows),
+    }
+
+
+def _resolve_uwu_icc_kills(
+    nombre_char, realm, raw_uwu_kills, persistent_confirmed, achi_payload, gear_data
+):
+    """Kills especiales de ICC combinando fuentes, en este orden:
+    1) UwU Logs, 2) Storming the Citadel, 3) ítems equipados del boss.
+    Persiste las kills nuevas confirmadas (Postgres, sincrónico)."""
+    uwu_icc_kills = _normalize_special_uwu_kills(raw_uwu_kills)
+    uwu_icc_kills = _overlay_persistent_confirmed_kills(uwu_icc_kills, persistent_confirmed)
+    uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
+    uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
+
+    persistent_confirmed = _persist_new_confirmed_icc_kills(
+        nombre_char, realm, uwu_icc_kills
+    )
+    uwu_icc_kills = _overlay_persistent_confirmed_kills(uwu_icc_kills, persistent_confirmed)
+    return _finalize_special_uwu_kills(uwu_icc_kills)
 
 
 def _build_dps_embed_from_cache(payload: dict):
@@ -922,8 +1137,6 @@ async def _personaje_impl(
 
         nombre_char = summary.get("name", nombre)
         nivel = summary.get("level", "N/A")
-        raza = summary.get("race", "N/A")
-        clase = summary.get("class", "N/A")
 
         if nivel != 80:
             await _safe_edit_original_response(
@@ -933,199 +1146,34 @@ async def _personaje_impl(
             )
             return
 
-        if isinstance(talents, list) and len(talents) > 0:
-            sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
-            active_specs = [
-                t.get("name", "N/A") for t in sorted_talents if t.get("active", False)
-            ]
-            inactive_specs = [
-                t.get("name", "N/A")
-                for t in sorted_talents
-                if not t.get("active", False)
-            ]
-            # Warmane sometimes returns talents without an explicit active marker.
-            # If no active spec is flagged, promote the first valid talent as active.
-            if not active_specs:
-                for talent in sorted_talents:
-                    candidate = str(talent.get("name") or "").strip()
-                    if not candidate or candidate == "N/A":
-                        continue
-                    active_specs = [candidate]
-                    inactive_specs = [
-                        name
-                        for name in inactive_specs
-                        if str(name or "").strip() != candidate
-                    ]
-                    break
-        else:
-            active_specs = []
-            inactive_specs = _fallback_spec_names_for_class(clase)
-
-        try:
-            gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
-            if gear_ids:
-                gs_values = gearscore.main(gear_ids)
-                gs = sum(gs_values)
-            else:
-                gs = summary.get("gearScore", "N/A")
-        except Exception:
-            logger.exception(
-                "gearscore calc failed for '%s'/%s — falling back to armory gearScore",
-                nombre_char,
-                realm,
-            )
-            gs = summary.get("gearScore", "N/A")
-
-        # Detect whether gear_data came from API stubs (item IDs only,
-        # no real gem/enchant data).  In that case, skip ench/gems checks
-        # to avoid false positives where stubs use ench="0" and gems=["0"].
-        is_stubs = (
-            isinstance(gear_data, list)
-            and len(gear_data) > 0
-            and all(isinstance(item, dict) and item.get("_source") == "api_stubs" for item in gear_data)
-        )
-
-        if is_stubs:
-            missing_enchants, missing_gems = [], []
-            suboptimal_gems = []
-        else:
-            try:
-                missing_enchants, missing_gems = (
-                    profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
-                )
-            except Exception:
-                logger.exception(
-                    "missing enchants/gems calc failed for '%s'/%s", nombre_char, realm
-                )
-                missing_enchants, missing_gems = [], []
-
-            try:
-                suboptimal_gems = profile_scraper.get_suboptimal_gems_from_gear_data(
-                    gear_data, clase, active_specs[0] if active_specs else ""
-                )
-            except Exception:
-                logger.exception(
-                    "suboptimal gems calc failed for '%s'/%s", nombre_char, realm
-                )
-                suboptimal_gems = []
-
-        guild_obj = summary.get("guild")
-        guild = guild_obj if isinstance(guild_obj, str) else "Sin guild"
-        guild_rank = None
-        if guild and guild != "Sin guild":
-            try:
-                guild_rank = await loop.run_in_executor(
-                    EXECUTOR,
-                    _fetch_guild_rank,
-                    nombre_char,
-                    guild,
-                    realm,
-                )
-            except Exception:
-                logger.exception(
-                    "guild rank fetch failed for '%s' guild='%s'/%s",
-                    nombre_char,
-                    guild,
-                    realm,
-                )
-                guild_rank = None
-
-        for active_spec in active_specs:
-            clean_active_spec = str(active_spec or "").strip()
-            if not clean_active_spec or clean_active_spec == "N/A":
-                continue
-            await async_set_external_cache(
-                "character_spec_gs",
-                "/personaje",
-                _build_character_spec_gs_key(nombre_char, realm, clean_active_spec),
-                {"character": nombre_char, "spec": clean_active_spec, "gs": gs},
-                {"character": nombre_char, "spec": clean_active_spec, "server": realm},
-            )
-
-        gs_by_spec = await asyncio.to_thread(
-            _get_known_gs_by_spec,
-            nombre_char,
+        base = await asyncio.to_thread(
+            _compute_personaje_base,
+            {**summary, "name": nombre_char},
             realm,
-            active_specs + inactive_specs,
-            gs,
-            active_specs,
-        )
-
-        # If current gear fetch failed (gs unknown), but we have any cached GS for
-        # this character/spec set, reuse it for the active spec instead of showing '?'.
-        if active_specs and gs in {None, "N/A", "?"}:
-            active_name = str(active_specs[0] or "").strip()
-            if active_name and gs_by_spec.get(active_name) in {None, "N/A", "?"}:
-                fallback_gs = next(
-                    (
-                        value
-                        for value in gs_by_spec.values()
-                        if value not in {None, "N/A", "?"}
-                    ),
-                    None,
-                )
-                if fallback_gs is not None:
-                    gs_by_spec[active_name] = fallback_gs
-
-        spec_gs_entries = _build_spec_gs_entries(
-            active_specs + inactive_specs,
-            gs_by_spec,
-            active_specs,
-        )
-        if spec_gs_entries and not any(entry.get("main") for entry in spec_gs_entries):
-            if gs not in {None, "N/A", "?"}:
-                spec_gs_entries[0]["main"] = True
-                spec_gs_entries[0]["gearscore"] = gs
-        active_spec_name = active_specs[0] if active_specs else None
-
-        halion_10n_achieved = achi_payload["halion_10n_achieved"]
-        halion_10h_achieved = achi_payload["halion_10h_achieved"]
-        halion_25n_achieved = achi_payload["halion_25n_achieved"]
-        halion_25h_achieved = achi_payload["halion_25h_achieved"]
-
-        icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
-
-        # Avoid synthetic ICC counts when statistics are temporarily unavailable.
-        # Storming achievements are handled in the special UwU section only.
-
-        guild_display = f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild"
-        spec_display = " - ".join(
-            f"**{spec}**" if spec in active_specs else spec
-            for spec in active_specs + inactive_specs
+            gear_data,
+            achi_payload,
+            stats_rows,
+            professions,
+            talents,
+            "/personaje",
         )
 
         # Cargar kills confirmadas del DB antes del embed inicial,
         # así los ✅ ya guardados aparecen de inmediato sin loading.
         persistent_confirmed = await asyncio.to_thread(_load_confirmed_icc_kills, nombre_char, realm)
-        initial_uwu_kills = _normalize_special_uwu_kills(dict(persistent_confirmed))
+        initial_payload = _serialize_personaje_payload(
+            **base,
+            uwu_icc_kills=_normalize_special_uwu_kills(dict(persistent_confirmed)),
+        )
 
         personaje_view = _build_personaje_view(nombre_char, realm)
-        embed_initial = _build_personaje_embed(
-            nombre_char,
-            gs,
-            nivel,
-            raza,
-            clase,
-            spec_display,
-            guild_display,
-            halion_10n_achieved,
-            halion_10h_achieved,
-            halion_25n_achieved,
-            halion_25h_achieved,
-            icc_10,
-            icc_25,
-            missing_enchants,
-            missing_gems,
-            uwu_icc_kills=initial_uwu_kills,
-            loading_symbol=LOADING_FRAMES[0],
-            spec_gs_value=_format_spec_gs_value(spec_gs_entries),
-            guild_rank=guild_rank,
-            professions=professions,
-            active_spec_name=active_spec_name,
-            suboptimal_gems=suboptimal_gems,
-        )
         await _safe_edit_original_response(
-            interaction, content=None, embed=embed_initial, view=personaje_view
+            interaction,
+            content=None,
+            embed=_build_personaje_embed_from_cache(
+                initial_payload, loading_symbol=LOADING_FRAMES[0]
+            ),
+            view=personaje_view,
         )
 
         frame_idx = 1
@@ -1133,29 +1181,9 @@ async def _personaje_impl(
             await asyncio.sleep(2.0)
             if uwu_icc_task.done():
                 break
-            embed_loading = _build_personaje_embed(
-                nombre_char,
-                gs,
-                nivel,
-                raza,
-                clase,
-                spec_display,
-                guild_display,
-                halion_10n_achieved,
-                halion_10h_achieved,
-                halion_25n_achieved,
-                halion_25h_achieved,
-                icc_10,
-                icc_25,
-                missing_enchants,
-                missing_gems,
-                uwu_icc_kills=initial_uwu_kills,
+            embed_loading = _build_personaje_embed_from_cache(
+                initial_payload,
                 loading_symbol=LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)],
-                spec_gs_value=_format_spec_gs_value(spec_gs_entries),
-                guild_rank=guild_rank,
-                professions=professions,
-                active_spec_name=active_spec_name,
-                suboptimal_gems=suboptimal_gems,
             )
             frame_idx += 1
             await _safe_edit_original_response(
@@ -1163,87 +1191,24 @@ async def _personaje_impl(
             )
 
         try:
-            uwu_icc_kills = await uwu_icc_task
+            raw_uwu_kills = await uwu_icc_task
         except Exception:
             logger.exception(
                 "uwu icc kills fetch failed for '%s'/%s", nombre_char, realm
             )
-            uwu_icc_kills = {}
+            raw_uwu_kills = {}
 
-        uwu_icc_kills = _normalize_special_uwu_kills(uwu_icc_kills)
-        uwu_icc_kills = _overlay_persistent_confirmed_kills(
-            uwu_icc_kills,
-            persistent_confirmed,
-        )
-
-        # Orden requerido:
-        # 1) UwU Logs
-        # 2) Storming the Citadel
-        # 3) Ítems equipados del boss
-        uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
-        uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
-
-        persistent_confirmed = await asyncio.to_thread(
-            _persist_new_confirmed_icc_kills,
+        uwu_icc_kills = await asyncio.to_thread(
+            _resolve_uwu_icc_kills,
             nombre_char,
             realm,
-            uwu_icc_kills,
-        )
-        uwu_icc_kills = _overlay_persistent_confirmed_kills(
-            uwu_icc_kills,
+            raw_uwu_kills,
             persistent_confirmed,
+            achi_payload,
+            gear_data,
         )
-        uwu_icc_kills = _finalize_special_uwu_kills(uwu_icc_kills)
-
-        embed_final = _build_personaje_embed(
-            nombre_char,
-            gs,
-            nivel,
-            raza,
-            clase,
-            spec_display,
-            guild_display,
-            halion_10n_achieved,
-            halion_10h_achieved,
-            halion_25n_achieved,
-            halion_25h_achieved,
-            icc_10,
-            icc_25,
-            missing_enchants,
-            missing_gems,
-            uwu_icc_kills=uwu_icc_kills,
-            spec_gs_value=_format_spec_gs_value(spec_gs_entries),
-            guild_rank=guild_rank,
-            professions=professions,
-            active_spec_name=active_spec_name,
-            suboptimal_gems=suboptimal_gems,
-        )
-        _payload_to_cache = _serialize_personaje_payload(
-            nombre_char,
-            realm,
-            gs,
-            nivel,
-            raza,
-            clase,
-            spec_display,
-            guild_display,
-            guild_rank,
-            halion_10n_achieved,
-            halion_10h_achieved,
-            halion_25n_achieved,
-            halion_25h_achieved,
-            icc_10,
-            icc_25,
-            missing_enchants,
-            missing_gems,
-            uwu_icc_kills,
-            spec_gs_entries,
-            active_spec_name,
-            professions,
-            suboptimal_gems,
-            gear_item_count=len(gear_data) if isinstance(gear_data, list) else 0,
-            data_complete=_is_personaje_data_complete(achi_payload, stats_rows),
-        )
+        _payload_to_cache = _serialize_personaje_payload(**base, uwu_icc_kills=uwu_icc_kills)
+        embed_final = _build_personaje_embed_from_cache(_payload_to_cache)
         if _is_valid_personaje_payload(_payload_to_cache):
             await async_set_external_cache(
                 "command_personaje",

@@ -91,7 +91,7 @@ class TestFilterHighGsDoesNotFilter:
 class TestPreloadPersonajeCacheDoesNotFilter:
     """tools/preload_personaje_cache.py — feeds the full 25h command_personaje cache."""
 
-    @patch("tools.preload_personaje_cache._fetch_guild_rank")
+    @patch("src.controller.commands._fetch_guild_rank")
     @patch("tools.preload_personaje_cache._uwu_icc_bugfix_kills")
     @patch("tools.preload_personaje_cache._fetch_specs")
     @patch("tools.preload_personaje_cache._fetch_professions")
