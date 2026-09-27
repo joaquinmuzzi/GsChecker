@@ -55,11 +55,7 @@ from src.db.postgres import (
     list_tracked_characters,
     set_external_cache,
 )
-from src.functions.embeds import (
-    _confirm_halion_kill,
-    _extract_halion_kills,
-    _extract_icc_boss_kills,
-)
+from src.functions.embeds import _extract_icc_boss_kills
 from src.functions.uwu import _uwu_icc_bugfix_kills
 from src.functions.warmane import (
     _fetch_achievements,
@@ -206,11 +202,10 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
             spec_gs_entries[0]["gearscore"] = gs
     active_spec_name = active_specs[0] if active_specs else None
 
-    halion_stats = _extract_halion_kills(stats_rows)
-    halion_10n_achieved = _confirm_halion_kill(achi_payload["halion_10n_achieved"], halion_stats["10n"])
-    halion_10h_achieved = _confirm_halion_kill(achi_payload["halion_10h_achieved"], halion_stats["10h"])
-    halion_25n_achieved = _confirm_halion_kill(achi_payload["halion_25n_achieved"], halion_stats["25n"])
-    halion_25h_achieved = _confirm_halion_kill(achi_payload["halion_25h_achieved"], halion_stats["25h"])
+    halion_10n_achieved = achi_payload["halion_10n_achieved"]
+    halion_10h_achieved = achi_payload["halion_10h_achieved"]
+    halion_25n_achieved = achi_payload["halion_25n_achieved"]
+    halion_25h_achieved = achi_payload["halion_25h_achieved"]
 
     icc_10, icc_25 = _extract_icc_boss_kills(stats_rows)
 
