@@ -50,6 +50,7 @@ ROTATION_INDEX_PATH = "data/preload_rotation_index.txt"
 DEFAULT_REALM = "Lordaeron"
 DEFAULT_DELAY = 2.0
 DEFAULT_ROTATION_SIZE = 500
+BIS_DAY_OF_MONTH = 15
 ROTATION_INDEX_STATE_KEY = "preload_rotation_index"
 HIGH_GS_STATE_KEY = "tracked_high_gs"
 
@@ -324,6 +325,18 @@ def main() -> int:
         preload_personaje_cache_main()
     except Exception:
         logger.exception("Precarga de command_personaje falló (no bloquea el resto del cron)")
+
+    # BiS por reino para /ia: una vez por mes (día 15, lejos del filter del día
+    # 1 que tarda horas) o forzado con FORCE_BIS=1. ~3 h extra.
+    force_bis = os.getenv("FORCE_BIS", "").strip() in ("1", "true", "yes")
+    if today.day == BIS_DAY_OF_MONTH or force_bis:
+        try:
+            from tools.build_bis_from_armory import monthly as bis_monthly
+
+            logger.info("Regenerando BiS por reino (día=%d, force=%s)...", today.day, force_bis)
+            bis_monthly()
+        except Exception:
+            logger.exception("Regeneración del BiS falló (se mantienen las guías publicadas)")
 
     return 0
 

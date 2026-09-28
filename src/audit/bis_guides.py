@@ -13,8 +13,10 @@ bot usen exactamente la misma regla.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+import time
 from pathlib import Path
+
+from src.db.postgres import get_app_state
 
 from .models import BisGuide, BisItemOption, BisSlot, StatCap
 
@@ -64,12 +66,30 @@ def normalize_realm(realm: str | None) -> str | None:
     return next((r for r in GUIDE_REALMS if r.lower() == clean), None)
 
 
-@lru_cache(maxsize=None)
+# El cron regenera las guías una vez por mes y las publica en Postgres; el
+# bot las relee cada tantas horas para tomarlas sin reiniciar.
+RELOAD_AFTER_S = 6 * 3600
+_REALM_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def app_state_key(realm: str) -> str:
+    return f"bis_guides:{realm.lower()}"
+
+
 def _load_realm(realm: str) -> dict:
-    path = BIS_DIR / f"{realm.lower()}.json"
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    cached = _REALM_CACHE.get(realm)
+    if cached and time.monotonic() - cached[0] < RELOAD_AFTER_S:
+        return cached[1]
+    data = get_app_state(app_state_key(realm))
+    if not isinstance(data, dict) or not data.get("guides"):
+        # Sin base (dev) o todavía sin publicar: las guías versionadas en el repo.
+        path = BIS_DIR / f"{realm.lower()}.json"
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    _REALM_CACHE[realm] = (time.monotonic(), data)
+    return data
+
+
+_load_realm.cache_clear = _REALM_CACHE.clear
 
 
 def available_guides(realm: str) -> list[str]:

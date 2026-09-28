@@ -6,6 +6,8 @@ Dos fases, re-ejecutables:
 
     python -m tools.build_bis_from_armory collect --realm Lordaeron
     python -m tools.build_bis_from_armory aggregate
+    python -m tools.build_bis_from_armory publish    # static/bis → Postgres
+    python -m tools.build_bis_from_armory monthly    # todo junto (lo usa el cron)
 
 `collect` toma candidatos de los rankings de uwu-logs (ICC 25H) por clase/spec,
 lee del armory el equipo (ítems, encantamientos, gemas), la spec activa y los
@@ -42,7 +44,13 @@ from profile_scraper import (  # noqa: E402
     parse_slot,
 )
 from src.audit.auditor import _is_meta_enchant_id, _resolve_gem_item_id  # noqa: E402
-from src.audit.bis_guides import HEALER_SPECS, detect_role, is_caster  # noqa: E402
+from src.audit.bis_guides import (  # noqa: E402
+    HEALER_SPECS,
+    app_state_key,
+    detect_role,
+    is_caster,
+)
+from src.db.postgres import get_app_state, init_database, set_app_state  # noqa: E402
 from src.functions.warmane import _parse_specs_from_html  # noqa: E402
 
 logger = logging.getLogger("gschecker.build_bis")
@@ -415,6 +423,49 @@ def aggregate() -> None:
         })
 
 
+# Una corrida mala (uwu-logs caído, armory rate-limitado) trae muchas menos
+# guías: en ese caso no se pisan las que ya están publicadas.
+MIN_GUIDES_RATIO = 0.8
+
+
+def publish(realm: str, data: dict | None = None) -> bool:
+    """Guarda las guías de un reino en Postgres (app_state), de donde las lee el
+    bot: el cron corre en otro contenedor y sus archivos no le llegan."""
+    if data is None:
+        data = _load(OUT_DIR / f"{realm.lower()}.json")
+    new_count = len(data.get("guides", {}))
+    current = get_app_state(app_state_key(realm)) or _load(OUT_DIR / f"{realm.lower()}.json")
+    current_count = len(current.get("guides", {})) if isinstance(current, dict) else 0
+    if new_count == 0 or new_count < current_count * MIN_GUIDES_RATIO:
+        logger.warning(
+            "%s: %d guías nuevas vs %d publicadas, no se publica (¿corrida incompleta?)",
+            realm, new_count, current_count,
+        )
+        return False
+    if not set_app_state(app_state_key(realm), data):
+        logger.warning("%s: no se pudo guardar en Postgres", realm)
+        return False
+    logger.info("%s: publicadas %d guías (antes %d)", realm, new_count, current_count)
+    return True
+
+
+def monthly() -> int:
+    """Corrida completa desde cero: recolecta los dos reinos (con segunda pasada
+    para specs flojas), genera las guías y las publica. ~3 h, 1 request al
+    armory cada 3 s."""
+    init_database()
+    for realm in REALMS:
+        path = RAW_DIR / f"{realm.lower()}.json"
+        if path.exists():
+            path.unlink()  # datos del mes pasado: se arranca de cero
+        collect(realm)
+        collect(realm, boost=True)
+    aggregate()
+    published = [realm for realm in REALMS if publish(realm)]
+    logger.info("BiS mensual: publicados %s", published or "ninguno")
+    return 0 if published else 1
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
     parser = argparse.ArgumentParser()
@@ -425,11 +476,18 @@ def main() -> int:
     c.add_argument("--boost", action="store_true",
                    help=f"sólo specs con menos de {BOOST_BELOW} jugadores, con más candidatos")
     sub.add_parser("aggregate")
+    sub.add_parser("publish")
+    sub.add_parser("monthly")
     args = parser.parse_args()
     if args.cmd == "collect":
         collect(args.realm, args.only_class, args.boost)
-    else:
+    elif args.cmd == "aggregate":
         aggregate()
+    elif args.cmd == "publish":
+        init_database()
+        return 0 if all(publish(realm) for realm in REALMS) else 1
+    else:
+        return monthly()
     return 0
 
 

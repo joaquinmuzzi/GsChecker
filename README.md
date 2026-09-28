@@ -128,6 +128,7 @@ Variables opcionales del cron:
 - `PRELOAD_ROTATION_SIZE` — personajes no-filtrados por run (default: `500`)
 - `PERSONAJE_CACHE_DELAY_SECONDS` / `PERSONAJE_CACHE_MAX_CHARACTERS` — lo mismo para la precarga de perfiles completos
 - `FORCE_FILTER` — `1` para forzar el `filter_high_gs` en cualquier día
+- `FORCE_BIS` — `1` para regenerar el BiS de `/ia` en cualquier día (normalmente el día 15)
 
 ### Fuentes de personajes
 
@@ -233,7 +234,11 @@ python -m tools.build_bis_from_armory aggregate                   # escribe stat
 3. **Rol**: DK con ≥18 % de esquivar → tanque (muestra: tanques 23-29 %, DPS 6-13 %); Feral con ≥3300 de aguante → oso; Protection siempre tanque.
 4. **Guía**: con los 12 de más GS de cada spec/rol, por slot los ítems más usados (sin PvP), los encantamientos que lleva la mayoría (mostrados por su efecto, vía tooltips de Wowhead), la gema meta y Nightmare Tear si la usa la mayoría, y como cap de hit/expertise lo que alcanzan 3 de cada 4 top.
 
-Las specs con menos de 5 jugadores en el reino quedan sin guía y `/ia` lo avisa. Conviene regenerar cada tanto (cambios de meta, nuevos ítems) y commitear `static/bis/`; los datos crudos (`data/bis_raw/`) no se versionan.
+Las specs con menos de 5 jugadores en el reino quedan sin guía y `/ia` lo avisa.
+
+**Actualización automática**: el cron lo regenera solo **el día 15 de cada mes** (`python -m tools.build_bis_from_armory monthly`, ~3 h extra después del preload; o cualquier día con `FORCE_BIS=1`). Recolecta los dos reinos desde cero, hace una segunda pasada (`--boost`: todos los jefes de ICC en 25H/25N, hasta 80 personajes) para las specs con menos de 8 jugadores, y **publica en Postgres** (`app_state`, claves `bis_guides:<reino>`), porque el disco del contenedor del cron no le llega al bot. Si una corrida trae menos del 80 % de las guías publicadas (uwu-logs caído, armory rate-limitado) no se publica y quedan las anteriores.
+
+El bot lee las guías de Postgres, las relee cada 6 h (toma las nuevas sin reiniciar) y, si no hay nada publicado, usa `static/bis/` del repo. Para publicar a mano lo que haya en `static/bis/`: `python -m tools.build_bis_from_armory publish`. Los datos crudos (`data/bis_raw/`) no se versionan.
 
 ## Logging
 
