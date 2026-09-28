@@ -81,8 +81,9 @@ def test_embed_shows_field_only_with_points():
     )
     without = _build_personaje_embed(*args, uwu_performance={})
 
-    assert "UwU Logs" in [f.name for f in with_perf.fields]
-    assert "UwU Logs" not in [f.name for f in without.fields]
+    ranking = [f for f in with_perf.fields if "(top " in f.value]
+    assert len(ranking) == 1 and ranking[0].name == "\u200b"
+    assert not [f for f in without.fields if "(top " in f.value]
 
 
 class MultiSpecSession(FakeSession):

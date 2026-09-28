@@ -309,5 +309,5 @@ async def test_cached_profile_without_ranking_gets_it(bot, interaction, patched_
 
     embed = interaction.last_edit().embed
     values = {f.name: f.value for f in embed.fields}
-    assert values["UwU Logs"] == "Demonology · **#895** (top 47,9 %)"
+    assert values["\u200b"] == "Demonology · **#895** (top 47,9 %)"
     patched_fetchers["summary"].assert_not_called()
