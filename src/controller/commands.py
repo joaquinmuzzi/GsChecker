@@ -1090,6 +1090,7 @@ async def _personaje_impl(
                             _fetch_uwu_performance,
                             cached_payload.get("nombre_char", nombre),
                             realm,
+                            cached_payload.get("clase"),
                         ),
                         timeout=10.0,
                     )
@@ -1146,9 +1147,6 @@ async def _personaje_impl(
 
         loop = asyncio.get_running_loop()
 
-        uwu_icc_task = loop.run_in_executor(
-            EXECUTOR, _uwu_icc_bugfix_kills, nombre, realm
-        )
         # Summary primero: si el personaje no existe o no es 80 se responde en
         # segundos, sin gastar ~15 requests del armory en logros/estadísticas.
         summary = await loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
@@ -1177,6 +1175,16 @@ async def _personaje_impl(
                 embed=None,
             )
             return
+
+        # uwu-logs en paralelo con el resto del armory. Va después del summary
+        # porque usa la clase del armory cuando uwu-logs no tiene perfil.
+        uwu_icc_task = loop.run_in_executor(
+            EXECUTOR,
+            _uwu_icc_bugfix_kills,
+            nombre_char,
+            realm,
+            summary.get("class"),
+        )
 
         gear_data, achi_payload, stats_rows, professions, talents = await asyncio.gather(
             loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre_char, realm),
@@ -1250,7 +1258,11 @@ async def _personaje_impl(
         try:
             # Después de las kills: reusa los /character que ya quedaron en caché.
             uwu_performance = await loop.run_in_executor(
-                EXECUTOR, _fetch_uwu_performance, nombre_char, realm
+                EXECUTOR,
+                _fetch_uwu_performance,
+                nombre_char,
+                realm,
+                summary.get("class"),
             )
         except Exception:
             logger.exception(
@@ -1439,6 +1451,8 @@ def register_commands(bot):
                 UWU_SERVER,
                 UWU_PDPS_BOSS_ORDER,
                 spec,
+                30.0,
+                summary.get("class"),
             )
             try:
                 uwu_dps_summary = await asyncio.wait_for(

@@ -123,3 +123,53 @@ def test_healer_only_keeps_healer_spec(monkeypatch):
     perf = uwu._fetch_uwu_performance("Soloholy", "Lordaeron")
 
     assert perf["spec"] == "Holy"
+
+
+class UnknownSession(FakeSession):
+    """Ganji (2026-09-28): /character devuelve "Unknown-Ganji" en las 3 specs,
+    pero figura en los rankings de Fire."""
+
+    def get(self, url, timeout=None):
+        return FakeResp({"name": f"Unknown-{self.name}", "class_i": 0, "bosses": {}})
+
+    def post(self, url, json=None, timeout=None, stream=False):
+        self.posts.append((url, json))
+        if url.endswith("/top_points"):
+            names = [f"P{i}" for i in range(3000)]
+            if json["spec_i"] == 2:
+                names.insert(1499, self.name)
+            return FakeResp([[n, 50.0, 5000] for n in names])
+        rows = [["26-09-07--08-25--X", 100.0, "0000001", f"Other{i}", 1_000_000, 1_000_000, 2, []]
+                for i in range(2000)]
+        if json["spec_i"] == 2:
+            rows.append(["26-09-07--08-25--X", 100.0, "0000002", self.name, 500_000, 500_000, 2, []])
+        return FakeResp(rows)
+
+
+def test_unknown_profile_ranking_uses_armory_class(monkeypatch):
+    monkeypatch.setattr(uwu, "SESSION", UnknownSession("Ganji"))
+
+    perf = uwu._fetch_uwu_performance("Ganji", "Lordaeron", "Mage")
+
+    assert perf == {"spec": "Fire", "points": None, "rank": 1500, "total": 3001}
+    assert uwu._fetch_uwu_performance("Ganji", "Lordaeron") == {}
+
+
+def test_unknown_profile_icc_kills_use_armory_class(monkeypatch):
+    session = UnknownSession("Ganji")
+    monkeypatch.setattr(uwu, "SESSION", session)
+
+    kills = uwu._uwu_icc_bugfix_kills("Ganji", "Lordaeron", "Mage")
+
+    assert kills["Marrowgar"]["25N"] == "✅"
+    assert {p[1]["class_i"] for p in session.posts} == {3}
+
+
+def test_unknown_profile_dps_uses_armory_class(monkeypatch):
+    session = UnknownSession("Ganji")
+    monkeypatch.setattr(uwu, "SESSION", session)
+
+    summary = uwu._build_uwu_dps_summary("Ganji", "Lordaeron", ["The Lich King"], char_class="Mage")
+
+    assert {(p[1]["class_i"], p[1]["spec_i"]) for p in session.posts} == {(3, 1), (3, 2), (3, 3)}
+    assert any(r["Raids"] == "1" for r in summary["rows"])

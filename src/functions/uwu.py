@@ -9,6 +9,7 @@ from src.schemas.constants import (
     UWU_BASE,
     UWU_BOSS_MODE,
     UWU_BOSS_SHORT,
+    UWU_CLASS_INDEX,
     UWU_MODES_ALL,
     UWU_SPEC_KEYWORDS,
     UWU_SPEC_KEYWORDS_BY_CLASS,
@@ -489,7 +490,9 @@ def _uwu_spec_ids_for_filter(spec_filter: str | None, class_i: int | None):
     return UWU_SPEC_KEYWORDS.get(kw)
 
 
-def _uwu_dps_spec_pairs(profiles, spec_filter: str | None = None):
+def _uwu_dps_spec_pairs(
+    profiles, spec_filter: str | None = None, char_class: str | None = None
+):
     """
     Pares (spec_i, class_i) a consultar en /top para /dps.
 
@@ -499,11 +502,16 @@ def _uwu_dps_spec_pairs(profiles, spec_filter: str | None = None):
     datos en el modo por defecto de /character, se piden las 3 specs: pedir
     la clase entera (spec_i=-1) pierde jugadores (en pala/Marrowgar 25H
     devuelve 5215 contra 5379 sumando las specs, y falta Flappyaladin).
-    Sin perfil en uwu-logs no hay nada que consultar.
+    Sin perfil en /character (sale "Unknown-...", aunque el personaje figure
+    en los rankings, como Ganji) se usa la clase del armory si se conoce.
     """
     valid = [(s, c, d) for s, c, d in profiles if c >= 0]
     if not valid:
-        return []
+        class_i = UWU_CLASS_INDEX.get(char_class or "")
+        if class_i is None:
+            return []
+        spec_ids = _uwu_spec_ids_for_filter(spec_filter, class_i) or [1, 2, 3]
+        return [(s, class_i) for s in spec_ids]
     class_i = valid[0][1]
 
     allowed_spec_ids = _uwu_spec_ids_for_filter(spec_filter, class_i)
@@ -625,8 +633,9 @@ def _fetch_uwu_overview_for_dps(
 def _uwu_icc_bugfix_kills(
     nombre: str,
     server: str,
+    char_class: str | None = None,
 ):
-    cache_key = ("v3", nombre.lower(), server)
+    cache_key = ("v3", nombre.lower(), server, char_class)
     cached = _cache_get(UWU_ICC_KILLS_CACHE, cache_key, UWU_ICC_KILLS_TTL)
     if cached is not None:
         return cached
@@ -647,9 +656,11 @@ def _uwu_icc_bugfix_kills(
     if profiles is None:
         return result
 
-    # Si el personaje no tiene perfil válido en UwU no tiene sentido escanear
-    # listas de ranking: salimos de inmediato con ❌ en todos los modos.
-    if not profiles:
+    # Sin perfil en /character ("Unknown-...") uwu-logs no da la clase, pero el
+    # personaje puede figurar igual en los rankings (Ganji): se usa la del
+    # armory. Sin ninguna de las dos no hay dónde buscar: ❌ en todos los modos.
+    fallback_class_i = UWU_CLASS_INDEX.get(char_class or "")
+    if not profiles and fallback_class_i is None:
         for short_name in target:
             for mode in modes:
                 result[short_name][mode] = "❌"
@@ -678,6 +689,8 @@ def _uwu_icc_bugfix_kills(
                 character_mode_presence[short_name][default_mode] = True
 
     probe_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
+    if not probe_pairs:
+        probe_pairs = [(spec_i, fallback_class_i) for spec_i in (1, 2, 3)]
     complete = True
     for short_name, full_boss_name in target.items():
         for mode in modes:
@@ -701,20 +714,20 @@ def _uwu_icc_bugfix_kills(
     return result
 
 
-def _fetch_uwu_spec_ranked_players(server: str, class_i: int, spec_i: int):
+def _fetch_uwu_spec_ranking(server: str, class_i: int, spec_i: int):
     """
-    Cantidad de jugadores en el ranking de puntos de una spec (POST
-    /top_points devuelve la lista entera como [nombre, %, puntos]). Se cachea
-    solo el número, compartido entre personajes. None si uwu-logs falló.
+    Ranking de puntos de una spec: nombres (en minúscula) en orden, de POST
+    /top_points (que devuelve [nombre, %, puntos]). Se cachea la lista de
+    nombres (~30 KB), compartida entre personajes. None si uwu-logs falló.
     """
     cache_key = (server, class_i, spec_i)
     cached = _cache_get(UWU_TOP_POINTS_CACHE, cache_key, UWU_TOP_POINTS_TTL)
     if cached is not None:
         return cached
 
-    persistent_cache_key = f"uwu:top_points_total:{server}:{class_i}:{spec_i}"
+    persistent_cache_key = f"uwu:top_points_names:{server}:{class_i}:{spec_i}"
     cached = get_external_cache("uwu_top_points", persistent_cache_key, UWU_TOP_POINTS_TTL)
-    if isinstance(cached, int):
+    if isinstance(cached, list):
         _cache_set(UWU_TOP_POINTS_CACHE, cache_key, cached)
         return cached
 
@@ -737,23 +750,27 @@ def _fetch_uwu_spec_ranked_players(server: str, class_i: int, spec_i: int):
     if status != 200 or not isinstance(rows, list):
         return None
 
-    total = len(rows)
-    _cache_set(UWU_TOP_POINTS_CACHE, cache_key, total)
+    names = [
+        str(row[0]).lower() for row in rows if isinstance(row, list) and row
+    ]
+    _cache_set(UWU_TOP_POINTS_CACHE, cache_key, names)
     set_external_cache(
         "uwu_top_points",
         f"{UWU_BASE}/top_points",
         persistent_cache_key,
-        total,
+        names,
         {"server": server, "class_i": class_i, "spec_i": spec_i},
     )
-    return total
+    return names
 
 
-def _fetch_uwu_performance(nombre: str, server: str):
+def _fetch_uwu_performance(nombre: str, server: str, char_class: str | None = None):
     """
-    Performance Points de uwu-logs para /p: puntos y puesto de la spec
-    principal (la misma que usa /dps). None si uwu-logs no respondió, {} si el
-    personaje no tiene puntos.
+    Puesto de uwu-logs para /p: el de la spec principal (la misma que usa
+    /dps). None si uwu-logs no respondió, {} si el personaje no está rankeado.
+    Si /character no tiene perfil ("Unknown-...", como Ganji, que igual figura
+    en los rankings) se lo busca en el ranking de cada spec de la clase del
+    armory.
     """
     profiles = _uwu_dps_profiles(nombre, server)
     if profiles is None:
@@ -763,18 +780,44 @@ def _fetch_uwu_performance(nombre: str, server: str):
         for s, c, d in profiles
         if c in UWU_SPEC_NAMES and float(d.get("overall_points") or 0) > 0
     ]
-    if not valid:
-        return {}
+    if valid:
+        spec_i, class_i, data = max(
+            valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
+        )
+        ranking = _fetch_uwu_spec_ranking(server, class_i, spec_i)
+        rank = data.get("overall_rank")
+        return {
+            "spec": UWU_SPEC_NAMES[class_i][spec_i - 1],
+            "points": round(float(data["overall_points"]) / 100, 2),
+            "rank": int(rank) if rank else None,
+            "total": len(ranking) if ranking is not None else None,
+        }
 
-    spec_i, class_i, data = max(
-        valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
+    class_i = UWU_CLASS_INDEX.get(char_class or "")
+    if profiles or class_i is None:
+        return {}
+    lower_name = nombre.lower()
+    found = []
+    failed = False
+    for spec_i in (1, 2, 3):
+        ranking = _fetch_uwu_spec_ranking(server, class_i, spec_i)
+        if ranking is None:
+            failed = True
+            continue
+        if lower_name in ranking:
+            found.append((spec_i, ranking.index(lower_name) + 1, len(ranking)))
+    if not found:
+        return None if failed else {}
+    # DPS antes que healer/tank; después el mejor percentil.
+    spec_i, rank, total = min(
+        found,
+        key=lambda f: ((class_i, f[0]) in UWU_NON_DPS_SPECS, f[1] / f[2]),
     )
-    rank = data.get("overall_rank")
     return {
         "spec": UWU_SPEC_NAMES[class_i][spec_i - 1],
-        "points": round(float(data["overall_points"]) / 100, 2),
-        "rank": int(rank) if rank else None,
-        "total": _fetch_uwu_spec_ranked_players(server, class_i, spec_i),
+        "points": None,
+        "rank": rank,
+        "total": total,
     }
 
 
@@ -816,9 +859,10 @@ def _build_uwu_dps_summary(
     selected_bosses=None,
     spec_filter: str | None = None,
     time_budget_s: float = 30.0,
+    char_class: str | None = None,
 ):
     selected_bosses_key = tuple(selected_bosses) if selected_bosses else None
-    cache_key = (nombre.lower(), server, selected_bosses_key, spec_filter)
+    cache_key = (nombre.lower(), server, selected_bosses_key, spec_filter, char_class)
     cached = _cache_get(UWU_PDPS_SUMMARY_CACHE, cache_key, UWU_PDPS_SUMMARY_TTL)
     if cached is not None:
         return cached
@@ -835,7 +879,7 @@ def _build_uwu_dps_summary(
             "failed_by_mode": failed_by_mode,
             "timed_out": False,
         }
-    spec_class_pairs = _uwu_dps_spec_pairs(profiles, spec_filter)
+    spec_class_pairs = _uwu_dps_spec_pairs(profiles, spec_filter, char_class)
 
     if not spec_class_pairs:
         payload = {

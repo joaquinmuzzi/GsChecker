@@ -99,6 +99,20 @@ UWU_SPEC_NAMES: dict[int, tuple[str, str, str]] = {
     9: ("Arms", "Fury", "Protection"),
 }
 
+# class_i de uwu-logs por clase del armory (orden de c_player_classes.CLASSES).
+UWU_CLASS_INDEX = {
+    "Death Knight": 0,
+    "Druid": 1,
+    "Hunter": 2,
+    "Mage": 3,
+    "Paladin": 4,
+    "Priest": 5,
+    "Rogue": 6,
+    "Shaman": 7,
+    "Warlock": 8,
+    "Warrior": 9,
+}
+
 # /top de uwu-logs no filtra por jugador: /dps pide hasta 10000 filas de la
 # spec (ordenadas por DPS útil) y busca las del personaje. Con 1000 los
 # tanks/healers quedaban afuera y salían con 0 raids.
