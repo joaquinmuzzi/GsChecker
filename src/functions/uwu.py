@@ -22,6 +22,7 @@ from src.schemas.constants import (
     UWU_ICC_KILLS_TTL,
     UWU_PLAYER_ROWS_CACHE,
     UWU_PLAYER_ROWS_TTL,
+    UWU_TOP_MAX_ATTEMPTS,
     UWU_TOP_PLAYER_LIMIT,
     UWU_TOP_PLAYER_TIMEOUT,
     UWU_TOP_WORKERS,
@@ -207,6 +208,7 @@ def _uwu_dps_profiles(nombre: str, server: str):
     for spec_i in (1, 2, 3):
         data = _fetch_uwu_character(nombre, server, spec_i)
         if not isinstance(data, dict) or data.get("__error__"):
+            time.sleep(1.5)
             data = _fetch_uwu_character(nombre, server, spec_i)
         if not isinstance(data, dict) or data.get("__error__"):
             failed += 1
@@ -225,14 +227,15 @@ def _post_json_with_deadline(url: str, payload: dict, total_timeout: float):
     """
     POST que corta a los total_timeout segundos contando la descarga entera.
     El timeout de requests es por lectura: una respuesta que llega de a poco
-    nunca lo dispara. Devuelve (status, bytes, json) o levanta excepción.
+    nunca lo dispara. Devuelve (status, bytes, json) o levanta excepción; si
+    el status no es 200, el tercer valor es el header Retry-After.
     """
     started = time.monotonic()
     with SESSION.post(
         url, json=payload, timeout=(5, total_timeout), stream=True
     ) as resp:
         if resp.status_code != 200:
-            return resp.status_code, 0, None
+            return resp.status_code, 0, resp.headers.get("Retry-After")
         chunks = []
         for chunk in resp.iter_content(chunk_size=65536):
             chunks.append(chunk)
@@ -291,18 +294,37 @@ def _fetch_uwu_player_rows(
         timeout_override if timeout_override is not None else UWU_TOP_PLAYER_TIMEOUT
     )
     started = time.monotonic()
-    try:
-        status, size, top_rows = _post_json_with_deadline(
-            f"{UWU_BASE}/top", payload, timeout_value
-        )
-    except Exception as e:
+    for attempt in range(1, UWU_TOP_MAX_ATTEMPTS + 1):
+        remaining = timeout_value - (time.monotonic() - started)
+        try:
+            status, size, top_rows = _post_json_with_deadline(
+                f"{UWU_BASE}/top", payload, max(remaining, 1.0)
+            )
+        except Exception as e:
+            logger.info(
+                "uwu_player_rows boss=%s mode=%s class=%s spec=%s timeout=%.1f "
+                "error=%r elapsed=%.2fs",
+                boss, mode, class_i, spec_i, timeout_value, e,
+                time.monotonic() - started,
+            )
+            return {"__error__": f"uwu top error: {e}"}
+        if status != 429 or attempt == UWU_TOP_MAX_ATTEMPTS:
+            break
+        # uwu-logs rate-limita las ráfagas (429): esperar y reintentar si
+        # todavía hay tiempo.
+        try:
+            wait_s = float(top_rows)
+        except (TypeError, ValueError):
+            wait_s = 1.5 * attempt
+        remaining = timeout_value - (time.monotonic() - started)
         logger.info(
-            "uwu_player_rows boss=%s mode=%s class=%s spec=%s timeout=%.1f "
-            "error=%r elapsed=%.2fs",
-            boss, mode, class_i, spec_i, timeout_value, e,
-            time.monotonic() - started,
+            "uwu_player_rows boss=%s mode=%s class=%s spec=%s status=429 "
+            "attempt=%s wait=%.1fs",
+            boss, mode, class_i, spec_i, attempt, wait_s,
         )
-        return {"__error__": f"uwu top error: {e}"}
+        if wait_s >= remaining - 1.0:
+            break
+        time.sleep(wait_s)
 
     if status != 200:
         logger.info(

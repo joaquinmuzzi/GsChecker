@@ -21,6 +21,7 @@ class FakeResp:
     def __init__(self, payload, status_code=200):
         self._payload = payload
         self.status_code = status_code
+        self.headers = {}
         self.content = json.dumps(payload).encode()
 
     def json(self):
@@ -71,6 +72,7 @@ class FakeSession:
 def _isolated_caches(monkeypatch):
     monkeypatch.setattr(uwu, "get_external_cache", lambda *a, **k: None)
     monkeypatch.setattr(uwu, "set_external_cache", lambda *a, **k: None)
+    monkeypatch.setattr(uwu.time, "sleep", lambda s: None)
     for cache in (
         uwu.UWU_CHARACTER_CACHE,
         uwu.UWU_PLAYER_ROWS_CACHE,
@@ -201,3 +203,22 @@ def test_slow_download_is_cut_by_total_deadline(monkeypatch):
     )
 
     assert "cortada" in result["__error__"]
+
+
+def test_rate_limited_request_is_retried(monkeypatch):
+    # Logs de prod 01:48 del 2026-09-28: con 4 consultas en paralelo uwu-logs
+    # devolvió 429 en 9 de 24 y esas filas salieron vacías.
+    class RateLimitedSession(FakeSession):
+        def post(self, url, json=None, timeout=None, stream=False):
+            self.posts.append(json)
+            if len(self.posts) == 1:
+                return FakeResp([], status_code=429)
+            return FakeResp(self.top_rows)
+
+    session = RateLimitedSession("Flappyaladin", top_rows=[_row("Flappyaladin", 25_000)])
+    monkeypatch.setattr(uwu, "SESSION", session)
+
+    result = uwu._fetch_uwu_player_rows("Lordaeron", "The Lich King", "25N", 4, 2, "Flappyaladin")
+
+    assert len(session.posts) == 2
+    assert len(result["rows"]) == 1

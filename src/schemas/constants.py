@@ -83,7 +83,10 @@ UWU_MODES_ALL = ("10N", "10H", "25N", "25H")
 # tanks/healers quedaban afuera y salían con 0 raids.
 UWU_TOP_PLAYER_LIMIT = 10000
 UWU_TOP_PLAYER_TIMEOUT = 15
-UWU_TOP_WORKERS = 4
+# Con 4 consultas en paralelo uwu-logs devolvía 429 en ~40 % de las
+# consultas (logs de prod, 2026-09-28): 2 a la vez y reintento con espera.
+UWU_TOP_WORKERS = 2
+UWU_TOP_MAX_ATTEMPTS = 3
 
 UWU_PDPS_BOSS_ORDER = [
     "Lord Marrowgar",
