@@ -1432,6 +1432,13 @@ def register_commands(bot):
             uwu_rows = uwu_dps_summary.get("rows", [])
             failed_by_mode = uwu_dps_summary.get("failed_by_mode", {})
             timed_out = bool(uwu_dps_summary.get("timed_out", False))
+            if uwu_dps_summary.get("uwu_down"):
+                await _safe_edit_original_response(
+                    interaction,
+                    content=uwu_dps_summary.get("__error__"),
+                    embed=None,
+                )
+                return
             if not uwu_rows:
                 timeout_note = " (cálculo parcial por timeout)" if timed_out else ""
                 await _safe_edit_original_response(
