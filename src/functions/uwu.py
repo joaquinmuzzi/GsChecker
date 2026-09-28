@@ -26,6 +26,7 @@ from src.schemas.constants import (
     UWU_TOP_PLAYER_LIMIT,
     UWU_SPEC_PLAYERS_CACHE,
     UWU_SPEC_PLAYERS_TTL,
+    UWU_NON_DPS_SPECS,
     UWU_SPEC_NAMES,
     UWU_TOP_POINTS_CACHE,
     UWU_TOP_POINTS_TTL,
@@ -461,13 +462,20 @@ def _fetch_uwu_player_rows(
 
 
 def _uwu_spec_sort_key(spec_i: int, data: dict):
-    """Spec principal: la que tiene más bosses con datos, después más puntos."""
+    """
+    Spec principal: una spec de DPS con datos antes que healer/tank (a casi
+    todos les interesa ver el DPS; Flappyaladin tiene más logs de Holy pero
+    se lo busca por Ret). Después, más bosses con datos y más puntos.
+    """
     bosses = data.get("bosses", {}) if isinstance(data, dict) else {}
     if not isinstance(bosses, dict):
         bosses = {}
     bosses_with_data = sum(1 for v in bosses.values() if isinstance(v, dict) and v)
     points = float(data.get("overall_points") or 0)
-    return (bosses_with_data, points, -spec_i)
+    class_i = data.get("class_i") if isinstance(data, dict) else None
+    is_dps = (class_i, spec_i) not in UWU_NON_DPS_SPECS
+    has_data = bosses_with_data > 0 or points > 0
+    return (is_dps and has_data, bosses_with_data, points, -spec_i)
 
 
 def _uwu_spec_ids_for_filter(spec_filter: str | None, class_i: int | None):

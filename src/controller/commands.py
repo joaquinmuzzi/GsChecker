@@ -1079,6 +1079,24 @@ async def _personaje_impl(
             "command_personaje", personaje_cache_key, COMMAND_PERSONAJE_TTL
         )
         if isinstance(cached_payload, dict):
+            if "uwu_performance" not in cached_payload:
+                # Perfil cacheado antes de que /p mostrara el ranking de uwu-logs
+                # (dura hasta 25 h): se pide solo el ranking (~1 s, sin armory).
+                # No se re-guarda para no estirar el TTL de los datos del armory.
+                try:
+                    cached_payload["uwu_performance"] = await asyncio.wait_for(
+                        asyncio.get_running_loop().run_in_executor(
+                            EXECUTOR,
+                            _fetch_uwu_performance,
+                            cached_payload.get("nombre_char", nombre),
+                            realm,
+                        ),
+                        timeout=10.0,
+                    )
+                except Exception:
+                    logger.warning(
+                        "uwu performance fetch failed for cached '%s'/%s", nombre, realm
+                    )
             embed_cached = _build_personaje_embed_from_cache(cached_payload)
             view_cached = _build_personaje_view(
                 cached_payload["nombre_char"],

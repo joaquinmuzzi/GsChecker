@@ -184,6 +184,18 @@ UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
     "rdruid": [3],
 }
 
+# Specs de healer/tank de uwu-logs como (class_i, spec_i). Blood DK y Feral
+# quedan como DPS porque uwu-logs no separa tank de DPS en esas specs.
+UWU_NON_DPS_SPECS = {
+    (1, 3),  # Druid Restoration
+    (4, 1),  # Paladin Holy
+    (4, 2),  # Paladin Protection
+    (5, 1),  # Priest Discipline
+    (5, 2),  # Priest Holy
+    (7, 3),  # Shaman Restoration
+    (9, 3),  # Warrior Protection
+}
+
 # Keywords cuya spec depende de la clase. Orden de clases de uwu-logs
 # (c_player_classes.CLASSES): DK 0, Druid 1, Hunter 2, Mage 3, Paladin 4,
 # Priest 5, Rogue 6, Shaman 7, Warlock 8, Warrior 9.

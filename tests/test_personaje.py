@@ -11,7 +11,7 @@ Cubre los 3 escenarios que corresponden a los bugs que ya vimos:
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -282,3 +282,32 @@ class TestHalionIgnoresBrokenStatistics:
         halion_row = next(l for l in rs_value.splitlines() if l.startswith("Halion"))
         assert "❌" not in halion_row, rs_value
         assert halion_row.count("✅") == 4, rs_value
+
+
+@pytest.mark.asyncio
+async def test_cached_profile_without_ranking_gets_it(bot, interaction, patched_fetchers):
+    # Novatizimu (2026-09-28): perfil cacheado por el cron antes del deploy del
+    # ranking de uwu-logs; /p lo servía sin el campo hasta que venciera (25 h).
+    old_payload = {
+        "nombre_char": "Novatizimu", "server": "Lordaeron", "gs": 6398, "nivel": 80,
+        "raza": "Human", "clase": "Warlock", "spec_display": "Affliction",
+        "guild_display": "<The Order of the Ring>", "guild_rank": "Officer",
+        "halion_10n_achieved": True, "halion_10h_achieved": True,
+        "halion_25n_achieved": True, "halion_25h_achieved": True,
+        "icc_10": {}, "icc_25": {}, "missing_enchants": [], "missing_gems": [],
+        "uwu_icc_kills": {}, "spec_gs_entries": [], "active_spec_name": "Affliction",
+    }
+    patched_fetchers["uwu_perf"].return_value = {
+        "spec": "Demonology", "points": 44.65, "rank": 895, "total": 1869,
+    }
+    with patch(
+        "src.controller.commands.async_get_external_cache",
+        new_callable=AsyncMock,
+        return_value=old_payload,
+    ):
+        await _find_command(bot, "p").callback(interaction, nombre="Novatizimu")
+
+    embed = interaction.last_edit().embed
+    values = {f.name: f.value for f in embed.fields}
+    assert values["UwU Logs"] == "Demonology · **#895** (top 47,9 %)"
+    patched_fetchers["summary"].assert_not_called()

@@ -83,3 +83,43 @@ def test_embed_shows_field_only_with_points():
 
     assert "UwU Logs" in [f.name for f in with_perf.fields]
     assert "UwU Logs" not in [f.name for f in without.fields]
+
+
+class MultiSpecSession(FakeSession):
+    """Flappyaladin (pala): más logs de Holy (14 bosses) que de Ret (13)."""
+
+    def __init__(self, name, specs):
+        super().__init__(name, class_i=4)
+        self.specs = specs  # spec_i -> (bosses_with_data, overall_points, rank)
+
+    def get(self, url, timeout=None):
+        spec_i = int(url.rsplit("/", 1)[1])
+        n_bosses, points, rank = self.specs.get(spec_i, (0, 0.0, 0))
+        bosses = {f"Boss{i}": {"raids": 1} for i in range(n_bosses)}
+        return FakeResp({
+            "name": self.name, "class_i": 4, "overall_points": points,
+            "overall_rank": rank, "bosses": bosses,
+        })
+
+    def post(self, url, json=None, timeout=None, stream=False):
+        self.posts.append((url, json))
+        return FakeResp([["P", 50.0, 5000]] * 1000)
+
+
+def test_dps_spec_preferred_over_healer(monkeypatch):
+    specs = {1: (14, 8523.6, 220), 2: (11, 8877.4, 106), 3: (13, 6695.7, 672)}
+    monkeypatch.setattr(uwu, "SESSION", MultiSpecSession("Flappyaladin", specs))
+
+    perf = uwu._fetch_uwu_performance("Flappyaladin", "Lordaeron")
+
+    assert perf["spec"] == "Retribution"
+    assert perf["rank"] == 672
+
+
+def test_healer_only_keeps_healer_spec(monkeypatch):
+    specs = {1: (12, 7810.4, 363)}
+    monkeypatch.setattr(uwu, "SESSION", MultiSpecSession("Soloholy", specs))
+
+    perf = uwu._fetch_uwu_performance("Soloholy", "Lordaeron")
+
+    assert perf["spec"] == "Holy"
