@@ -77,6 +77,7 @@ def _isolated_caches(monkeypatch):
         uwu.UWU_CHARACTER_CACHE,
         uwu.UWU_SPEC_PLAYERS_CACHE,
         uwu.UWU_ICC_KILLS_CACHE,
+        uwu.UWU_TOP_POINTS_CACHE,
         uwu.UWU_PLAYER_ROWS_CACHE,
         uwu.UWU_PDPS_SUMMARY_CACHE,
     ):

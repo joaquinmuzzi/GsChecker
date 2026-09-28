@@ -16,6 +16,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
   - profesiones,
   - enchants y gemas faltantes,
   - GearScore por spec (cachea el GS de cada spec en Postgres para mostrarlas todas),
+  - **ranking de UwU Logs** de la spec principal: puesto en el reino por Performance Points y percentil (ej. `Fire · #37 (top 1,2 %)`),
   - links a Armory y UwU Logs.
 - **DPS por boss** (máximo y promedio) vía uwu-logs.xyz, con overview rápido y tabla detallada.
 - **Trial of the Crusader**: logros 10N / 10H / 25N / 25H.

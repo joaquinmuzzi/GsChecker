@@ -24,6 +24,7 @@ UWU_PDPS_SUMMARY_CACHE: dict = {}
 UWU_ICC_KILLS_CACHE: dict = {}
 UWU_PLAYER_ROWS_CACHE: dict = {}
 UWU_SPEC_PLAYERS_CACHE: dict = {}
+UWU_TOP_POINTS_CACHE: dict = {}
 
 # ---------- TTLs (segundos) ----------
 SUMMARY_TTL = 120
@@ -39,6 +40,8 @@ UWU_PLAYER_ROWS_TTL = 180
 # Lista de jugadores con kill por spec/boss/modo (kills de ICC en /p y el
 # cron): cambia poco y es compartida entre personajes.
 UWU_SPEC_PLAYERS_TTL = 3600
+# Cantidad de jugadores rankeados por spec (/top_points), para "#37 de 3174".
+UWU_TOP_POINTS_TTL = 3600
 # 25h: cubre el ciclo diario de tools/preload_personaje_cache.py con margen,
 # así el cache que deja el cron sigue vivo hasta que corre de nuevo al día siguiente.
 COMMAND_PERSONAJE_TTL = 90000
@@ -81,6 +84,20 @@ UWU_BOSS_SHORT = {
 }
 
 UWU_MODES_ALL = ("10N", "10H", "25N", "25H")
+
+# Nombres de spec de uwu-logs por class_i (c_player_classes.CLASSES).
+UWU_SPEC_NAMES: dict[int, tuple[str, str, str]] = {
+    0: ("Blood", "Frost", "Unholy"),
+    1: ("Balance", "Feral Combat", "Restoration"),
+    2: ("Beast Mastery", "Marksmanship", "Survival"),
+    3: ("Arcane", "Fire", "Frost"),
+    4: ("Holy", "Protection", "Retribution"),
+    5: ("Discipline", "Holy", "Shadow"),
+    6: ("Assassination", "Combat", "Subtlety"),
+    7: ("Elemental", "Enhancement", "Restoration"),
+    8: ("Affliction", "Demonology", "Destruction"),
+    9: ("Arms", "Fury", "Protection"),
+}
 
 # /top de uwu-logs no filtra por jugador: /dps pide hasta 10000 filas de la
 # spec (ordenadas por DPS útil) y busca las del personaje. Con 1000 los

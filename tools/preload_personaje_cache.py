@@ -46,7 +46,7 @@ from src.db.postgres import (
     set_external_cache,
 )
 from src.functions.names import is_valid_character_name
-from src.functions.uwu import _uwu_icc_bugfix_kills
+from src.functions.uwu import _fetch_uwu_performance, _uwu_icc_bugfix_kills
 from src.functions.warmane import (
     _fetch_achievements,
     _fetch_gear_data,
@@ -105,7 +105,14 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
     uwu_icc_kills = _resolve_uwu_icc_kills(
         nombre_char, server, raw_uwu_kills, persistent_confirmed, achi_payload, gear_data
     )
-    payload = _serialize_personaje_payload(**base, uwu_icc_kills=uwu_icc_kills)
+    try:
+        uwu_performance = _fetch_uwu_performance(nombre_char, server)
+    except Exception:
+        logger.exception("uwu performance fetch failed for '%s'/%s", nombre_char, server)
+        uwu_performance = None
+    payload = _serialize_personaje_payload(
+        **base, uwu_icc_kills=uwu_icc_kills, uwu_performance=uwu_performance
+    )
 
     if not _is_valid_personaje_payload(payload):
         return None

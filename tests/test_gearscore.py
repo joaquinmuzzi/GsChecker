@@ -91,6 +91,7 @@ class TestFilterHighGsDoesNotFilter:
 class TestPreloadPersonajeCacheDoesNotFilter:
     """tools/preload_personaje_cache.py — feeds the full 25h command_personaje cache."""
 
+    @patch("tools.preload_personaje_cache._fetch_uwu_performance", return_value={})
     @patch("src.controller.commands._fetch_guild_rank")
     @patch("tools.preload_personaje_cache._uwu_icc_bugfix_kills")
     @patch("tools.preload_personaje_cache._fetch_specs")
@@ -109,6 +110,7 @@ class TestPreloadPersonajeCacheDoesNotFilter:
         mock_specs,
         mock_uwu,
         mock_rank,
+        mock_perf,
     ):
         from tools.preload_personaje_cache import build_personaje_cache_entry
 

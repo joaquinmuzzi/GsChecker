@@ -100,6 +100,7 @@ def patched_fetchers():
         "statistics": "src.controller.commands._fetch_statistics",
         "guild_rank": "src.controller.commands._fetch_guild_rank",
         "uwu_icc": "src.controller.commands._uwu_icc_bugfix_kills",
+        "uwu_perf": "src.controller.commands._fetch_uwu_performance",
     }
     with (
         patch(targets["summary"]) as m_summary,
@@ -110,6 +111,7 @@ def patched_fetchers():
         patch(targets["statistics"]) as m_stats,
         patch(targets["guild_rank"]) as m_rank,
         patch(targets["uwu_icc"]) as m_uwu,
+        patch(targets["uwu_perf"]) as m_perf,
     ):
         m_summary.return_value = _happy_summary()
         m_specs.return_value = [
@@ -122,6 +124,7 @@ def patched_fetchers():
         m_stats.return_value = []
         m_rank.return_value = "Gran Canciller"
         m_uwu.return_value = {}
+        m_perf.return_value = {}
         yield {
             "summary": m_summary,
             "specs": m_specs,
@@ -131,6 +134,7 @@ def patched_fetchers():
             "statistics": m_stats,
             "guild_rank": m_rank,
             "uwu_icc": m_uwu,
+            "uwu_perf": m_perf,
         }
 
 

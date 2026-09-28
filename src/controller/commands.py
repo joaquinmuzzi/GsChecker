@@ -39,6 +39,7 @@ from src.functions.warmane import (
 from src.functions.names import is_valid_character_name
 from src.functions.uwu import (
     _uwu_icc_bugfix_kills,
+    _fetch_uwu_performance,
     _build_uwu_dps_summary,
     _fetch_uwu_overview_for_dps,
 )
@@ -567,6 +568,7 @@ def _serialize_personaje_payload(
     suboptimal_gems=None,
     gear_item_count=None,
     data_complete=True,
+    uwu_performance=None,
 ):
     return {
         "nombre_char": nombre_char,
@@ -593,6 +595,7 @@ def _serialize_personaje_payload(
         "professions": professions or [],
         "gear_item_count": gear_item_count,
         "data_complete": data_complete,
+        "uwu_performance": uwu_performance,
     }
 
 
@@ -674,6 +677,7 @@ def _build_personaje_embed_from_cache(payload: dict, loading_symbol: str = "?"):
         professions=payload.get("professions"),
         active_spec_name=payload.get("active_spec_name"),
         suboptimal_gems=payload.get("suboptimal_gems"),
+        uwu_performance=payload.get("uwu_performance"),
     )
 
 
@@ -1225,7 +1229,20 @@ async def _personaje_impl(
             achi_payload,
             gear_data,
         )
-        _payload_to_cache = _serialize_personaje_payload(**base, uwu_icc_kills=uwu_icc_kills)
+        try:
+            # Después de las kills: reusa los /character que ya quedaron en caché.
+            uwu_performance = await loop.run_in_executor(
+                EXECUTOR, _fetch_uwu_performance, nombre_char, realm
+            )
+        except Exception:
+            logger.exception(
+                "uwu performance fetch failed for '%s'/%s", nombre_char, realm
+            )
+            uwu_performance = None
+
+        _payload_to_cache = _serialize_personaje_payload(
+            **base, uwu_icc_kills=uwu_icc_kills, uwu_performance=uwu_performance
+        )
         embed_final = _build_personaje_embed_from_cache(_payload_to_cache)
         if _is_valid_personaje_payload(_payload_to_cache):
             await async_set_external_cache(

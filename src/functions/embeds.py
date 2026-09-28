@@ -345,6 +345,20 @@ def _spec_icon_url(
     return _SPEC_ICON_URLS.get(clean_name)
 
 
+def _format_uwu_performance(perf: dict | None) -> str:
+    """"Fire · #37 (top 1,2 %)": puesto de la spec en el reino. Los puntos de
+    uwu-logs no se muestran porque no se entienden. Vacío si no hay puesto."""
+    if not isinstance(perf, dict) or not perf.get("rank"):
+        return ""
+    rank = perf["rank"]
+    line = f"{perf.get('spec') or '?'} · **#{rank}**"
+    total = perf.get("total")
+    if total:
+        top_pct = f"{rank / total * 100:.1f}".replace(".", ",")
+        line += f" (top {top_pct} %)"
+    return line
+
+
 def _build_personaje_embed(
     nombre_char,
     gs,
@@ -368,6 +382,7 @@ def _build_personaje_embed(
     professions: list[str] | None = None,
     active_spec_name: str | None = None,
     suboptimal_gems: list[str] | None = None,
+    uwu_performance: dict | None = None,
 ):
     embed = discord.Embed(color=0x2B2D31)
     icon_url = _spec_icon_url(active_spec_name, clase)
@@ -425,6 +440,10 @@ def _build_personaje_embed(
         value=f"```\n{rs_table}```",
         inline=False,
     )
+
+    performance_line = _format_uwu_performance(uwu_performance)
+    if performance_line:
+        embed.add_field(name="UwU Logs", value=performance_line, inline=False)
 
     if missing_enchants or missing_gems or suboptimal_gems:
         missing_lines = []

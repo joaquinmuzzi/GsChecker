@@ -32,6 +32,7 @@ FETCHERS = {
     "_fetch_statistics": STATS_ROWS,
     "_fetch_guild_rank": "Officer",
     "_uwu_icc_bugfix_kills": {"25H": {"Lord Marrowgar": True}},
+    "_fetch_uwu_performance": {"spec": "Blood", "points": 74.19, "rank": 230, "total": 1607},
 }
 
 

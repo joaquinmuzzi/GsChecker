@@ -26,6 +26,9 @@ from src.schemas.constants import (
     UWU_TOP_PLAYER_LIMIT,
     UWU_SPEC_PLAYERS_CACHE,
     UWU_SPEC_PLAYERS_TTL,
+    UWU_SPEC_NAMES,
+    UWU_TOP_POINTS_CACHE,
+    UWU_TOP_POINTS_TTL,
     UWU_TOP_PLAYER_TIMEOUT,
     UWU_TOP_WORKERS,
 )
@@ -688,6 +691,83 @@ def _uwu_icc_bugfix_kills(
     if complete:
         _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
     return result
+
+
+def _fetch_uwu_spec_ranked_players(server: str, class_i: int, spec_i: int):
+    """
+    Cantidad de jugadores en el ranking de puntos de una spec (POST
+    /top_points devuelve la lista entera como [nombre, %, puntos]). Se cachea
+    solo el número, compartido entre personajes. None si uwu-logs falló.
+    """
+    cache_key = (server, class_i, spec_i)
+    cached = _cache_get(UWU_TOP_POINTS_CACHE, cache_key, UWU_TOP_POINTS_TTL)
+    if cached is not None:
+        return cached
+
+    persistent_cache_key = f"uwu:top_points_total:{server}:{class_i}:{spec_i}"
+    cached = get_external_cache("uwu_top_points", persistent_cache_key, UWU_TOP_POINTS_TTL)
+    if isinstance(cached, int):
+        _cache_set(UWU_TOP_POINTS_CACHE, cache_key, cached)
+        return cached
+
+    payload = {"server": server, "class_i": class_i, "spec_i": spec_i}
+    started = time.monotonic()
+    try:
+        status, size, rows = _post_json_with_deadline(
+            f"{UWU_BASE}/top_points", payload, UWU_TOP_PLAYER_TIMEOUT
+        )
+    except Exception as e:
+        logger.info(
+            "uwu_top_points class=%s spec=%s error=%r elapsed=%.2fs",
+            class_i, spec_i, e, time.monotonic() - started,
+        )
+        return None
+    logger.info(
+        "uwu_top_points class=%s spec=%s status=%s bytes=%s elapsed=%.2fs",
+        class_i, spec_i, status, size, time.monotonic() - started,
+    )
+    if status != 200 or not isinstance(rows, list):
+        return None
+
+    total = len(rows)
+    _cache_set(UWU_TOP_POINTS_CACHE, cache_key, total)
+    set_external_cache(
+        "uwu_top_points",
+        f"{UWU_BASE}/top_points",
+        persistent_cache_key,
+        total,
+        {"server": server, "class_i": class_i, "spec_i": spec_i},
+    )
+    return total
+
+
+def _fetch_uwu_performance(nombre: str, server: str):
+    """
+    Performance Points de uwu-logs para /p: puntos y puesto de la spec
+    principal (la misma que usa /dps). None si uwu-logs no respondió, {} si el
+    personaje no tiene puntos.
+    """
+    profiles = _uwu_dps_profiles(nombre, server)
+    if profiles is None:
+        return None
+    valid = [
+        (s, c, d)
+        for s, c, d in profiles
+        if c in UWU_SPEC_NAMES and float(d.get("overall_points") or 0) > 0
+    ]
+    if not valid:
+        return {}
+
+    spec_i, class_i, data = max(
+        valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
+    )
+    rank = data.get("overall_rank")
+    return {
+        "spec": UWU_SPEC_NAMES[class_i][spec_i - 1],
+        "points": round(float(data["overall_points"]) / 100, 2),
+        "rank": int(rank) if rank else None,
+        "total": _fetch_uwu_spec_ranked_players(server, class_i, spec_i),
+    }
 
 
 UWU_DOWN_MESSAGE = (
