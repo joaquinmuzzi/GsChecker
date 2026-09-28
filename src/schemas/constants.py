@@ -23,6 +23,7 @@ UWU_TOP_CACHE: dict = {}
 UWU_PDPS_SUMMARY_CACHE: dict = {}
 UWU_ICC_KILLS_CACHE: dict = {}
 UWU_PLAYER_ROWS_CACHE: dict = {}
+UWU_SPEC_PLAYERS_CACHE: dict = {}
 
 # ---------- TTLs (segundos) ----------
 SUMMARY_TTL = 120
@@ -35,6 +36,9 @@ UWU_TOP_TTL = 180
 UWU_PDPS_SUMMARY_TTL = 180
 UWU_ICC_KILLS_TTL = 180
 UWU_PLAYER_ROWS_TTL = 180
+# Lista de jugadores con kill por spec/boss/modo (kills de ICC en /p y el
+# cron): cambia poco y es compartida entre personajes.
+UWU_SPEC_PLAYERS_TTL = 3600
 # 25h: cubre el ciclo diario de tools/preload_personaje_cache.py con margen,
 # así el cache que deja el cron sigue vivo hasta que corre de nuevo al día siguiente.
 COMMAND_PERSONAJE_TTL = 90000

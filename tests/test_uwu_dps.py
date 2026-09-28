@@ -75,6 +75,8 @@ def _isolated_caches(monkeypatch):
     monkeypatch.setattr(uwu.time, "sleep", lambda s: None)
     for cache in (
         uwu.UWU_CHARACTER_CACHE,
+        uwu.UWU_SPEC_PLAYERS_CACHE,
+        uwu.UWU_ICC_KILLS_CACHE,
         uwu.UWU_PLAYER_ROWS_CACHE,
         uwu.UWU_PDPS_SUMMARY_CACHE,
     ):
@@ -140,15 +142,16 @@ def test_prot_keyword_is_class_aware(monkeypatch):
     assert {(p["class_i"], p["spec_i"]) for p in session.posts} == {(4, 2)}
 
 
-def test_no_default_mode_data_queries_whole_class(monkeypatch):
-    # Sin datos en el modo por defecto (25H) no se sabe la spec: se pide la clase.
+def test_no_default_mode_data_queries_all_three_specs(monkeypatch):
+    # Sin datos en el modo por defecto (25H) no se sabe la spec: se piden las 3.
+    # No spec_i=-1: la clase entera pierde jugadores (Flappyaladin, pala/Marrowgar 25H).
     session = FakeSession("Solo10n", spec_with_data=0, top_rows=[_row("Solo10n", 900_000)])
     monkeypatch.setattr(uwu, "SESSION", session)
 
     summary = uwu._build_uwu_dps_summary("Solo10n", "Lordaeron", ["The Lich King"])
 
-    assert {(p["class_i"], p["spec_i"]) for p in session.posts} == {(3, -1)}
-    assert summary["rows"][0]["Raids"] == "1"
+    assert {(p["class_i"], p["spec_i"]) for p in session.posts} == {(3, 1), (3, 2), (3, 3)}
+    assert summary["rows"][0]["Raids"] == "3"
 
 
 def test_unknown_character_skips_top(monkeypatch):
@@ -222,3 +225,31 @@ def test_rate_limited_request_is_retried(monkeypatch):
 
     assert len(session.posts) == 2
     assert len(result["rows"]) == 1
+
+
+def test_icc_kill_found_beyond_first_thousand_players(monkeypatch):
+    # /p: en Lordaeron Fire tiene 3227 jugadores en Marrowgar 25N; con
+    # limit=1000 el que estaba más abajo salía ❌ aunque tuviera el kill.
+    top_rows = [_row(f"Other{i}", 2_000_000) for i in range(3000)]
+    top_rows.append(_row("Lentito", 500_000))
+    session = FakeSession("Lentito", spec_with_data=0, top_rows=top_rows)
+    monkeypatch.setattr(uwu, "SESSION", session)
+
+    kills = uwu._uwu_icc_bugfix_kills("Lentito", "Lordaeron")
+
+    assert kills["Marrowgar"] == {"10H": "✅", "25N": "✅", "25H": "✅"}
+    assert all(p["limit"] == "10000" and p["best_only"] is True for p in session.posts)
+
+
+def test_icc_kills_unknown_when_uwu_is_down(monkeypatch):
+    class DownSession(FakeSession):
+        def get(self, url, timeout=None):
+            raise ConnectionError("uwu-logs caído")
+
+    monkeypatch.setattr(uwu, "SESSION", DownSession("Flappyaladin"))
+
+    kills = uwu._uwu_icc_bugfix_kills("Flappyaladin", "Lordaeron")
+
+    # Sin dato (None), no ❌, y sin cachear.
+    assert kills["Marrowgar"] == {"10H": None, "25N": None, "25H": None}
+    assert not uwu.UWU_ICC_KILLS_CACHE

@@ -24,6 +24,8 @@ from src.schemas.constants import (
     UWU_PLAYER_ROWS_TTL,
     UWU_TOP_MAX_ATTEMPTS,
     UWU_TOP_PLAYER_LIMIT,
+    UWU_SPEC_PLAYERS_CACHE,
+    UWU_SPEC_PLAYERS_TTL,
     UWU_TOP_PLAYER_TIMEOUT,
     UWU_TOP_WORKERS,
 )
@@ -245,6 +247,113 @@ def _post_json_with_deadline(url: str, payload: dict, total_timeout: float):
     return 200, len(body), json.loads(body)
 
 
+def _post_top_with_retry(payload: dict, timeout_value: float):
+    """
+    POST /top con deadline total. uwu-logs rate-limita las ráfagas (429):
+    espera (Retry-After o 1,5 s, 3 s) y reintenta mientras quede tiempo.
+    Devuelve (status, bytes, json) como _post_json_with_deadline.
+    """
+    started = time.monotonic()
+    for attempt in range(1, UWU_TOP_MAX_ATTEMPTS + 1):
+        remaining = timeout_value - (time.monotonic() - started)
+        status, size, data = _post_json_with_deadline(
+            f"{UWU_BASE}/top", payload, max(remaining, 1.0)
+        )
+        if status != 429 or attempt == UWU_TOP_MAX_ATTEMPTS:
+            break
+        try:
+            wait_s = float(data)
+        except (TypeError, ValueError):
+            wait_s = 1.5 * attempt
+        remaining = timeout_value - (time.monotonic() - started)
+        logger.info(
+            "uwu_top_retry boss=%s mode=%s class=%s spec=%s status=429 "
+            "attempt=%s wait=%.1fs",
+            payload.get("boss"), payload.get("mode"), payload.get("class_i"),
+            payload.get("spec_i"), attempt, wait_s,
+        )
+        if wait_s >= remaining - 1.0:
+            break
+        time.sleep(wait_s)
+    return status, size, data
+
+
+def _fetch_uwu_spec_players(
+    server: str, boss: str, mode: str, class_i: int, spec_i: int
+):
+    """
+    Nombres (en minúscula) de todos los jugadores de una spec con al menos un
+    kill válido del boss en ese modo. Es la misma lista para todos los
+    personajes, así que se cachea compartida (sirve para /p y para el cron).
+    Con limit=1000 los jugadores más allá del puesto 1000 salían sin kill: en
+    Lordaeron casi todas las specs populares superan los 1000 en Marrowgar y
+    Deathwhisper. Devuelve None si uwu-logs no respondió.
+    """
+    cache_key = (server, boss, mode, class_i, spec_i)
+    cached = _cache_get(UWU_SPEC_PLAYERS_CACHE, cache_key, UWU_SPEC_PLAYERS_TTL)
+    if cached is not None:
+        return cached
+
+    persistent_cache_key = (
+        f"uwu:spec_players:{server}:{boss}:{mode}:{class_i}:{spec_i}"
+    )
+    cached = get_external_cache(
+        "uwu_spec_players", persistent_cache_key, UWU_SPEC_PLAYERS_TTL
+    )
+    if cached is not None:
+        _cache_set(UWU_SPEC_PLAYERS_CACHE, cache_key, cached)
+        return cached
+
+    payload = {
+        "server": server,
+        "boss": boss,
+        "mode": mode,
+        "class_i": class_i,
+        "spec_i": spec_i,
+        "sort_by": "head-useful-dps",
+        "limit": str(UWU_TOP_PLAYER_LIMIT),
+        "best_only": True,
+        "externals": True,
+    }
+    started = time.monotonic()
+    try:
+        status, size, top_rows = _post_top_with_retry(
+            payload, UWU_TOP_PLAYER_TIMEOUT
+        )
+    except Exception as e:
+        logger.info(
+            "uwu_spec_players boss=%s mode=%s class=%s spec=%s error=%r elapsed=%.2fs",
+            boss, mode, class_i, spec_i, e, time.monotonic() - started,
+        )
+        return None
+    if status != 200 or not isinstance(top_rows, list):
+        logger.info(
+            "uwu_spec_players boss=%s mode=%s class=%s spec=%s status=%s elapsed=%.2fs",
+            boss, mode, class_i, spec_i, status, time.monotonic() - started,
+        )
+        return None
+
+    names = sorted({
+        str(row[3]).lower()
+        for row in top_rows
+        if isinstance(row, list) and len(row) > 4 and _uwu_row_dps(row) is not None
+    })
+    logger.info(
+        "uwu_spec_players boss=%s mode=%s class=%s spec=%s status=200 bytes=%s "
+        "players=%s elapsed=%.2fs",
+        boss, mode, class_i, spec_i, size, len(names), time.monotonic() - started,
+    )
+    _cache_set(UWU_SPEC_PLAYERS_CACHE, cache_key, names)
+    set_external_cache(
+        "uwu_spec_players",
+        f"{UWU_BASE}/top",
+        persistent_cache_key,
+        names,
+        {"server": server, "boss": boss, "mode": mode, "class_i": class_i, "spec_i": spec_i},
+    )
+    return names
+
+
 def _fetch_uwu_player_rows(
     server: str,
     boss: str,
@@ -294,37 +403,16 @@ def _fetch_uwu_player_rows(
         timeout_override if timeout_override is not None else UWU_TOP_PLAYER_TIMEOUT
     )
     started = time.monotonic()
-    for attempt in range(1, UWU_TOP_MAX_ATTEMPTS + 1):
-        remaining = timeout_value - (time.monotonic() - started)
-        try:
-            status, size, top_rows = _post_json_with_deadline(
-                f"{UWU_BASE}/top", payload, max(remaining, 1.0)
-            )
-        except Exception as e:
-            logger.info(
-                "uwu_player_rows boss=%s mode=%s class=%s spec=%s timeout=%.1f "
-                "error=%r elapsed=%.2fs",
-                boss, mode, class_i, spec_i, timeout_value, e,
-                time.monotonic() - started,
-            )
-            return {"__error__": f"uwu top error: {e}"}
-        if status != 429 or attempt == UWU_TOP_MAX_ATTEMPTS:
-            break
-        # uwu-logs rate-limita las ráfagas (429): esperar y reintentar si
-        # todavía hay tiempo.
-        try:
-            wait_s = float(top_rows)
-        except (TypeError, ValueError):
-            wait_s = 1.5 * attempt
-        remaining = timeout_value - (time.monotonic() - started)
+    try:
+        status, size, top_rows = _post_top_with_retry(payload, timeout_value)
+    except Exception as e:
         logger.info(
-            "uwu_player_rows boss=%s mode=%s class=%s spec=%s status=429 "
-            "attempt=%s wait=%.1fs",
-            boss, mode, class_i, spec_i, attempt, wait_s,
+            "uwu_player_rows boss=%s mode=%s class=%s spec=%s timeout=%.1f "
+            "error=%r elapsed=%.2fs",
+            boss, mode, class_i, spec_i, timeout_value, e,
+            time.monotonic() - started,
         )
-        if wait_s >= remaining - 1.0:
-            break
-        time.sleep(wait_s)
+        return {"__error__": f"uwu top error: {e}"}
 
     if status != 200:
         logger.info(
@@ -397,8 +485,10 @@ def _uwu_dps_spec_pairs(profiles, spec_filter: str | None = None):
     /character devuelve perfil para las 3 specs aunque el personaje no tenga
     logs en ellas, así que sin filtro se usa solo la spec principal (no se
     mezclan, por ejemplo, las raids de prot y de ret). Si ninguna spec tiene
-    datos en el modo por defecto de /character, se pide la clase entera
-    (spec_i=-1). Sin perfil en uwu-logs no hay nada que consultar.
+    datos en el modo por defecto de /character, se piden las 3 specs: pedir
+    la clase entera (spec_i=-1) pierde jugadores (en pala/Marrowgar 25H
+    devuelve 5215 contra 5379 sumando las specs, y falta Flappyaladin).
+    Sin perfil en uwu-logs no hay nada que consultar.
     """
     valid = [(s, c, d) for s, c, d in profiles if c >= 0]
     if not valid:
@@ -413,7 +503,7 @@ def _uwu_dps_spec_pairs(profiles, spec_filter: str | None = None):
         valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
     )
     if _uwu_spec_sort_key(spec_i, data)[0] == 0:
-        return [(-1, class_i)]
+        return [(s, class_i) for s in (1, 2, 3)]
     return [(spec_i, class_i)]
 
 
@@ -525,7 +615,7 @@ def _uwu_icc_bugfix_kills(
     nombre: str,
     server: str,
 ):
-    cache_key = ("v2", nombre.lower(), server)
+    cache_key = ("v3", nombre.lower(), server)
     cached = _cache_get(UWU_ICC_KILLS_CACHE, cache_key, UWU_ICC_KILLS_TTL)
     if cached is not None:
         return cached
@@ -539,19 +629,26 @@ def _uwu_icc_bugfix_kills(
         short_name: {mode: None for mode in modes} for short_name in target
     }
 
-    profiles = _uwu_profiles(nombre, server)
+    profiles = _uwu_dps_profiles(nombre, server)
     lower_name = nombre.lower()
+
+    # uwu-logs no respondió: sin dato (None) y sin cachear, no ❌.
+    if profiles is None:
+        return result
+
+    # Si el personaje no tiene perfil válido en UwU no tiene sentido escanear
+    # listas de ranking: salimos de inmediato con ❌ en todos los modos.
+    if not profiles:
+        for short_name in target:
+            for mode in modes:
+                result[short_name][mode] = "❌"
+        _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
+        return result
 
     character_mode_presence = {
         short_name: {mode: False for mode in modes} for short_name in target
     }
-    for spec_i in (1, 2, 3):
-        data = _fetch_uwu_character(nombre, server, spec_i)
-        if not isinstance(data, dict) or data.get("__error__"):
-            continue
-        profile_name = str(data.get("name") or "")
-        if profile_name.startswith("Unknown-"):
-            continue
+    for _, _, data in profiles:
         bosses = data.get("bosses")
         if not isinstance(bosses, dict):
             continue
@@ -570,45 +667,26 @@ def _uwu_icc_bugfix_kills(
                 character_mode_presence[short_name][default_mode] = True
 
     probe_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
-
-    # Si el personaje no tiene perfil válido en UwU no tiene sentido escanear
-    # miles de listas de ranking: salimos de inmediato con ❌ en todos los modos.
-    if not probe_pairs:
-        for short_name in target:
-            for mode in modes:
-                result[short_name][mode] = "❌"
-        _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
-        return result
-
+    complete = True
     for short_name, full_boss_name in target.items():
         for mode in modes:
             found = character_mode_presence.get(short_name, {}).get(mode, False)
             checked = found
             for spec_i, class_i in probe_pairs:
-                top_rows = _fetch_uwu_top(
-                    server,
-                    full_boss_name,
-                    mode,
-                    class_i,
-                    spec_i,
-                )
-                if not isinstance(top_rows, list):
-                    continue
-                checked = True
-                for row in top_rows:
-                    if not isinstance(row, list) or len(row) < 6:
-                        continue
-                    row_name = str(row[3]).lower() if len(row) > 3 else ""
-                    if row_name != lower_name:
-                        continue
-                    if _uwu_row_dps(row) is not None:
-                        found = True
-                        break
                 if found:
                     break
+                players = _fetch_uwu_spec_players(
+                    server, full_boss_name, mode, class_i, spec_i
+                )
+                if players is None:
+                    complete = False
+                    continue
+                checked = True
+                found = lower_name in players
             result[short_name][mode] = "✅" if found else ("❌" if checked else None)
 
-    _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
+    if complete:
+        _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
     return result
 
 
