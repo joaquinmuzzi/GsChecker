@@ -1,4 +1,5 @@
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from src.schemas.constants import (
     SESSION,
@@ -8,6 +9,7 @@ from src.schemas.constants import (
     UWU_BOSS_SHORT,
     UWU_MODES_ALL,
     UWU_SPEC_KEYWORDS,
+    UWU_SPEC_KEYWORDS_BY_CLASS,
     UWU_CHARACTER_CACHE,
     UWU_CHARACTER_TTL,
     UWU_TOP_CACHE,
@@ -16,6 +18,11 @@ from src.schemas.constants import (
     UWU_PDPS_SUMMARY_TTL,
     UWU_ICC_KILLS_CACHE,
     UWU_ICC_KILLS_TTL,
+    UWU_PLAYER_ROWS_CACHE,
+    UWU_PLAYER_ROWS_TTL,
+    UWU_TOP_PLAYER_LIMIT,
+    UWU_TOP_PLAYER_TIMEOUT,
+    UWU_TOP_WORKERS,
 )
 from src.db.postgres import get_external_cache, set_external_cache
 from src.functions.cache import _cache_get, _cache_set
@@ -162,56 +169,143 @@ def _uwu_profiles(nombre: str, server: str):
     return profiles
 
 
-def _discover_uwu_spec_class_pairs(
-    nombre: str,
+def _fetch_uwu_player_rows(
     server: str,
-    boss_names,
-    modes,
-    deadline_ts: float | None = None,
+    boss: str,
+    mode: str,
+    class_i: int,
+    spec_i: int,
+    nombre: str,
+    timeout_override: float | None = None,
 ):
+    """
+    Filas de /top (todas las raids, no solo la mejor) de un jugador.
+
+    /top no filtra por nombre: trae la spec entera ordenada por DPS útil, así
+    que se piden UWU_TOP_PLAYER_LIMIT filas y se quedan solo las del jugador.
+    Se cachean esas filas y no la lista completa (pesa ~1-2 MB).
+    "truncated" indica que la spec tiene más filas que el límite, así que al
+    jugador le pueden faltar sus raids de menor DPS.
+    """
     lower_name = nombre.lower()
-    discovered_pairs = []
-    seen = set()
+    cache_key = (server, boss, mode, class_i, spec_i, lower_name)
+    cached = _cache_get(UWU_PLAYER_ROWS_CACHE, cache_key, UWU_PLAYER_ROWS_TTL)
+    if cached is not None:
+        return cached
 
-    for boss_name in boss_names:
-        for mode in modes:
-            for class_i in range(10):
-                for spec_i in (1, 2, 3):
-                    if deadline_ts is not None and time.monotonic() >= deadline_ts:
-                        return discovered_pairs
-                    remaining = None
-                    if deadline_ts is not None:
-                        remaining = max(deadline_ts - time.monotonic(), 0.5)
-                    top_rows = _fetch_uwu_top(
-                        server,
-                        boss_name,
-                        mode,
-                        class_i,
-                        spec_i,
-                        timeout_override=(
-                            min(HTTP_TIMEOUT, remaining)
-                            if remaining is not None
-                            else None
-                        ),
-                        max_attempts=1,
-                    )
-                    if not isinstance(top_rows, list):
-                        continue
-                    has_player = any(
-                        isinstance(row, list)
-                        and len(row) > 3
-                        and str(row[3]).lower() == lower_name
-                        and _uwu_row_dps(row) is not None
-                        for row in top_rows
-                    )
-                    if not has_player:
-                        continue
-                    pair = (spec_i, class_i)
-                    if pair not in seen:
-                        seen.add(pair)
-                        discovered_pairs.append(pair)
+    persistent_cache_key = (
+        f"uwu:player_rows:{server}:{boss}:{mode}:{class_i}:{spec_i}:{lower_name}"
+    )
+    cached = get_external_cache(
+        "uwu_player_rows", persistent_cache_key, UWU_PLAYER_ROWS_TTL
+    )
+    if cached is not None:
+        _cache_set(UWU_PLAYER_ROWS_CACHE, cache_key, cached)
+        return cached
 
-    return discovered_pairs
+    payload = {
+        "server": server,
+        "boss": boss,
+        "mode": mode,
+        "class_i": class_i,
+        "spec_i": spec_i,
+        "sort_by": "head-useful-dps",
+        "limit": str(UWU_TOP_PLAYER_LIMIT),
+        "best_only": False,
+        "externals": True,
+    }
+    timeout_value = (
+        timeout_override if timeout_override is not None else UWU_TOP_PLAYER_TIMEOUT
+    )
+    try:
+        resp = SESSION.post(f"{UWU_BASE}/top", json=payload, timeout=timeout_value)
+    except Exception as e:
+        return {"__error__": f"uwu top error: {e}"}
+
+    if resp.status_code != 200:
+        return {"__error__": f"uwu top status: {resp.status_code}"}
+
+    try:
+        top_rows = resp.json()
+    except Exception as e:
+        return {"__error__": f"uwu top json error: {e}"}
+    if not isinstance(top_rows, list):
+        return {"__error__": "uwu top: respuesta inesperada"}
+
+    result = {
+        "rows": [
+            row
+            for row in top_rows
+            if isinstance(row, list)
+            and len(row) > 4
+            and str(row[3]).lower() == lower_name
+        ],
+        "truncated": len(top_rows) >= UWU_TOP_PLAYER_LIMIT,
+    }
+    _cache_set(UWU_PLAYER_ROWS_CACHE, cache_key, result)
+    set_external_cache(
+        "uwu_player_rows",
+        f"{UWU_BASE}/top",
+        persistent_cache_key,
+        result,
+        {
+            "server": server,
+            "boss": boss,
+            "mode": mode,
+            "class_i": class_i,
+            "spec_i": spec_i,
+            "name": nombre,
+        },
+    )
+    return result
+
+
+def _uwu_spec_sort_key(spec_i: int, data: dict):
+    """Spec principal: la que tiene más bosses con datos, después más puntos."""
+    bosses = data.get("bosses", {}) if isinstance(data, dict) else {}
+    if not isinstance(bosses, dict):
+        bosses = {}
+    bosses_with_data = sum(1 for v in bosses.values() if isinstance(v, dict) and v)
+    points = float(data.get("overall_points") or 0)
+    return (bosses_with_data, points, -spec_i)
+
+
+def _uwu_spec_ids_for_filter(spec_filter: str | None, class_i: int | None):
+    """spec_i de uwu-logs para la spec pedida, desambiguada por clase si se conoce."""
+    if not spec_filter:
+        return None
+    kw = spec_filter.strip().lower()
+    by_class = UWU_SPEC_KEYWORDS_BY_CLASS.get(kw, {})
+    if class_i in by_class:
+        return [by_class[class_i]]
+    return UWU_SPEC_KEYWORDS.get(kw)
+
+
+def _uwu_dps_spec_pairs(profiles, spec_filter: str | None = None):
+    """
+    Pares (spec_i, class_i) a consultar en /top para /dps.
+
+    /character devuelve perfil para las 3 specs aunque el personaje no tenga
+    logs en ellas, así que sin filtro se usa solo la spec principal (no se
+    mezclan, por ejemplo, las raids de prot y de ret). Si ninguna spec tiene
+    datos en el modo por defecto de /character, se pide la clase entera
+    (spec_i=-1). Sin perfil en uwu-logs no hay nada que consultar.
+    """
+    valid = [(s, c, d) for s, c, d in profiles if c >= 0]
+    if not valid:
+        return []
+    class_i = valid[0][1]
+
+    allowed_spec_ids = _uwu_spec_ids_for_filter(spec_filter, class_i)
+    if allowed_spec_ids:
+        return [(s, class_i) for s in allowed_spec_ids]
+
+    spec_i, class_i, data = max(
+        valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
+    )
+    if _uwu_spec_sort_key(spec_i, data)[0] == 0:
+        return [(-1, class_i)]
+    return [(spec_i, class_i)]
 
 
 def _pick_uwu_spec(nombre: str, server: str):
@@ -224,14 +318,9 @@ def _pick_uwu_spec(nombre: str, server: str):
     if not payloads:
         return None, None
 
-    def sort_key(item):
-        spec_i, data = item
-        bosses = data.get("bosses", {}) if isinstance(data, dict) else {}
-        bosses_with_data = sum(1 for v in bosses.values() if isinstance(v, dict) and v)
-        points = float(data.get("overall_points") or 0)
-        return (bosses_with_data, points, -spec_i)
-
-    best_spec_i, best_payload = max(payloads, key=sort_key)
+    best_spec_i, best_payload = max(
+        payloads, key=lambda item: _uwu_spec_sort_key(item[0], item[1])
+    )
     return best_spec_i, best_payload
 
 
@@ -304,8 +393,11 @@ def _fetch_uwu_overview_for_dps(
     desde UwU Logs. Usa la mejor spec disponible salvo que spec_filter lo indique.
     """
     if spec_filter:
-        kw = spec_filter.strip().lower()
-        spec_i_candidates = UWU_SPEC_KEYWORDS.get(kw)
+        class_i = None
+        first = _fetch_uwu_character(nombre, server, 1)
+        if isinstance(first, dict) and not first.get("__error__"):
+            class_i = first.get("class_i")
+        spec_i_candidates = _uwu_spec_ids_for_filter(spec_filter, class_i)
         if spec_i_candidates:
             for si in spec_i_candidates:
                 data = _fetch_uwu_character(nombre, server, si)
@@ -411,6 +503,33 @@ def _uwu_icc_bugfix_kills(
     return result
 
 
+def _uwu_dps_row(boss_name: str, mode: str, player_rows, truncated: bool):
+    boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
+    dps_values = [x for x in (_uwu_row_dps(r) for r in player_rows) if x is not None]
+    # Con la lista truncada pueden faltar las raids de menor DPS del jugador:
+    # el máximo es exacto, pero la cantidad es un mínimo ("+").
+    raids_suffix = "+" if truncated else ""
+    if not dps_values:
+        return {
+            "Boss": boss_short,
+            "Mode": mode,
+            "Raids": "0" + raids_suffix,
+            "Max DPS": "-",
+            "Avg DPS": "-",
+            "_boss": boss_name,
+        }
+    dps_avg = round(sum(dps_values) / len(dps_values), 2)
+    dps_max = round(max(dps_values), 2)
+    return {
+        "Boss": boss_short,
+        "Mode": mode,
+        "Raids": f"{len(dps_values)}{raids_suffix}",
+        "Max DPS": f"{dps_max:.2f}",
+        "Avg DPS": f"{dps_avg:.2f}",
+        "_boss": boss_name,
+    }
+
+
 def _build_uwu_dps_summary(
     nombre: str,
     server: str,
@@ -424,10 +543,20 @@ def _build_uwu_dps_summary(
     if cached is not None:
         return cached
 
-    profiles = _uwu_profiles(nombre, server)
-    spec_class_pairs = [(spec_i, class_i) for spec_i, class_i, _ in profiles]
     deadline_ts = time.monotonic() + max(time_budget_s, 1.0)
-    timed_out = False
+    profiles = _uwu_profiles(nombre, server)
+    spec_class_pairs = _uwu_dps_spec_pairs(profiles, spec_filter)
+    failed_by_mode = {mode: 0 for mode in UWU_MODES_ALL}
+
+    if not spec_class_pairs:
+        payload = {
+            "rows": [],
+            "__error__": "No hay datos de uwu-logs para el personaje.",
+            "failed_by_mode": failed_by_mode,
+            "timed_out": False,
+        }
+        _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
+        return payload
 
     if selected_bosses:
         boss_names = [
@@ -443,120 +572,67 @@ def _build_uwu_dps_summary(
             bosses = {boss_name: {} for boss_name in UWU_BOSS_SHORT}
         boss_names = sorted(bosses.keys(), key=lambda x: UWU_BOSS_SHORT.get(x, x))
 
-    if not spec_class_pairs:
-        discovered_pairs = _discover_uwu_spec_class_pairs(
-            nombre,
+    def fetch(boss_name, mode, spec_i, class_i):
+        remaining = deadline_ts - time.monotonic()
+        if remaining <= 0:
+            return {"__error__": "timeout"}
+        return _fetch_uwu_player_rows(
             server,
-            boss_names,
-            ("10H", "25N", "10N", "25H"),
-            deadline_ts=deadline_ts,
+            boss_name,
+            mode,
+            class_i,
+            spec_i,
+            nombre,
+            timeout_override=min(UWU_TOP_PLAYER_TIMEOUT, max(1.0, remaining)),
         )
-        if discovered_pairs:
-            spec_class_pairs = discovered_pairs
-        else:
-            spec_class_pairs = [(-1, -1)]
 
-    if spec_filter:
-        kw = spec_filter.strip().lower()
-        allowed_spec_ids = UWU_SPEC_KEYWORDS.get(kw)
-        if allowed_spec_ids:
-            filtered = [(s, c) for s, c in spec_class_pairs if s in allowed_spec_ids]
-            if filtered:
-                spec_class_pairs = filtered
-            elif profiles:
-                class_i_fallback = profiles[0][1]
-                spec_class_pairs = [(s, class_i_fallback) for s in allowed_spec_ids]
-            else:
-                spec_class_pairs = [(s, -1) for s in allowed_spec_ids]
+    tasks = [
+        (boss_name, mode, spec_i, class_i)
+        for boss_name in boss_names
+        for mode in UWU_MODES_ALL
+        for spec_i, class_i in spec_class_pairs
+    ]
+    # Cada consulta de 10000 filas tarda ~0,3-2 s: van en paralelo, pocas a la
+    # vez para no castigar a uwu-logs.
+    pool = ThreadPoolExecutor(max_workers=UWU_TOP_WORKERS)
+    futures = {pool.submit(fetch, *task): task for task in tasks}
+    _, pending = wait(futures, timeout=max(deadline_ts - time.monotonic(), 0.0))
+    pool.shutdown(wait=False, cancel_futures=True)
+    timed_out = bool(pending)
+
+    results = {}
+    for future, task in futures.items():
+        if future in pending:
+            continue
+        try:
+            results[task] = future.result()
+        except Exception as e:
+            results[task] = {"__error__": f"uwu top error: {e}"}
 
     rows = []
-    lower_name = nombre.lower()
-    failed_by_mode = {mode: 0 for mode in UWU_MODES_ALL}
-
     for boss_name in boss_names:
-        if time.monotonic() >= deadline_ts:
-            timed_out = True
-            break
-        boss_short = UWU_BOSS_SHORT.get(boss_name, boss_name[:10])
         for mode in UWU_MODES_ALL:
-            if time.monotonic() >= deadline_ts:
-                timed_out = True
-                break
             player_rows = []
+            truncated = False
             any_fetch_ok = False
+            answered = False
             for spec_i, class_i in spec_class_pairs:
-                remaining = deadline_ts - time.monotonic()
-                if remaining <= 0:
-                    timed_out = True
-                    break
-                top_rows = _fetch_uwu_top(
-                    server,
-                    boss_name,
-                    mode,
-                    class_i,
-                    spec_i,
-                    best_only=False,
-                    timeout_override=min(HTTP_TIMEOUT, max(1.0, remaining)),
-                    max_attempts=1,
-                )
-                if not isinstance(top_rows, list):
+                data = results.get((boss_name, mode, spec_i, class_i))
+                if data is None:
+                    continue
+                answered = True
+                if not isinstance(data, dict) or data.get("__error__"):
                     failed_by_mode[mode] += 1
                     continue
                 any_fetch_ok = True
-                for row in top_rows:
-                    if not isinstance(row, list) or len(row) < 6:
-                        continue
-                    row_name = str(row[3]).lower() if len(row) > 3 else ""
-                    if row_name == lower_name:
-                        player_rows.append(row)
-
-            if timed_out:
-                break
-
+                player_rows.extend(data.get("rows") or [])
+                truncated = truncated or bool(data.get("truncated"))
+            if not answered:
+                # Quedó afuera por el timeout: la fila no se muestra.
+                continue
             if not any_fetch_ok:
-                rows.append(
-                    {
-                        "Boss": boss_short,
-                        "Mode": mode,
-                        "Raids": "0",
-                        "Max DPS": "-",
-                        "Avg DPS": "-",
-                        "_boss": boss_name,
-                    }
-                )
-                continue
-
-            dps_values = [
-                x for x in (_uwu_row_dps(x) for x in player_rows) if x is not None
-            ]
-            if not dps_values:
-                rows.append(
-                    {
-                        "Boss": boss_short,
-                        "Mode": mode,
-                        "Raids": "0",
-                        "Max DPS": "-",
-                        "Avg DPS": "-",
-                        "_boss": boss_name,
-                    }
-                )
-                continue
-
-            dps_avg = round(sum(dps_values) / len(dps_values), 2)
-            dps_max = round(max(dps_values), 2)
-            rows.append(
-                {
-                    "Boss": boss_short,
-                    "Mode": mode,
-                    "Raids": str(len(dps_values)),
-                    "Max DPS": f"{dps_max:.2f}",
-                    "Avg DPS": f"{dps_avg:.2f}",
-                    "_boss": boss_name,
-                }
-            )
-
-        if timed_out:
-            break
+                player_rows = []
+            rows.append(_uwu_dps_row(boss_name, mode, player_rows, truncated))
 
     if not rows:
         payload = {
@@ -570,7 +646,7 @@ def _build_uwu_dps_summary(
 
     payload = {
         "rows": rows,
-        "spec_i": "all",
+        "spec_i": spec_class_pairs[0][0] if len(spec_class_pairs) == 1 else "all",
         "failed_by_mode": failed_by_mode,
         "timed_out": timed_out,
     }

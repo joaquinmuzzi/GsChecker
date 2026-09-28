@@ -22,6 +22,7 @@ UWU_CHARACTER_CACHE: dict = {}
 UWU_TOP_CACHE: dict = {}
 UWU_PDPS_SUMMARY_CACHE: dict = {}
 UWU_ICC_KILLS_CACHE: dict = {}
+UWU_PLAYER_ROWS_CACHE: dict = {}
 
 # ---------- TTLs (segundos) ----------
 SUMMARY_TTL = 120
@@ -33,6 +34,7 @@ UWU_CHARACTER_TTL = 120
 UWU_TOP_TTL = 180
 UWU_PDPS_SUMMARY_TTL = 180
 UWU_ICC_KILLS_TTL = 180
+UWU_PLAYER_ROWS_TTL = 180
 # 25h: cubre el ciclo diario de tools/preload_personaje_cache.py con margen,
 # así el cache que deja el cron sigue vivo hasta que corre de nuevo al día siguiente.
 COMMAND_PERSONAJE_TTL = 90000
@@ -75,6 +77,13 @@ UWU_BOSS_SHORT = {
 }
 
 UWU_MODES_ALL = ("10N", "10H", "25N", "25H")
+
+# /top de uwu-logs no filtra por jugador: /dps pide hasta 10000 filas de la
+# spec (ordenadas por DPS útil) y busca las del personaje. Con 1000 los
+# tanks/healers quedaban afuera y salían con 0 raids.
+UWU_TOP_PLAYER_LIMIT = 10000
+UWU_TOP_PLAYER_TIMEOUT = 15
+UWU_TOP_WORKERS = 4
 
 UWU_PDPS_BOSS_ORDER = [
     "Lord Marrowgar",
@@ -149,6 +158,16 @@ UWU_SPEC_KEYWORDS: dict[str, list[int]] = {
     "balance": [1],
     "feral": [2],
     "rdruid": [3],
+}
+
+# Keywords cuya spec depende de la clase. Orden de clases de uwu-logs
+# (c_player_classes.CLASSES): DK 0, Druid 1, Hunter 2, Mage 3, Paladin 4,
+# Priest 5, Rogue 6, Shaman 7, Warlock 8, Warrior 9.
+UWU_SPEC_KEYWORDS_BY_CLASS: dict[str, dict[int, int]] = {
+    "frost": {0: 2, 3: 3},
+    "holy": {4: 1, 5: 2},
+    "prot": {4: 2, 9: 3},
+    "protection": {4: 2, 9: 3},
 }
 
 # ---------- Shared HTTP session / executor ----------
