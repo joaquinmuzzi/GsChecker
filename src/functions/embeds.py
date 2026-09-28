@@ -474,6 +474,35 @@ def _build_personaje_embed(
     return embed
 
 
+def _build_uwu_logs_embed(nombre: str, server: str, data: dict) -> discord.Embed:
+    """/logs: un renglón por reporte, del más nuevo al más viejo."""
+    lines = [
+        f"`{r['date']}` · {r['label']} · por {r['author']} · "
+        f"[ver](https://uwu-logs.xyz/reports/{r['id']}/)"
+        for r in data.get("reports", [])
+    ]
+    embed = discord.Embed(
+        title=f"{nombre} · últimos logs en UwU Logs",
+        description="\n".join(lines),
+        color=0x2B2D31,
+    )
+    total = data.get("total", len(lines))
+    embed.set_footer(text=f"{server} · {total} reportes en total")
+    return embed
+
+
+def _build_uwu_logs_view(nombre: str, server: str) -> discord.ui.View:
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Ver todos en UwU Logs",
+            url=f"https://uwu-logs.xyz/logs_list?server={server}&player={nombre}",
+            style=discord.ButtonStyle.link,
+        )
+    )
+    return view
+
+
 def _build_personaje_view(
     nombre_char: str, server: str = "Lordaeron"
 ) -> discord.ui.View:

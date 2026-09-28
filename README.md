@@ -20,6 +20,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
   - links a Armory y UwU Logs.
 - **DPS por boss** (máximo y promedio) vía uwu-logs.xyz, con overview rápido y tabla detallada.
 - **Trial of the Crusader**: logros 10N / 10H / 25N / 25H.
+- **Últimos logs** con `/logs`: los 10 reportes más nuevos de UwU Logs donde aparece el personaje, con la raid de cada uno (`ICC 11/12`, `Halion`, `Toravon` u `otro raid`). uwu-logs no trae los bosses en la lista, así que se pide una vez por pelea (14 consultas, 2 a la vez) y se cachea 10 min.
 - **Análisis BiS + coach por IA** (Groq) con `/ia`, contra un BiS **por reino** (Lordaeron / Icecrown) armado con lo que equipan los mejores jugadores de cada spec en Warmane.
 - **Cache en memoria + Postgres** (`external_api_cache`) para reducir requests al Armory / UwU.
 - **Rate limit propio + circuit breaker** para no gatillar el 429 / ban de Cloudflare del Armory.
@@ -31,6 +32,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 | `/personaje <nombre> [reino]` | Perfil completo del personaje.                         | Configurable        |
 | `/p <nombre> [reino]`        | Alias corto de `/personaje`.                            | Configurable        |
 | `/dps <nombre> [spec]`       | DPS por boss desde UwU Logs.                            | Lordaeron           |
+| `/logs <nombre> [reino]`     | Últimos 10 reportes de UwU Logs donde aparece el personaje (fecha, raid, quién lo subió, link). | Configurable |
 | `/ptoc <nombre>`             | Logros ToC (10N/10H/25N/25H) en tabla.                  | Lordaeron           |
 | `/ia <nombre> [reino]`       | Análisis BiS + resumen de coach por IA (requiere `GROQ_API_KEY`). | Lordaeron / Icecrown |
 | `/ping`                      | Latencia actual del bot.                                | —                   |

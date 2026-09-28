@@ -31,6 +31,11 @@ from src.schemas.constants import (
     UWU_SPEC_NAMES,
     UWU_TOP_POINTS_CACHE,
     UWU_TOP_POINTS_TTL,
+    UWU_LOGS_CACHE,
+    UWU_LOGS_ICC_FIGHTS,
+    UWU_LOGS_LIMIT,
+    UWU_LOGS_OTHER_FIGHTS,
+    UWU_LOGS_TTL,
     UWU_TOP_PLAYER_TIMEOUT,
     UWU_TOP_WORKERS,
 )
@@ -252,17 +257,18 @@ def _post_json_with_deadline(url: str, payload: dict, total_timeout: float):
     return 200, len(body), json.loads(body)
 
 
-def _post_top_with_retry(payload: dict, timeout_value: float):
+def _post_top_with_retry(payload: dict, timeout_value: float, path: str = "/top"):
     """
-    POST /top con deadline total. uwu-logs rate-limita las ráfagas (429):
-    espera (Retry-After o 1,5 s, 3 s) y reintenta mientras quede tiempo.
-    Devuelve (status, bytes, json) como _post_json_with_deadline.
+    POST a uwu-logs (por defecto /top) con deadline total. uwu-logs
+    rate-limita las ráfagas (429): espera (Retry-After o 1,5 s, 3 s) y
+    reintenta mientras quede tiempo. Devuelve (status, bytes, json) como
+    _post_json_with_deadline.
     """
     started = time.monotonic()
     for attempt in range(1, UWU_TOP_MAX_ATTEMPTS + 1):
         remaining = timeout_value - (time.monotonic() - started)
         status, size, data = _post_json_with_deadline(
-            f"{UWU_BASE}/top", payload, max(remaining, 1.0)
+            f"{UWU_BASE}{path}", payload, max(remaining, 1.0)
         )
         if status != 429 or attempt == UWU_TOP_MAX_ATTEMPTS:
             break
@@ -819,6 +825,108 @@ def _fetch_uwu_performance(nombre: str, server: str, char_class: str | None = No
         "rank": rank,
         "total": total,
     }
+
+
+def _fetch_uwu_report_ids(server: str, nombre: str, fight: str | None = None):
+    """
+    Ids de los reportes de uwu-logs donde aparece el jugador (POST /logs_list
+    filtra por nombre exacto), opcionalmente solo los que tienen esa pelea.
+    None si uwu-logs no respondió.
+    """
+    payload = {"server": server, "player": nombre}
+    if fight:
+        payload["fight"] = fight
+    started = time.monotonic()
+    try:
+        status, size, ids = _post_top_with_retry(
+            payload, UWU_TOP_PLAYER_TIMEOUT, path="/logs_list"
+        )
+    except Exception as e:
+        logger.info(
+            "uwu_logs_list name=%s fight=%s error=%r elapsed=%.2fs",
+            nombre, fight, e, time.monotonic() - started,
+        )
+        return None
+    logger.info(
+        "uwu_logs_list name=%s fight=%s status=%s bytes=%s elapsed=%.2fs",
+        nombre, fight, status, size, time.monotonic() - started,
+    )
+    if status != 200 or not isinstance(ids, list):
+        return None
+    return [str(report_id) for report_id in ids]
+
+
+def _uwu_report_label(fights: set[str]) -> str:
+    """"ICC 11/12", "Halion", "ICC 12/12 + Halion" u "otro raid"."""
+    parts = []
+    icc = sum(1 for fight in UWU_LOGS_ICC_FIGHTS if fight in fights)
+    if icc:
+        parts.append(f"ICC {icc}/{len(UWU_LOGS_ICC_FIGHTS)}")
+    parts.extend(
+        label for fight, label in UWU_LOGS_OTHER_FIGHTS.items() if fight in fights
+    )
+    return " + ".join(parts) or "otro raid"
+
+
+def _fetch_uwu_recent_logs(nombre: str, server: str):
+    """
+    Últimos UWU_LOGS_LIMIT reportes de uwu-logs del personaje para /logs, del
+    más nuevo al más viejo, con la etiqueta de raid de cada uno. /logs_list no
+    trae los bosses: se pide una vez por pelea (14 consultas, 2 a la vez) y se
+    cruza. None si uwu-logs no respondió.
+    """
+    cache_key = (nombre.lower(), server)
+    cached = _cache_get(UWU_LOGS_CACHE, cache_key, UWU_LOGS_TTL)
+    if cached is not None:
+        return cached
+    persistent_cache_key = f"uwu:logs:{server}:{nombre.lower()}"
+    cached = get_external_cache("uwu_logs", persistent_cache_key, UWU_LOGS_TTL)
+    if isinstance(cached, dict):
+        _cache_set(UWU_LOGS_CACHE, cache_key, cached)
+        return cached
+
+    ids = _fetch_uwu_report_ids(server, nombre)
+    if ids is None:
+        return None
+    # El id empieza con "AA-MM-DD--HH-MM": ordenarlo como texto es por fecha.
+    recent = sorted(set(ids), reverse=True)[:UWU_LOGS_LIMIT]
+    result = {"total": len(set(ids)), "reports": []}
+    if not recent:
+        return result
+
+    fights = list(UWU_LOGS_ICC_FIGHTS) + list(UWU_LOGS_OTHER_FIGHTS)
+    with ThreadPoolExecutor(max_workers=UWU_TOP_WORKERS) as pool:
+        fight_ids = dict(
+            zip(
+                fights,
+                pool.map(lambda fight: _fetch_uwu_report_ids(server, nombre, fight), fights),
+            )
+        )
+    complete = all(v is not None for v in fight_ids.values())
+    fight_sets = {fight: set(v or []) for fight, v in fight_ids.items()}
+
+    for report_id in recent:
+        parts = report_id.split("--")
+        date = "-".join(reversed(parts[0].split("-"))) if parts else report_id
+        author = parts[2] if len(parts) >= 4 else "?"
+        present = {fight for fight, s in fight_sets.items() if report_id in s}
+        result["reports"].append({
+            "id": report_id,
+            "date": date,
+            "author": author,
+            "label": _uwu_report_label(present) if complete else "?",
+        })
+
+    if complete:
+        _cache_set(UWU_LOGS_CACHE, cache_key, result)
+        set_external_cache(
+            "uwu_logs",
+            f"{UWU_BASE}/logs_list",
+            persistent_cache_key,
+            result,
+            {"server": server, "name": nombre},
+        )
+    return result
 
 
 UWU_DOWN_MESSAGE = (

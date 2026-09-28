@@ -25,6 +25,7 @@ UWU_ICC_KILLS_CACHE: dict = {}
 UWU_PLAYER_ROWS_CACHE: dict = {}
 UWU_SPEC_PLAYERS_CACHE: dict = {}
 UWU_TOP_POINTS_CACHE: dict = {}
+UWU_LOGS_CACHE: dict = {}
 
 # ---------- TTLs (segundos) ----------
 SUMMARY_TTL = 120
@@ -42,6 +43,8 @@ UWU_PLAYER_ROWS_TTL = 180
 UWU_SPEC_PLAYERS_TTL = 3600
 # Cantidad de jugadores rankeados por spec (/top_points), para "#37 de 3174".
 UWU_TOP_POINTS_TTL = 3600
+# /logs: últimos reportes del personaje (con los bosses de cada uno).
+UWU_LOGS_TTL = 600
 # 25h: cubre el ciclo diario de tools/preload_personaje_cache.py con margen,
 # así el cache que deja el cron sigue vivo hasta que corre de nuevo al día siguiente.
 COMMAND_PERSONAJE_TTL = 90000
@@ -122,6 +125,25 @@ UWU_TOP_PLAYER_TIMEOUT = 15
 # consultas (logs de prod, 2026-09-28): 2 a la vez y reintento con espera.
 UWU_TOP_WORKERS = 2
 UWU_TOP_MAX_ATTEMPTS = 3
+
+# /logs: cuántos reportes se muestran y con qué peleas se arma la etiqueta
+# (nombres de fight de uwu-logs, c_bosses.py).
+UWU_LOGS_LIMIT = 10
+UWU_LOGS_ICC_FIGHTS = (
+    "Lord Marrowgar",
+    "Lady Deathwhisper",
+    "Gunship",
+    "Deathbringer Saurfang",
+    "Festergut",
+    "Rotface",
+    "Professor Putricide",
+    "Blood Prince Council",
+    "Blood-Queen Lana'thel",
+    "Valithria Dreamwalker",
+    "Sindragosa",
+    "The Lich King",
+)
+UWU_LOGS_OTHER_FIGHTS = {"Halion": "Halion", "Toravon the Ice Watcher": "Toravon"}
 
 UWU_PDPS_BOSS_ORDER = [
     "Lord Marrowgar",
