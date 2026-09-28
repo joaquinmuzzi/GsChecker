@@ -1,3 +1,4 @@
+import asyncio
 import atexit
 import logging
 import os
@@ -11,7 +12,8 @@ from dotenv import load_dotenv
 
 from src.controller.commands import register_commands
 from src.db.postgres import init_database
-from src.schemas.constants import PREFIX
+from src.functions.uwu import probe_uwu_latency
+from src.schemas.constants import EXECUTOR, PREFIX
 
 
 LOCK_PATH = "/tmp/gschecker.lock"
@@ -102,9 +104,17 @@ bot = GsCheckerBot(command_prefix=PREFIX, intents=intents)
 register_commands(bot)
 
 
+_uwu_probe_done = False
+
+
 @bot.event
 async def on_ready():
+    global _uwu_probe_done
     logger.info("Bot conectado como %s", bot.user)
+    # Diagnóstico temporal de latencia de uwu-logs desde Railway.
+    if not _uwu_probe_done:
+        _uwu_probe_done = True
+        asyncio.get_running_loop().run_in_executor(EXECUTOR, probe_uwu_latency)
 
 
 @bot.event

@@ -1,3 +1,4 @@
+import logging
 import time
 
 from src.schemas.constants import (
@@ -20,6 +21,8 @@ from src.schemas.constants import (
 from src.db.postgres import get_external_cache, set_external_cache
 from src.functions.cache import _cache_get, _cache_set
 
+logger = logging.getLogger("gschecker.uwu")
+
 
 def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
     cache_key = (nombre, server, spec_i)
@@ -36,10 +39,20 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
         return cached
 
     url = f"{UWU_BASE}/character/{server}/{nombre}/{spec_i}"
+    started = time.monotonic()
     try:
         resp = SESSION.get(url, timeout=HTTP_TIMEOUT)
     except Exception as e:
+        logger.info(
+            "uwu_character name=%s spec=%s error=%r elapsed=%.2fs",
+            nombre, spec_i, e, time.monotonic() - started,
+        )
         return {"__error__": f"uwu character error: {e}"}
+    logger.info(
+        "uwu_character name=%s spec=%s status=%s bytes=%s elapsed=%.2fs",
+        nombre, spec_i, resp.status_code, len(resp.content),
+        time.monotonic() - started,
+    )
 
     if resp.status_code != 200:
         return {"__error__": f"uwu character status: {resp.status_code}"}
@@ -101,11 +114,24 @@ def _fetch_uwu_top(
     last_error = None
     timeout_value = timeout_override if timeout_override is not None else HTTP_TIMEOUT
     for _ in range(max_attempts):
+        started = time.monotonic()
         try:
             resp = SESSION.post(f"{UWU_BASE}/top", json=payload, timeout=timeout_value)
         except Exception as e:
             last_error = f"uwu top error: {e}"
+            logger.info(
+                "uwu_top boss=%s mode=%s class=%s spec=%s best_only=%s "
+                "timeout=%.1f error=%r elapsed=%.2fs",
+                boss, mode, class_i, spec_i, best_only, timeout_value, e,
+                time.monotonic() - started,
+            )
             continue
+        logger.info(
+            "uwu_top boss=%s mode=%s class=%s spec=%s best_only=%s "
+            "status=%s bytes=%s elapsed=%.2fs",
+            boss, mode, class_i, spec_i, best_only, resp.status_code,
+            len(resp.content), time.monotonic() - started,
+        )
 
         if resp.status_code != 200:
             last_error = f"uwu top status: {resp.status_code}"
@@ -576,3 +602,55 @@ def _build_uwu_dps_summary(
     }
     _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
     return payload
+
+
+def probe_uwu_latency():
+    """
+    Diagnóstico temporal: mide desde el server cuánto tarda uwu-logs en
+    /character y en /top con 1000 y 10000 filas (tiempo al primer byte, total
+    y bytes). Se corre una vez al arrancar el bot; nunca levanta excepciones.
+    """
+    top_payload = {
+        "server": "Lordaeron",
+        "boss": "The Lich King",
+        "mode": "25N",
+        "class_i": 4,
+        "spec_i": 1,
+        "sort_by": "head-useful-dps",
+        "best_only": False,
+        "externals": True,
+    }
+    probes = [
+        ("character", "GET", f"{UWU_BASE}/character/Lordaeron/Flappyaladin/1", None),
+        ("top_1000", "POST", f"{UWU_BASE}/top", {**top_payload, "limit": "1000"}),
+        ("top_10000", "POST", f"{UWU_BASE}/top", {**top_payload, "limit": "10000"}),
+    ]
+    for label, method, url, body in probes:
+        started = time.monotonic()
+        first_byte = None
+        size = 0
+        status = None
+        error = None
+        try:
+            with SESSION.request(
+                method, url, json=body, timeout=(5, 30), stream=True
+            ) as resp:
+                status = resp.status_code
+                for chunk in resp.iter_content(chunk_size=65536):
+                    if first_byte is None:
+                        first_byte = time.monotonic() - started
+                    size += len(chunk)
+                    if time.monotonic() - started > 90:
+                        error = "cortado a los 90 s"
+                        break
+        except Exception as e:
+            error = repr(e)
+        logger.info(
+            "uwu_probe %s status=%s bytes=%s first_byte=%s total=%.2fs error=%s",
+            label,
+            status,
+            size,
+            f"{first_byte:.2f}s" if first_byte is not None else "-",
+            time.monotonic() - started,
+            error,
+        )
