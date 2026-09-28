@@ -443,8 +443,7 @@ def _build_personaje_embed(
 
     performance_line = _format_uwu_performance(uwu_performance)
     if performance_line:
-        # Sin título: Discord exige un nombre de campo, va un espacio de ancho cero.
-        embed.add_field(name="\u200b", value=performance_line, inline=False)
+        embed.add_field(name="Leaderboard", value=performance_line, inline=False)
 
     if missing_enchants or missing_gems or suboptimal_gems:
         missing_lines = []
