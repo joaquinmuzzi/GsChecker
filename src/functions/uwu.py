@@ -211,9 +211,11 @@ def _uwu_profiles(nombre: str, server: str):
 
 def _uwu_dps_profiles(nombre: str, server: str):
     """
-    Como _uwu_profiles, pero devuelve None si uwu-logs no respondió (ninguna
-    spec se pudo leer), para no confundirlo con "el personaje no está".
-    Reintenta una vez las specs que fallaron.
+    Como _uwu_profiles, pero devuelve None si uwu-logs no respondió para
+    alguna spec, para no confundirlo con "el personaje no está" o "no tiene
+    datos en esa spec". Reintenta una vez las specs que fallaron. Con una sola
+    spec caída alcanza: en el cron del 2026-09-28 a Epillef le falló Balance
+    (su única spec con puntos) y se guardó "sin ranking" por 25 h.
     """
     profiles = []
     failed = 0
@@ -230,7 +232,7 @@ def _uwu_dps_profiles(nombre: str, server: str):
             continue
         class_i = int(data.get("class_i", -1))
         profiles.append((spec_i, class_i, data))
-    if not profiles and failed:
+    if failed:
         return None
     return profiles
 

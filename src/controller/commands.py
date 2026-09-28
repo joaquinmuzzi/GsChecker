@@ -1083,10 +1083,11 @@ async def _personaje_impl(
             "command_personaje", personaje_cache_key, COMMAND_PERSONAJE_TTL
         )
         if isinstance(cached_payload, dict):
-            if "uwu_performance" not in cached_payload:
-                # Perfil cacheado antes de que /p mostrara el ranking de uwu-logs
-                # (dura hasta 25 h): se pide solo el ranking (~1 s, sin armory).
-                # No se re-guarda para no estirar el TTL de los datos del armory.
+            if not (cached_payload.get("uwu_performance") or {}).get("rank"):
+                # Perfil cacheado sin ranking de uwu-logs (de antes de que /p lo
+                # mostrara, o uwu-logs no respondió cuando corrió el cron; dura
+                # hasta 25 h): se pide solo el ranking (~1 s, sin armory). No se
+                # re-guarda para no estirar el TTL de los datos del armory.
                 try:
                     cached_payload["uwu_performance"] = await asyncio.wait_for(
                         asyncio.get_running_loop().run_in_executor(

@@ -174,3 +174,20 @@ def test_unknown_profile_dps_uses_armory_class(monkeypatch):
 
     assert {(p[1]["class_i"], p[1]["spec_i"]) for p in session.posts} == {(3, 1), (3, 2), (3, 3)}
     assert any(r["Raids"] == "1" for r in summary["rows"])
+
+
+def test_partial_uwu_failure_is_unknown_not_unranked(monkeypatch):
+    # Cron del 2026-09-28: a Epillef (druida) le dio timeout /character de Balance
+    # (su única spec con puntos) y respondieron Feral y Resto con 0 puntos; se
+    # guardó "sin ranking" ({}) por 25 h. Tiene que ser None: dato desconocido.
+    class PartialSession(FakeSession):
+        def get(self, url, timeout=None):
+            spec_i = int(url.rsplit("/", 1)[1])
+            if spec_i == 1:
+                raise TimeoutError("Read timed out")
+            return FakeResp({"name": self.name, "class_i": 1, "overall_points": 0.0,
+                             "overall_rank": 1355, "bosses": {}})
+
+    monkeypatch.setattr(uwu, "SESSION", PartialSession("Epillef"))
+
+    assert uwu._fetch_uwu_performance("Epillef", "Lordaeron", "Druid") is None

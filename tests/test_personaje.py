@@ -311,3 +311,32 @@ async def test_cached_profile_without_ranking_gets_it(bot, interaction, patched_
     values = {f.name: f.value for f in embed.fields}
     assert values["Leaderboard"] == "Demonology · **#895** (top 47,9 %)"
     patched_fetchers["summary"].assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cached_profile_with_empty_ranking_is_refetched(bot, interaction, patched_fetchers):
+    # Epillef (2026-09-28): el cron guardó uwu_performance={} porque uwu-logs no
+    # respondió; /p lo servía sin Leaderboard hasta que venciera la caché.
+    payload = {
+        "nombre_char": "Epillef", "server": "Lordaeron", "gs": 6072, "nivel": 80,
+        "raza": "Night Elf", "clase": "Druid", "spec_display": "Balance",
+        "guild_display": "<Brotherhood Of Silence>", "guild_rank": "Member",
+        "halion_10n_achieved": False, "halion_10h_achieved": False,
+        "halion_25n_achieved": False, "halion_25h_achieved": False,
+        "icc_10": {}, "icc_25": {}, "missing_enchants": [], "missing_gems": [],
+        "uwu_icc_kills": {}, "spec_gs_entries": [], "active_spec_name": "Balance",
+        "uwu_performance": {},
+    }
+    patched_fetchers["uwu_perf"].return_value = {
+        "spec": "Balance", "points": 29.69, "rank": 2034, "total": 3143,
+    }
+    with patch(
+        "src.controller.commands.async_get_external_cache",
+        new_callable=AsyncMock,
+        return_value=payload,
+    ):
+        await _find_command(bot, "p").callback(interaction, nombre="Epillef")
+
+    values = {f.name: f.value for f in interaction.last_edit().embed.fields}
+    assert values["Leaderboard"] == "Balance · **#2034** (top 64,7 %)"
+    patched_fetchers["uwu_perf"].assert_called_once_with("Epillef", "Lordaeron", "Druid")
