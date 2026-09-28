@@ -105,6 +105,9 @@ def _log_command_usage(
 
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
+# /p: cuánto se espera a uwu-logs para las kills de Marrowgar/Deathwhisper
+# antes de mostrar el estado final con "?" en lo que falte.
+PERSONAJE_UWU_WAIT_SECONDS = 25
 ITEM_SOURCE_TTL = 86400
 CONFIRMED_KILLS_TTL = 315360000
 ICC_SPECIAL_BOSSES = ("Marrowgar", "Deathwhisper")
@@ -1029,9 +1032,14 @@ async def _safe_edit_original_response(
             await interaction.edit_original_response(**kwargs)
             return
         except discord.NotFound:
+            logger.warning(
+                "edit_original_response NotFound (mensaje o interacción inexistente) "
+                "command=%s", getattr(getattr(interaction, "command", None), "name", "?"),
+            )
             return
         except discord.HTTPException as exc:
             if _is_expired_token(exc):
+                logger.warning("edit_original_response con token vencido: %s", exc)
                 return
             if getattr(exc, "status", None) != 429:
                 raise
@@ -1151,6 +1159,7 @@ async def _personaje_impl(
         )
 
         loop = asyncio.get_running_loop()
+        started_at = loop.time()
 
         # Summary primero: si el personaje no existe o no es 80 se responde en
         # segundos, sin gastar ~15 requests del armory en logros/estadísticas.
@@ -1214,10 +1223,15 @@ async def _personaje_impl(
         # Cargar kills confirmadas del DB antes del embed inicial,
         # así los ✅ ya guardados aparecen de inmediato sin loading.
         persistent_confirmed = await asyncio.to_thread(_load_confirmed_icc_kills, nombre_char, realm)
-        initial_payload = _serialize_personaje_payload(
-            **base,
-            uwu_icc_kills=_normalize_special_uwu_kills(dict(persistent_confirmed)),
+        # Storming the Citadel y los ítems del boss ya confirman kills: se
+        # muestran ✅ desde el primer embed, sin esperar a uwu-logs.
+        initial_kills = _apply_item_drop_fallback_to_uwu(
+            _apply_storming_fallback_to_uwu(
+                _normalize_special_uwu_kills(dict(persistent_confirmed)), achi_payload
+            ),
+            gear_data,
         )
+        initial_payload = _serialize_personaje_payload(**base, uwu_icc_kills=initial_kills)
 
         personaje_view = _build_personaje_view(nombre_char, realm)
         await _safe_edit_original_response(
@@ -1230,7 +1244,8 @@ async def _personaje_impl(
         )
 
         frame_idx = 1
-        while not uwu_icc_task.done():
+        uwu_deadline = loop.time() + PERSONAJE_UWU_WAIT_SECONDS
+        while not uwu_icc_task.done() and loop.time() < uwu_deadline:
             await asyncio.sleep(2.0)
             if uwu_icc_task.done():
                 break
@@ -1243,31 +1258,47 @@ async def _personaje_impl(
                 interaction, content=None, embed=embed_loading, view=personaje_view
             )
 
-        try:
-            raw_uwu_kills = await uwu_icc_task
-        except Exception:
-            logger.exception(
-                "uwu icc kills fetch failed for '%s'/%s", nombre_char, realm
+        if not uwu_icc_task.done():
+            # uwu-logs no terminó a tiempo: esos modos quedan en "?" (sigue
+            # corriendo de fondo y deja la caché lista para el próximo /p).
+            logger.warning(
+                "uwu icc kills timeout (%ss) for '%s'/%s",
+                PERSONAJE_UWU_WAIT_SECONDS, nombre_char, realm,
             )
             raw_uwu_kills = {}
+        else:
+            try:
+                raw_uwu_kills = uwu_icc_task.result()
+            except Exception:
+                logger.exception(
+                    "uwu icc kills fetch failed for '%s'/%s", nombre_char, realm
+                )
+                raw_uwu_kills = {}
 
-        uwu_icc_kills = await asyncio.to_thread(
-            _resolve_uwu_icc_kills,
-            nombre_char,
-            realm,
-            raw_uwu_kills,
-            persistent_confirmed,
-            achi_payload,
-            gear_data,
-        )
         try:
-            # Después de las kills: reusa los /character que ya quedaron en caché.
-            uwu_performance = await loop.run_in_executor(
-                EXECUTOR,
-                _fetch_uwu_performance,
+            uwu_icc_kills = await asyncio.to_thread(
+                _resolve_uwu_icc_kills,
                 nombre_char,
                 realm,
-                summary.get("class"),
+                raw_uwu_kills,
+                persistent_confirmed,
+                achi_payload,
+                gear_data,
+            )
+        except Exception:
+            logger.exception("icc kills resolve failed for '%s'/%s", nombre_char, realm)
+            uwu_icc_kills = _finalize_special_uwu_kills(initial_kills)
+        try:
+            # Después de las kills: reusa los /character que ya quedaron en caché.
+            uwu_performance = await asyncio.wait_for(
+                loop.run_in_executor(
+                    EXECUTOR,
+                    _fetch_uwu_performance,
+                    nombre_char,
+                    realm,
+                    summary.get("class"),
+                ),
+                timeout=10.0,
             )
         except Exception:
             logger.exception(
@@ -1280,13 +1311,19 @@ async def _personaje_impl(
         )
         embed_final = _build_personaje_embed_from_cache(_payload_to_cache)
         if _is_valid_personaje_payload(_payload_to_cache):
-            await async_set_external_cache(
-                "command_personaje",
-                f"/{command_name}",
-                personaje_cache_key,
-                _payload_to_cache,
-                {"character": nombre_char, "command": command_name, "server": realm},
-            )
+            try:
+                await asyncio.wait_for(
+                    async_set_external_cache(
+                        "command_personaje",
+                        f"/{command_name}",
+                        personaje_cache_key,
+                        _payload_to_cache,
+                        {"character": nombre_char, "command": command_name, "server": realm},
+                    ),
+                    timeout=10.0,
+                )
+            except Exception:
+                logger.exception("personaje cache write failed for '%s'/%s", nombre_char, realm)
         else:
             logger.warning(
                 "Skipping cache write for '%s'/%s — payload failed validation",
@@ -1308,6 +1345,10 @@ async def _personaje_impl(
         await _safe_edit_original_response(
             interaction, content=None, embed=embed_final, view=personaje_view
         )
+        logger.info(
+            "personaje done character='%s' realm='%s' elapsed=%.1fs",
+            nombre_char, realm, loop.time() - started_at,
+        )
 
     except discord.NotFound:
         return
@@ -1318,6 +1359,7 @@ async def _personaje_impl(
     except ValueError as e:
         await _safe_send_error(interaction, str(e))
     except Exception as e:
+        logger.exception("personaje failed for '%s'", nombre)
         await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
 
 

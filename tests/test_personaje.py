@@ -340,3 +340,47 @@ async def test_cached_profile_with_empty_ranking_is_refetched(bot, interaction, 
     values = {f.name: f.value for f in interaction.last_edit().embed.fields}
     assert values["Leaderboard"] == "Balance · **#2034** (top 64,7 %)"
     patched_fetchers["uwu_perf"].assert_called_once_with("Epillef", "Lordaeron", "Druid")
+
+
+def _icc_line(embed, boss):
+    icc = next(f.value for f in embed.fields if f.name == "Icecrown Citadel")
+    return next(line for line in icc.splitlines() if line.startswith(boss))
+
+
+@pytest.mark.asyncio
+async def test_hung_uwu_lookup_still_ends_in_final_state(
+    bot, interaction, patched_fetchers, monkeypatch
+):
+    # /p Suramar (2026-09-28): Marrowgar/Deathwhisper quedaron en ⌛ para siempre.
+    # Aunque uwu-logs no termine, el embed tiene que llegar a un estado final.
+    import threading
+
+    release = threading.Event()
+    patched_fetchers["uwu_icc"].side_effect = lambda *a, **k: release.wait(10) or {}
+    monkeypatch.setattr("src.controller.commands.PERSONAJE_UWU_WAIT_SECONDS", 0.1)
+    try:
+        await _find_command(bot, "p").callback(interaction, nombre="Suramar")
+    finally:
+        release.set()
+
+    final = interaction.last_edit().embed
+    for boss in ("Marrowgar", "Deathwhisper"):
+        line = _icc_line(final, boss)
+        assert "⌛" not in line and "⏳" not in line, line
+
+
+@pytest.mark.asyncio
+async def test_storming_the_citadel_marks_kills_without_waiting_uwu(
+    bot, interaction, patched_fetchers
+):
+    # Storming the Citadel 25N (4604) completo: Marrowgar/Deathwhisper 25N ✅ ya
+    # en el primer embed, antes de que responda uwu-logs.
+    patched_fetchers["achievements"].return_value = {
+        **_happy_achievements(), "storming_25n_achieved": True,
+    }
+    await _find_command(bot, "p").callback(interaction, nombre="Suramar")
+
+    first_embed = next(s.embed for s in interaction.sent if s.kind == "edit" and s.embed)
+    for boss in ("Marrowgar", "Deathwhisper"):
+        cells = [c.strip() for c in _icc_line(first_embed, boss).split("|")]
+        assert cells[3].startswith("✅"), cells  # columna 25N
