@@ -324,7 +324,7 @@ Nunca se persiste una respuesta incompleta. Si el Armory falla a mitad de un per
 
 - El Armory de Warmane rate-limita por IP (~5-6 requests / 10 s → 429; abuso sostenido → "error code: 1015"). Todo el tráfico pasa por `_armory_request`: token bucket de 1 request cada 2 s (ráfaga de 3), hasta 4 intentos con backoff de 8–20 s ante 429/5xx, y circuit breaker (60 s tras 3 fallos en 30 s, 90 s si aparece 1015).
 - **Halion**: la página de estadísticas de Warmane muestra `- -` en todas las filas "Halion kills (...)", incluso para personajes con el logro ganado. Por eso Ruby Sanctum se basa sólo en los logros.
-- `/dps` depende 100% de uwu-logs.xyz; si están lentos, el timeout es 45 s. Usa la spec principal del personaje (la que tiene más bosses con logs en `/character`) o la que se pase en `spec` (`frost`, `holy` y `prot` se resuelven según la clase). Como `/top` de uwu-logs no filtra por jugador, pide hasta 10 000 filas de la spec por boss y modo (4 consultas en paralelo) y se queda con las del personaje. Si la spec tiene más filas que eso, la columna Raids sale con `+` (por ejemplo `38+`): pueden faltar las raids de menor DPS, así que el máximo es exacto y el promedio queda algo inflado.
+- `/dps` depende 100% de uwu-logs.xyz; si están lentos, el timeout es 45 s.
 - El GS por spec se sirve desde Postgres una vez que el bot vio al personaje en esa spec; primera vez muestra `?` en las specs no activas.
 - La API JSON del Armory (`/api/character/.../summary`) no devuelve `gearScore` — se calcula siempre localmente desde el equipo scrapeado.
 
