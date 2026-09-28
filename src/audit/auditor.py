@@ -113,11 +113,14 @@ def _audit_items(
             if bis is None:
                 continue
             equipped_name = guide.item_names.get(equipped.item_id, equipped.item_id)
-            if equipped_name == bis.item_name:
-                # Mismo ítem, otra versión (normal vs heroico).
+            same_item = next(
+                (opt for opt in bis_slot.options if opt.item_name == equipped_name), None
+            )
+            if same_item is not None:
+                # Mismo ítem que usan los top, en otra versión (normal vs heroico).
                 msg = (
                     f"{slot_name}: tenés '{equipped_name}', los top usan la versión "
-                    f"de mayor nivel ({bis.item_id}) [{bis.tier_note}]"
+                    f"de mayor nivel ({same_item.item_id}) [{same_item.tier_note}]"
                 )
             else:
                 msg = (

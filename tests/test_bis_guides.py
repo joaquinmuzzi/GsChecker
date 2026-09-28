@@ -89,3 +89,13 @@ def test_nightmare_tear_is_recognised(realm_files):
     messages = " ".join(i.issue for i in issues)
     assert "Nightmare Tear" not in messages
     assert "Meta gema" not in messages and "No hay meta" not in messages
+
+
+def test_lower_version_of_any_option_is_reported_as_upgrade(realm_files):
+    """Srpingu tiene el Faceguard normal (51133); los top usan el heroico, que es
+    la opción 2 del slot: el mensaje tiene que decir "versión de mayor nivel",
+    no "cambialo por la opción 1"."""
+    guide = bis_guides.get_bis_guide("Death Knight", "Blood", role="Tank")
+    guide.item_names = {"51133": "Sanctified Scourgelord Faceguard"}
+    issues, _ = _audit_items(_char([EquippedItem(slot="Head", item_id="51133")]), guide)
+    assert "versión de mayor nivel (51306)" in issues[0].message

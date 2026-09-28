@@ -2066,9 +2066,9 @@
    ]
   },
   "Hunter|Survival|": {
-   "sample_size": 5,
+   "sample_size": 12,
    "gs_range": [
-    6006,
+    5739,
     6587
    ],
    "players": [
@@ -2076,7 +2076,14 @@
     "Arrowbg",
     "Edouardmanet",
     "Hntfunrun",
-    "Rackmaster"
+    "Tymson",
+    "Zaena",
+    "Julien",
+    "Turbogolem",
+    "Rackmaster",
+    "Hachafuerte",
+    "Awm",
+    "Kailey"
    ],
    "slots": {
     "Head": {
@@ -2084,11 +2091,16 @@
       {
        "item_id": "51286",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Headpiece",
-       "used_by": 4
+       "used_by": 5
       },
       {
        "item_id": "51153",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Headpiece",
+       "used_by": 5
+      },
+      {
+       "item_id": "50115",
+       "item_name": "Ahn'Kahar Blood Hunter's Headpiece",
        "used_by": 1
       }
      ],
@@ -2102,7 +2114,7 @@
       {
        "item_id": "50452",
        "item_name": "Wodin's Lucky Necklace",
-       "used_by": 2
+       "used_by": 8
       },
       {
        "item_id": "50633",
@@ -2121,14 +2133,19 @@
     "Shoulder": {
      "options": [
       {
+       "item_id": "51151",
+       "item_name": "Sanctified Ahn'Kahar Blood Hunter's Spaulders",
+       "used_by": 7
+      },
+      {
        "item_id": "51288",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Spaulders",
        "used_by": 3
       },
       {
-       "item_id": "51151",
-       "item_name": "Sanctified Ahn'Kahar Blood Hunter's Spaulders",
-       "used_by": 2
+       "item_id": "51577",
+       "item_name": "Titan-Forged Shoulders of Triumph",
+       "used_by": 1
       }
      ],
      "enchant_ids": [
@@ -2141,11 +2158,16 @@
       {
        "item_id": "50653",
        "item_name": "Shadowvault Slayer's Cloak",
-       "used_by": 4
+       "used_by": 7
       },
       {
        "item_id": "50470",
        "item_name": "Recovered Scarlet Onslaught Cape",
+       "used_by": 3
+      },
+      {
+       "item_id": "54802",
+       "item_name": "The Frost Lord's War Cloak",
        "used_by": 1
       }
      ],
@@ -2157,19 +2179,19 @@
     "Chest": {
      "options": [
       {
-       "item_id": "51289",
+       "item_id": "51150",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Tunic",
-       "used_by": 2
+       "used_by": 4
       },
       {
-       "item_id": "50689",
-       "item_name": "Carapace of Forgotten Kings",
-       "used_by": 1
+       "item_id": "51289",
+       "item_name": "Sanctified Ahn'Kahar Blood Hunter's Tunic",
+       "used_by": 3
       },
       {
        "item_id": "50038",
        "item_name": "Carapace of Forgotten Kings",
-       "used_by": 1
+       "used_by": 2
       }
      ],
      "enchant_ids": [
@@ -2182,11 +2204,16 @@
       {
        "item_id": "50655",
        "item_name": "Scourge Hunter's Vambraces",
-       "used_by": 4
+       "used_by": 7
       },
       {
        "item_id": "51914",
        "item_name": "Icecrown Rampart Bracers",
+       "used_by": 3
+      },
+      {
+       "item_id": "47850",
+       "item_name": "Bracers of the Northern Stalker",
        "used_by": 1
       }
      ],
@@ -2200,16 +2227,16 @@
       {
        "item_id": "51154",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Handguards",
+       "used_by": 5
+      },
+      {
+       "item_id": "50619",
+       "item_name": "Anub'ar Stalker's Gloves",
        "used_by": 2
       },
       {
        "item_id": "51285",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Handguards",
-       "used_by": 1
-      },
-      {
-       "item_id": "50619",
-       "item_name": "Anub'ar Stalker's Gloves",
        "used_by": 1
       }
      ],
@@ -2222,6 +2249,11 @@
      "options": [
       {
        "item_id": "50688",
+       "item_name": "Nerub'ar Stalker's Cord",
+       "used_by": 6
+      },
+      {
+       "item_id": "50413",
        "item_name": "Nerub'ar Stalker's Cord",
        "used_by": 4
       },
@@ -2239,16 +2271,16 @@
       {
        "item_id": "51152",
        "item_name": "Sanctified Ahn'Kahar Blood Hunter's Legguards",
+       "used_by": 4
+      },
+      {
+       "item_id": "49901",
+       "item_name": "Draconic Bonesplinter Legguards",
        "used_by": 2
       },
       {
        "item_id": "50645",
        "item_name": "Leggings of Northern Lights",
-       "used_by": 1
-      },
-      {
-       "item_id": "51287",
-       "item_name": "Sanctified Ahn'Kahar Blood Hunter's Legguards",
        "used_by": 1
       }
      ],
@@ -2260,19 +2292,19 @@
     "Feet": {
      "options": [
       {
+       "item_id": "53127",
+       "item_name": "Returning Footfalls",
+       "used_by": 5
+      },
+      {
        "item_id": "54577",
        "item_name": "Returning Footfalls",
        "used_by": 3
       },
       {
-       "item_id": "53127",
-       "item_name": "Returning Footfalls",
-       "used_by": 1
-      },
-      {
        "item_id": "49897",
        "item_name": "Rock-Steady Treads",
-       "used_by": 1
+       "used_by": 2
       }
      ],
      "enchant_ids": [
@@ -2285,21 +2317,21 @@
       {
        "item_id": "50402",
        "item_name": "Ashen Band of Endless Vengeance",
-       "used_by": 4
+       "used_by": 9
       },
       {
        "item_id": "54576",
        "item_name": "Signet of Twilight",
-       "used_by": 3
-      },
-      {
-       "item_id": "50604",
-       "item_name": "Band of the Bone Colossus",
-       "used_by": 1
+       "used_by": 4
       },
       {
        "item_id": "53133",
        "item_name": "Signet of Twilight",
+       "used_by": 4
+      },
+      {
+       "item_id": "50604",
+       "item_name": "Band of the Bone Colossus",
        "used_by": 1
       }
      ],
@@ -2314,19 +2346,19 @@
        "used_by": 3
       },
       {
-       "item_id": "54590",
-       "item_name": "Sharpened Twilight Scale",
-       "used_by": 1
+       "item_id": "44253",
+       "item_name": "Darkmoon Card: Greatness",
+       "used_by": 3
       },
       {
-       "item_id": "47303",
-       "item_name": "Death's Choice",
-       "used_by": 1
+       "item_id": "50362",
+       "item_name": "Deathbringer's Will",
+       "used_by": 3
       },
       {
        "item_id": "54569",
        "item_name": "Sharpened Twilight Scale",
-       "used_by": 1
+       "used_by": 2
       }
      ],
      "enchant_ids": [],
@@ -2340,14 +2372,14 @@
        "used_by": 2
       },
       {
-       "item_id": "50727",
-       "item_name": "Bloodfall",
-       "used_by": 1
+       "item_id": "50695",
+       "item_name": "Distant Land",
+       "used_by": 2
       },
       {
-       "item_id": "50425",
-       "item_name": "Oathbinder, Charge of the Ranger-General",
-       "used_by": 1
+       "item_id": "51881",
+       "item_name": "Shaft of Glacial Ice",
+       "used_by": 2
       }
      ],
      "enchant_ids": [
@@ -2358,39 +2390,55 @@
     "Ranged": {
      "options": [
       {
+       "item_id": "50034",
+       "item_name": "Zod's Repeating Longbow",
+       "used_by": 4
+      },
+      {
        "item_id": "49981",
        "item_name": "Fal'inrush, Defender of Quel'thalas",
-       "used_by": 2
+       "used_by": 3
       },
       {
        "item_id": "51927",
        "item_name": "Njorndar Bone Bow",
-       "used_by": 2
-      },
-      {
-       "item_id": "50733",
-       "item_name": "Fal'inrush, Defender of Quel'thalas",
-       "used_by": 1
+       "used_by": 3
       }
      ],
      "enchant_ids": [
       "3608"
      ],
      "enchant_label": "+40 Ranged Critical Strike"
+    },
+    "Off Hand": {
+     "options": [
+      {
+       "item_id": "51916",
+       "item_name": "Frost Giant's Cleaver",
+       "used_by": 1
+      },
+      {
+       "item_id": "50016",
+       "item_name": "Rib Spreader",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
     }
    },
    "meta_gem": {
     "item_id": "41398",
     "name": "Relentless Earthsiege Diamond",
-    "used_by": 5
+    "used_by": 11
    },
-   "nightmare_tear_share": 0.8,
+   "nightmare_tear_share": 0.92,
    "stat_caps": [
     {
      "stat_key": "hit_rating",
      "display_name": "Hit Rating",
-     "cap_value": 167,
-     "cap_label": "lo que tienen 3 de cada 4 top (mediana 230)"
+     "cap_value": 208,
+     "cap_label": "lo que tienen 3 de cada 4 top (mediana 265)"
     }
    ]
   },
@@ -3003,6 +3051,381 @@
     }
    ]
   },
+  "Mage|Frost|": {
+   "sample_size": 8,
+   "gs_range": [
+    5556,
+    6557
+   ],
+   "players": [
+    "Arivaldi",
+    "Littlelove",
+    "Killington",
+    "Magustragus",
+    "Kurskiy",
+    "Lag",
+    "Neprostydis",
+    "Lotusmortal"
+   ],
+   "slots": {
+    "Head": {
+     "options": [
+      {
+       "item_id": "51281",
+       "item_name": "Sanctified Bloodmage Hood",
+       "used_by": 5
+      },
+      {
+       "item_id": "51158",
+       "item_name": "Sanctified Bloodmage Hood",
+       "used_by": 1
+      },
+      {
+       "item_id": "47754",
+       "item_name": "Khadgar's Hood of Triumph",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3820"
+     ],
+     "enchant_label": "+30 Spell Power and 20 Critical strike rating."
+    },
+    "Neck": {
+     "options": [
+      {
+       "item_id": "50658",
+       "item_name": "Amulet of the Silent Eulogy",
+       "used_by": 4
+      },
+      {
+       "item_id": "50724",
+       "item_name": "Blood Queen's Crimson Choker",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Shoulder": {
+     "options": [
+      {
+       "item_id": "51284",
+       "item_name": "Sanctified Bloodmage Shoulderpads",
+       "used_by": 4
+      },
+      {
+       "item_id": "51155",
+       "item_name": "Sanctified Bloodmage Shoulderpads",
+       "used_by": 2
+      },
+      {
+       "item_id": "51572",
+       "item_name": "Titan-Forged Shoulderpads of Salvation",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3810"
+     ],
+     "enchant_label": "+24 Spell Power and +15 Critical Strike Rating"
+    },
+    "Back": {
+     "options": [
+      {
+       "item_id": "54583",
+       "item_name": "Cloak of Burning Dusk",
+       "used_by": 3
+      },
+      {
+       "item_id": "50628",
+       "item_name": "Frostbinder's Shredded Cape",
+       "used_by": 2
+      },
+      {
+       "item_id": "53489",
+       "item_name": "Cloak of Burning Dusk",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3722"
+     ],
+     "enchant_label": "Lightweave Embroidery"
+    },
+    "Chest": {
+     "options": [
+      {
+       "item_id": "51283",
+       "item_name": "Sanctified Bloodmage Robe",
+       "used_by": 3
+      },
+      {
+       "item_id": "50629",
+       "item_name": "Robe of the Waking Nightmare",
+       "used_by": 3
+      },
+      {
+       "item_id": "50278",
+       "item_name": "Bloodmage Robe",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3832"
+     ],
+     "enchant_label": "+10 All Stats"
+    },
+    "Wrist": {
+     "options": [
+      {
+       "item_id": "54582",
+       "item_name": "Bracers of Fiery Night",
+       "used_by": 3
+      },
+      {
+       "item_id": "53486",
+       "item_name": "Bracers of Fiery Night",
+       "used_by": 2
+      },
+      {
+       "item_id": "50686",
+       "item_name": "Death Surgeon's Sleeves",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "2332"
+     ],
+     "enchant_label": "+30 Spell Power"
+    },
+    "Hands": {
+     "options": [
+      {
+       "item_id": "51280",
+       "item_name": "Sanctified Bloodmage Gloves",
+       "used_by": 3
+      },
+      {
+       "item_id": "51159",
+       "item_name": "Sanctified Bloodmage Gloves",
+       "used_by": 2
+      },
+      {
+       "item_id": "50663",
+       "item_name": "Gunship Captain's Mittens",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3604",
+      "3246"
+     ],
+     "enchant_label": "Hyperspeed Accelerators / +28 Spell Power"
+    },
+    "Waist": {
+     "options": [
+      {
+       "item_id": "50613",
+       "item_name": "Crushing Coldwraith Belt",
+       "used_by": 2
+      },
+      {
+       "item_id": "50702",
+       "item_name": "Lingering Illness",
+       "used_by": 2
+      },
+      {
+       "item_id": "50997",
+       "item_name": "Circle of Ossus",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Legs": {
+     "options": [
+      {
+       "item_id": "51282",
+       "item_name": "Sanctified Bloodmage Leggings",
+       "used_by": 3
+      },
+      {
+       "item_id": "51157",
+       "item_name": "Sanctified Bloodmage Leggings",
+       "used_by": 2
+      },
+      {
+       "item_id": "50694",
+       "item_name": "Plaguebringer's Stained Pants",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3872",
+      "3719"
+     ],
+     "enchant_label": "+50 Spell Power and +20 Spirit / +50 Spell Power and +20 Spirit"
+    },
+    "Feet": {
+     "options": [
+      {
+       "item_id": "50699",
+       "item_name": "Plague Scientist's Boots",
+       "used_by": 4
+      },
+      {
+       "item_id": "51899",
+       "item_name": "Icecrown Spire Sandals",
+       "used_by": 1
+      },
+      {
+       "item_id": "50062",
+       "item_name": "Plague Scientist's Boots",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3606",
+      "3826"
+     ],
+     "enchant_label": "+24 Critical Strike Rating / +12 Hit Rating and +12 Critical Strike Rating"
+    },
+    "Finger": {
+     "options": [
+      {
+       "item_id": "50398",
+       "item_name": "Ashen Band of Endless Destruction",
+       "used_by": 7
+      },
+      {
+       "item_id": "50664",
+       "item_name": "Ring of Rapid Ascent",
+       "used_by": 6
+      },
+      {
+       "item_id": "50714",
+       "item_name": "Valanar's Other Signet Ring",
+       "used_by": 1
+      },
+      {
+       "item_id": "50384",
+       "item_name": "Ashen Band of Greater Destruction",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Trinket": {
+     "options": [
+      {
+       "item_id": "50348",
+       "item_name": "Dislodged Foreign Object",
+       "used_by": 4
+      },
+      {
+       "item_id": "54588",
+       "item_name": "Charred Twilight Scale",
+       "used_by": 3
+      },
+      {
+       "item_id": "50360",
+       "item_name": "Phylactery of the Nameless Lich",
+       "used_by": 3
+      },
+      {
+       "item_id": "54572",
+       "item_name": "Charred Twilight Scale",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Main Hand": {
+     "options": [
+      {
+       "item_id": "50732",
+       "item_name": "Bloodsurge, Kel'Thuzad's Blade of Agony",
+       "used_by": 3
+      },
+      {
+       "item_id": "50608",
+       "item_name": "Frozen Bonespike",
+       "used_by": 2
+      },
+      {
+       "item_id": "50731",
+       "item_name": "Archus, Greatstaff of Antonidas",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3834",
+      "3854"
+     ],
+     "enchant_label": "+63 Spell Power / +81 Spell Power"
+    },
+    "Off Hand": {
+     "options": [
+      {
+       "item_id": "50719",
+       "item_name": "Shadow Silk Spindle",
+       "used_by": 3
+      },
+      {
+       "item_id": "50173",
+       "item_name": "Shadow Silk Spindle",
+       "used_by": 1
+      },
+      {
+       "item_id": "50309",
+       "item_name": "Shriveled Heart",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Ranged": {
+     "options": [
+      {
+       "item_id": "50684",
+       "item_name": "Corpse-Impaling Spike",
+       "used_by": 3
+      },
+      {
+       "item_id": "50631",
+       "item_name": "Nightmare Ender",
+       "used_by": 3
+      },
+      {
+       "item_id": "50472",
+       "item_name": "Nightmare Ender",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    }
+   },
+   "meta_gem": {
+    "item_id": "41285",
+    "name": "Chaotic Skyflare Diamond",
+    "used_by": 8
+   },
+   "nightmare_tear_share": 0.12,
+   "stat_caps": [
+    {
+     "stat_key": "hit_rating",
+     "display_name": "Hit Rating (hechizos)",
+     "cap_value": 321,
+     "cap_label": "lo que tienen 3 de cada 4 top (mediana 361)"
+    }
+   ]
+  },
   "Paladin|Holy|": {
    "sample_size": 12,
    "gs_range": [
@@ -3327,20 +3750,366 @@
    "nightmare_tear_share": 0.75,
    "stat_caps": []
   },
-  "Paladin|Retribution|": {
+  "Paladin|Protection|Tank": {
    "sample_size": 7,
    "gs_range": [
-    6290,
+    5876,
+    6499
+   ],
+   "players": [
+    "Mirtrudmay",
+    "Rj",
+    "Candlex",
+    "Runcy",
+    "Druzekottito",
+    "Fraud",
+    "Ralvina"
+   ],
+   "slots": {
+    "Head": {
+     "options": [
+      {
+       "item_id": "50640",
+       "item_name": "Broken Ram Skull Helm",
+       "used_by": 3
+      },
+      {
+       "item_id": "51266",
+       "item_name": "Sanctified Lightsworn Faceguard",
+       "used_by": 2
+      },
+      {
+       "item_id": "51173",
+       "item_name": "Sanctified Lightsworn Faceguard",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3878",
+      "3812"
+     ],
+     "enchant_label": "Mind Amplification Dish / +25 Frost Resistance and +30 Stamina"
+    },
+    "Neck": {
+     "options": [
+      {
+       "item_id": "50682",
+       "item_name": "Bile-Encrusted Medallion",
+       "used_by": 4
+      },
+      {
+       "item_id": "50627",
+       "item_name": "Noose of Malachite",
+       "used_by": 1
+      },
+      {
+       "item_id": "50763",
+       "item_name": "Marrowgar's Scratching Choker",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Shoulder": {
+     "options": [
+      {
+       "item_id": "51269",
+       "item_name": "Sanctified Lightsworn Shoulderguards",
+       "used_by": 5
+      },
+      {
+       "item_id": "51170",
+       "item_name": "Sanctified Lightsworn Shoulderguards",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3852",
+      "3811"
+     ],
+     "enchant_label": "+30 Stamina and +15 Resilience Rating / +20 Dodge Rating and +15 Defense Rating"
+    },
+    "Back": {
+     "options": [
+      {
+       "item_id": "50718",
+       "item_name": "Royal Crimson Cloak",
+       "used_by": 4
+      },
+      {
+       "item_id": "50466",
+       "item_name": "Sentinel's Winter Cloak",
+       "used_by": 2
+      },
+      {
+       "item_id": "50677",
+       "item_name": "Winding Sheet",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3294"
+     ],
+     "enchant_label": "+225 Armor"
+    },
+    "Chest": {
+     "options": [
+      {
+       "item_id": "51265",
+       "item_name": "Sanctified Lightsworn Chestguard",
+       "used_by": 6
+      }
+     ],
+     "enchant_ids": [
+      "3832",
+      "3297"
+     ],
+     "enchant_label": "+10 All Stats / +275 Health"
+    },
+    "Wrist": {
+     "options": [
+      {
+       "item_id": "50611",
+       "item_name": "Bracers of Dark Reckoning",
+       "used_by": 5
+      },
+      {
+       "item_id": "51901",
+       "item_name": "Gargoyle Spit Bracers",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3850"
+     ],
+     "enchant_label": "+40 Stamina"
+    },
+    "Hands": {
+     "options": [
+      {
+       "item_id": "51267",
+       "item_name": "Sanctified Lightsworn Handguards",
+       "used_by": 5
+      },
+      {
+       "item_id": "51172",
+       "item_name": "Sanctified Lightsworn Handguards",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3860"
+     ],
+     "enchant_label": "+885 Armor"
+    },
+    "Waist": {
+     "options": [
+      {
+       "item_id": "50691",
+       "item_name": "Belt of Broken Bones",
+       "used_by": 5
+      },
+      {
+       "item_id": "50991",
+       "item_name": "Verdigris Chain Belt",
+       "used_by": 1
+      },
+      {
+       "item_id": "50987",
+       "item_name": "Malevolent Girdle",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Legs": {
+     "options": [
+      {
+       "item_id": "51268",
+       "item_name": "Sanctified Lightsworn Legguards",
+       "used_by": 3
+      },
+      {
+       "item_id": "50612",
+       "item_name": "Legguards of Lost Hope",
+       "used_by": 2
+      },
+      {
+       "item_id": "51171",
+       "item_name": "Sanctified Lightsworn Legguards",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3822",
+      "3327"
+     ],
+     "enchant_label": "+55 Stamina and +22 Agility / +55 Stamina and +22 Agility"
+    },
+    "Feet": {
+     "options": [
+      {
+       "item_id": "54579",
+       "item_name": "Treads of Impending Resurrection",
+       "used_by": 3
+      },
+      {
+       "item_id": "50625",
+       "item_name": "Grinning Skull Greatboots",
+       "used_by": 2
+      },
+      {
+       "item_id": "54564",
+       "item_name": "Scion's Treads",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3606"
+     ],
+     "enchant_label": "+24 Critical Strike Rating"
+    },
+    "Finger": {
+     "options": [
+      {
+       "item_id": "50622",
+       "item_name": "Devium's Eternally Cold Ring",
+       "used_by": 4
+      },
+      {
+       "item_id": "50642",
+       "item_name": "Juggernaut Band",
+       "used_by": 2
+      },
+      {
+       "item_id": "52572",
+       "item_name": "Ashen Band of Endless Might",
+       "used_by": 2
+      },
+      {
+       "item_id": "50404",
+       "item_name": "Ashen Band of Endless Courage",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Trinket": {
+     "options": [
+      {
+       "item_id": "54591",
+       "item_name": "Petrified Twilight Scale",
+       "used_by": 5
+      },
+      {
+       "item_id": "50364",
+       "item_name": "Sindragosa's Flawless Fang",
+       "used_by": 5
+      },
+      {
+       "item_id": "54571",
+       "item_name": "Petrified Twilight Scale",
+       "used_by": 1
+      },
+      {
+       "item_id": "50356",
+       "item_name": "Corroded Skeleton Key",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Main Hand": {
+     "options": [
+      {
+       "item_id": "50738",
+       "item_name": "Mithrios, Bronzebeard's Legacy",
+       "used_by": 4
+      },
+      {
+       "item_id": "50737",
+       "item_name": "Havoc's Call, Blade of Lordaeron Kings",
+       "used_by": 1
+      },
+      {
+       "item_id": "50672",
+       "item_name": "Bloodvenom Blade",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "2673",
+      "3869"
+     ],
+     "enchant_label": "Mongoose / Blade Ward"
+    },
+    "Off Hand": {
+     "options": [
+      {
+       "item_id": "50729",
+       "item_name": "Icecrown Glacial Wall",
+       "used_by": 4
+      },
+      {
+       "item_id": "51909",
+       "item_name": "Neverending Winter",
+       "used_by": 3
+      }
+     ],
+     "enchant_ids": [
+      "3849",
+      "1071"
+     ],
+     "enchant_label": "Titanium Plating / +18 Stamina"
+    },
+    "Ranged": {
+     "options": [
+      {
+       "item_id": "47661",
+       "item_name": "Libram of Valiance",
+       "used_by": 6
+      },
+      {
+       "item_id": "45145",
+       "item_name": "Libram of the Sacred Shield",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    }
+   },
+   "meta_gem": {
+    "item_id": "41380",
+    "name": "Austere Earthsiege Diamond",
+    "used_by": 5
+   },
+   "nightmare_tear_share": 0.29,
+   "stat_caps": []
+  },
+  "Paladin|Retribution|": {
+   "sample_size": 12,
+   "gs_range": [
+    6864,
     6923
    ],
    "players": [
     "Cofiz",
+    "Procne",
+    "Salatiel",
+    "Punio",
     "Suprematist",
     "Negobubble",
-    "Tyreliaqt",
-    "Wrath",
-    "Bassmaster",
-    "Strente"
+    "Lynch",
+    "Hessria",
+    "Benihime",
+    "Aratiel",
+    "Exis",
+    "Amondir"
    ],
    "slots": {
     "Head": {
@@ -3348,7 +4117,7 @@
       {
        "item_id": "51277",
        "item_name": "Sanctified Lightsworn Helmet",
-       "used_by": 6
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3361,12 +4130,7 @@
       {
        "item_id": "54581",
        "item_name": "Penumbra Pendant",
-       "used_by": 5
-      },
-      {
-       "item_id": "54557",
-       "item_name": "Baltharus' Gift",
-       "used_by": 1
+       "used_by": 12
       }
      ],
      "enchant_ids": [],
@@ -3377,12 +4141,7 @@
       {
        "item_id": "51279",
        "item_name": "Sanctified Lightsworn Shoulderplates",
-       "used_by": 5
-      },
-      {
-       "item_id": "51269",
-       "item_name": "Sanctified Lightsworn Shoulderguards",
-       "used_by": 1
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3395,12 +4154,7 @@
       {
        "item_id": "50653",
        "item_name": "Shadowvault Slayer's Cloak",
-       "used_by": 6
-      },
-      {
-       "item_id": "50677",
-       "item_name": "Winding Sheet",
-       "used_by": 1
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3414,7 +4168,7 @@
       {
        "item_id": "51275",
        "item_name": "Sanctified Lightsworn Battleplate",
-       "used_by": 6
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3427,7 +4181,7 @@
       {
        "item_id": "54580",
        "item_name": "Umbrage Armbands",
-       "used_by": 7
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3440,11 +4194,11 @@
       {
        "item_id": "50690",
        "item_name": "Fleshrending Gauntlets",
-       "used_by": 5
+       "used_by": 11
       },
       {
-       "item_id": "51267",
-       "item_name": "Sanctified Lightsworn Handguards",
+       "item_id": "50619",
+       "item_name": "Anub'ar Stalker's Gloves",
        "used_by": 1
       }
      ],
@@ -3458,7 +4212,7 @@
       {
        "item_id": "50707",
        "item_name": "Astrylian's Sutured Cinch",
-       "used_by": 5
+       "used_by": 11
       },
       {
        "item_id": "50688",
@@ -3474,7 +4228,7 @@
       {
        "item_id": "51278",
        "item_name": "Sanctified Lightsworn Legplates",
-       "used_by": 6
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3487,7 +4241,7 @@
       {
        "item_id": "54578",
        "item_name": "Apocalypse's Advance",
-       "used_by": 7
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3500,35 +4254,38 @@
       {
        "item_id": "50402",
        "item_name": "Ashen Band of Endless Vengeance",
-       "used_by": 7
+       "used_by": 12
       },
       {
        "item_id": "54576",
        "item_name": "Signet of Twilight",
-       "used_by": 6
+       "used_by": 9
       },
       {
-       "item_id": "50678",
-       "item_name": "Seal of Many Mouths",
+       "item_id": "50618",
+       "item_name": "Frostbrood Sapphire Ring",
+       "used_by": 2
+      },
+      {
+       "item_id": "50604",
+       "item_name": "Band of the Bone Colossus",
        "used_by": 1
       }
      ],
-     "enchant_ids": [
-      "3839"
-     ],
-     "enchant_label": "+40 Attack Power"
+     "enchant_ids": [],
+     "enchant_label": ""
     },
     "Trinket": {
      "options": [
       {
        "item_id": "50706",
        "item_name": "Tiny Abomination in a Jar",
-       "used_by": 5
+       "used_by": 12
       },
       {
        "item_id": "54590",
        "item_name": "Sharpened Twilight Scale",
-       "used_by": 3
+       "used_by": 9
       },
       {
        "item_id": "47131",
@@ -3536,8 +4293,8 @@
        "used_by": 2
       },
       {
-       "item_id": "50351",
-       "item_name": "Tiny Abomination in a Jar",
+       "item_id": "54569",
+       "item_name": "Sharpened Twilight Scale",
        "used_by": 1
       }
      ],
@@ -3549,17 +4306,7 @@
       {
        "item_id": "49623",
        "item_name": "Shadowmourne",
-       "used_by": 5
-      },
-      {
-       "item_id": "50737",
-       "item_name": "Havoc's Call, Blade of Lordaeron Kings",
-       "used_by": 1
-      },
-      {
-       "item_id": "50732",
-       "item_name": "Bloodsurge, Kel'Thuzad's Blade of Agony",
-       "used_by": 1
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -3570,30 +4317,14 @@
     "Ranged": {
      "options": [
       {
-       "item_id": "47661",
-       "item_name": "Libram of Valiance",
-       "used_by": 5
-      },
-      {
        "item_id": "50455",
        "item_name": "Libram of Three Truths",
-       "used_by": 1
+       "used_by": 6
       },
       {
-       "item_id": "45145",
-       "item_name": "Libram of the Sacred Shield",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
-    },
-    "Off Hand": {
-     "options": [
-      {
-       "item_id": "50729",
-       "item_name": "Icecrown Glacial Wall",
-       "used_by": 2
+       "item_id": "47661",
+       "item_name": "Libram of Valiance",
+       "used_by": 6
       }
      ],
      "enchant_ids": [],
@@ -3603,7 +4334,7 @@
    "meta_gem": {
     "item_id": "41398",
     "name": "Relentless Earthsiege Diamond",
-    "used_by": 7
+    "used_by": 12
    },
    "nightmare_tear_share": 1.0,
    "stat_caps": [
@@ -3616,8 +4347,8 @@
     {
      "stat_key": "expertise_rating",
      "display_name": "Expertise Rating",
-     "cap_value": 172,
-     "cap_label": "lo que tienen 3 de cada 4 top (mediana 205)"
+     "cap_value": 123,
+     "cap_label": "lo que tienen 3 de cada 4 top (mediana 131)"
     }
    ]
   },
@@ -4321,19 +5052,24 @@
    "stat_caps": []
   },
   "Priest|Shadow|": {
-   "sample_size": 7,
+   "sample_size": 12,
    "gs_range": [
-    6315,
-    6545
+    6514,
+    6566
    ],
    "players": [
+    "Neurobionic",
+    "Nomananosex",
     "Imvinny",
     "Nooji",
     "Dushaw",
+    "Saintkott",
     "Drbubbless",
-    "Punkanana",
-    "Imnotreina",
-    "Continental"
+    "Thirst",
+    "Usuwu",
+    "Teutonica",
+    "Exxjke",
+    "Lftr"
    ],
    "slots": {
     "Head": {
@@ -4341,11 +5077,11 @@
       {
        "item_id": "51255",
        "item_name": "Sanctified Crimson Acolyte Cowl",
-       "used_by": 6
+       "used_by": 11
       },
       {
-       "item_id": "50661",
-       "item_name": "Corp'rethar Ceremonial Crown",
+       "item_id": "51261",
+       "item_name": "Sanctified Crimson Acolyte Hood",
        "used_by": 1
       }
      ],
@@ -4359,11 +5095,16 @@
       {
        "item_id": "50658",
        "item_name": "Amulet of the Silent Eulogy",
-       "used_by": 6
+       "used_by": 10
       },
       {
-       "item_id": "50700",
-       "item_name": "Holiday's Grace",
+       "item_id": "50609",
+       "item_name": "Bone Sentinel's Amulet",
+       "used_by": 1
+      },
+      {
+       "item_id": "50182",
+       "item_name": "Blood Queen's Crimson Choker",
        "used_by": 1
       }
      ],
@@ -4375,7 +5116,12 @@
       {
        "item_id": "51257",
        "item_name": "Sanctified Crimson Acolyte Mantle",
-       "used_by": 6
+       "used_by": 11
+      },
+      {
+       "item_id": "51264",
+       "item_name": "Sanctified Crimson Acolyte Shoulderpads",
+       "used_by": 1
       }
      ],
      "enchant_ids": [
@@ -4388,12 +5134,12 @@
       {
        "item_id": "54583",
        "item_name": "Cloak of Burning Dusk",
-       "used_by": 4
+       "used_by": 9
       },
       {
        "item_id": "50628",
        "item_name": "Frostbinder's Shredded Cape",
-       "used_by": 2
+       "used_by": 3
       }
      ],
      "enchant_ids": [
@@ -4406,7 +5152,12 @@
       {
        "item_id": "51259",
        "item_name": "Sanctified Crimson Acolyte Raiments",
-       "used_by": 6
+       "used_by": 11
+      },
+      {
+       "item_id": "50717",
+       "item_name": "Sanguine Silk Robes",
+       "used_by": 1
       }
      ],
      "enchant_ids": [
@@ -4419,12 +5170,12 @@
       {
        "item_id": "54582",
        "item_name": "Bracers of Fiery Night",
-       "used_by": 4
+       "used_by": 11
       },
       {
-       "item_id": "53486",
-       "item_name": "Bracers of Fiery Night",
-       "used_by": 2
+       "item_id": "51872",
+       "item_name": "Ether-Soaked Bracers",
+       "used_by": 1
       }
      ],
      "enchant_ids": [
@@ -4437,11 +5188,16 @@
       {
        "item_id": "51256",
        "item_name": "Sanctified Crimson Acolyte Handwraps",
-       "used_by": 5
+       "used_by": 9
       },
       {
        "item_id": "50663",
        "item_name": "Gunship Captain's Mittens",
+       "used_by": 2
+      },
+      {
+       "item_id": "51260",
+       "item_name": "Sanctified Crimson Acolyte Gloves",
        "used_by": 1
       }
      ],
@@ -4455,7 +5211,7 @@
       {
        "item_id": "50613",
        "item_name": "Crushing Coldwraith Belt",
-       "used_by": 6
+       "used_by": 12
       }
      ],
      "enchant_ids": [],
@@ -4466,11 +5222,16 @@
       {
        "item_id": "50694",
        "item_name": "Plaguebringer's Stained Pants",
-       "used_by": 5
+       "used_by": 9
       },
       {
        "item_id": "51258",
        "item_name": "Sanctified Crimson Acolyte Pants",
+       "used_by": 2
+      },
+      {
+       "item_id": "51262",
+       "item_name": "Sanctified Crimson Acolyte Leggings",
        "used_by": 1
       }
      ],
@@ -4485,12 +5246,7 @@
       {
        "item_id": "50699",
        "item_name": "Plague Scientist's Boots",
-       "used_by": 5
-      },
-      {
-       "item_id": "49893",
-       "item_name": "Sandals of Consecration",
-       "used_by": 1
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -4503,16 +5259,21 @@
       {
        "item_id": "50398",
        "item_name": "Ashen Band of Endless Destruction",
-       "used_by": 7
+       "used_by": 11
       },
       {
        "item_id": "50664",
        "item_name": "Ring of Rapid Ascent",
-       "used_by": 6
+       "used_by": 10
       },
       {
        "item_id": "50636",
        "item_name": "Memory of Malygos",
+       "used_by": 2
+      },
+      {
+       "item_id": "50644",
+       "item_name": "Ring of Maddening Whispers",
        "used_by": 1
       }
      ],
@@ -4524,21 +5285,21 @@
       {
        "item_id": "50348",
        "item_name": "Dislodged Foreign Object",
-       "used_by": 5
+       "used_by": 9
       },
       {
        "item_id": "50365",
        "item_name": "Phylactery of the Nameless Lich",
-       "used_by": 5
+       "used_by": 8
       },
       {
        "item_id": "54588",
        "item_name": "Charred Twilight Scale",
-       "used_by": 2
+       "used_by": 5
       },
       {
-       "item_id": "51378",
-       "item_name": "Medallion of the Horde",
+       "item_id": "54589",
+       "item_name": "Glowing Twilight Scale",
        "used_by": 1
       }
      ],
@@ -4550,45 +5311,51 @@
       {
        "item_id": "50734",
        "item_name": "Royal Scepter of Terenas II",
-       "used_by": 4
+       "used_by": 6
+      },
+      {
+       "item_id": "50731",
+       "item_name": "Archus, Greatstaff of Antonidas",
+       "used_by": 3
       },
       {
        "item_id": "50608",
        "item_name": "Frozen Bonespike",
        "used_by": 2
-      },
-      {
-       "item_id": "50731",
-       "item_name": "Archus, Greatstaff of Antonidas",
-       "used_by": 1
       }
      ],
      "enchant_ids": [
-      "3834"
+      "3834",
+      "3854"
      ],
-     "enchant_label": "+63 Spell Power"
-    },
-    "Off Hand": {
-     "options": [
-      {
-       "item_id": "50719",
-       "item_name": "Shadow Silk Spindle",
-       "used_by": 6
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
+     "enchant_label": "+63 Spell Power / +81 Spell Power"
     },
     "Ranged": {
      "options": [
       {
        "item_id": "50684",
        "item_name": "Corpse-Impaling Spike",
-       "used_by": 6
+       "used_by": 11
       },
       {
        "item_id": "50631",
        "item_name": "Nightmare Ender",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Off Hand": {
+     "options": [
+      {
+       "item_id": "50719",
+       "item_name": "Shadow Silk Spindle",
+       "used_by": 8
+      },
+      {
+       "item_id": "50635",
+       "item_name": "Sundial of Eternal Dusk",
        "used_by": 1
       }
      ],
@@ -4599,14 +5366,14 @@
    "meta_gem": {
     "item_id": "41285",
     "name": "Chaotic Skyflare Diamond",
-    "used_by": 6
+    "used_by": 11
    },
    "nightmare_tear_share": 0.0,
    "stat_caps": [
     {
      "stat_key": "hit_rating",
      "display_name": "Hit Rating (hechizos)",
-     "cap_value": 364,
+     "cap_value": 371,
      "cap_label": "lo que tienen 3 de cada 4 top (mediana 371)"
     }
    ]
@@ -5891,6 +6658,341 @@
     }
    ]
   },
+  "Shaman|Restoration|": {
+   "sample_size": 12,
+   "gs_range": [
+    6149,
+    6550
+   ],
+   "players": [
+    "Tinaa",
+    "Ayachan",
+    "Sacurita",
+    "Paintsniffer",
+    "Kanelli",
+    "Systeri",
+    "Atmu",
+    "Malke",
+    "Shamanakos",
+    "Mupplemup",
+    "Evefaysm",
+    "Ovoshtar"
+   ],
+   "slots": {
+    "Head": {
+     "options": [
+      {
+       "item_id": "51247",
+       "item_name": "Sanctified Frost Witch's Headpiece",
+       "used_by": 11
+      },
+      {
+       "item_id": "51192",
+       "item_name": "Sanctified Frost Witch's Headpiece",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3820"
+     ],
+     "enchant_label": "+30 Spell Power and 20 Critical strike rating."
+    },
+    "Neck": {
+     "options": [
+      {
+       "item_id": "50724",
+       "item_name": "Blood Queen's Crimson Choker",
+       "used_by": 5
+      },
+      {
+       "item_id": "50182",
+       "item_name": "Blood Queen's Crimson Choker",
+       "used_by": 4
+      },
+      {
+       "item_id": "51894",
+       "item_name": "Soulcleave Pendant",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Shoulder": {
+     "options": [
+      {
+       "item_id": "51245",
+       "item_name": "Sanctified Frost Witch's Spaulders",
+       "used_by": 10
+      },
+      {
+       "item_id": "51194",
+       "item_name": "Sanctified Frost Witch's Spaulders",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3810"
+     ],
+     "enchant_label": "+24 Spell Power and +15 Critical Strike Rating"
+    },
+    "Back": {
+     "options": [
+      {
+       "item_id": "54583",
+       "item_name": "Cloak of Burning Dusk",
+       "used_by": 5
+      },
+      {
+       "item_id": "50628",
+       "item_name": "Frostbinder's Shredded Cape",
+       "used_by": 2
+      },
+      {
+       "item_id": "53489",
+       "item_name": "Cloak of Burning Dusk",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3831"
+     ],
+     "enchant_label": "+23 Haste Rating"
+    },
+    "Chest": {
+     "options": [
+      {
+       "item_id": "51249",
+       "item_name": "Sanctified Frost Witch's Tunic",
+       "used_by": 10
+      },
+      {
+       "item_id": "51190",
+       "item_name": "Sanctified Frost Witch's Tunic",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3832"
+     ],
+     "enchant_label": "+10 All Stats"
+    },
+    "Wrist": {
+     "options": [
+      {
+       "item_id": "54584",
+       "item_name": "Phaseshifter's Bracers",
+       "used_by": 7
+      },
+      {
+       "item_id": "50687",
+       "item_name": "Bloodsunder's Bracers",
+       "used_by": 3
+      },
+      {
+       "item_id": "54582",
+       "item_name": "Bracers of Fiery Night",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "2332"
+     ],
+     "enchant_label": "+30 Spell Power"
+    },
+    "Hands": {
+     "options": [
+      {
+       "item_id": "50703",
+       "item_name": "Unclean Surgical Gloves",
+       "used_by": 9
+      },
+      {
+       "item_id": "54560",
+       "item_name": "Changeling Gloves",
+       "used_by": 2
+      },
+      {
+       "item_id": "51827",
+       "item_name": "Stormbringer Gloves",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3604"
+     ],
+     "enchant_label": "Hyperspeed Accelerators"
+    },
+    "Waist": {
+     "options": [
+      {
+       "item_id": "54587",
+       "item_name": "Split Shape Belt",
+       "used_by": 10
+      },
+      {
+       "item_id": "53488",
+       "item_name": "Split Shape Belt",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Legs": {
+     "options": [
+      {
+       "item_id": "51246",
+       "item_name": "Sanctified Frost Witch's Legguards",
+       "used_by": 10
+      },
+      {
+       "item_id": "51193",
+       "item_name": "Sanctified Frost Witch's Legguards",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3721"
+     ],
+     "enchant_label": "+50 Spell Power and +30 Stamina"
+    },
+    "Feet": {
+     "options": [
+      {
+       "item_id": "50699",
+       "item_name": "Plague Scientist's Boots",
+       "used_by": 7
+      },
+      {
+       "item_id": "49896",
+       "item_name": "Earthsoul Boots",
+       "used_by": 4
+      },
+      {
+       "item_id": "51920",
+       "item_name": "Boots of the Frozen Seed",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3606"
+     ],
+     "enchant_label": "+24 Critical Strike Rating"
+    },
+    "Finger": {
+     "options": [
+      {
+       "item_id": "50664",
+       "item_name": "Ring of Rapid Ascent",
+       "used_by": 9
+      },
+      {
+       "item_id": "54585",
+       "item_name": "Ring of Phased Regeneration",
+       "used_by": 8
+      },
+      {
+       "item_id": "50400",
+       "item_name": "Ashen Band of Endless Wisdom",
+       "used_by": 5
+      },
+      {
+       "item_id": "50610",
+       "item_name": "Marrowgar's Frigid Eye",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Trinket": {
+     "options": [
+      {
+       "item_id": "54589",
+       "item_name": "Glowing Twilight Scale",
+       "used_by": 9
+      },
+      {
+       "item_id": "50366",
+       "item_name": "Althor's Abacus",
+       "used_by": 5
+      },
+      {
+       "item_id": "47432",
+       "item_name": "Solace of the Fallen",
+       "used_by": 4
+      },
+      {
+       "item_id": "54573",
+       "item_name": "Glowing Twilight Scale",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Main Hand": {
+     "options": [
+      {
+       "item_id": "50428",
+       "item_name": "Royal Scepter of Terenas II",
+       "used_by": 4
+      },
+      {
+       "item_id": "50685",
+       "item_name": "Trauma",
+       "used_by": 3
+      },
+      {
+       "item_id": "50734",
+       "item_name": "Royal Scepter of Terenas II",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3834"
+     ],
+     "enchant_label": "+63 Spell Power"
+    },
+    "Off Hand": {
+     "options": [
+      {
+       "item_id": "50616",
+       "item_name": "Bulwark of Smouldering Steel",
+       "used_by": 12
+      }
+     ],
+     "enchant_ids": [
+      "1128"
+     ],
+     "enchant_label": "+25 Intellect"
+    },
+    "Ranged": {
+     "options": [
+      {
+       "item_id": "50464",
+       "item_name": "Totem of the Surging Sea",
+       "used_by": 7
+      },
+      {
+       "item_id": "47665",
+       "item_name": "Totem of Calming Tides",
+       "used_by": 5
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    }
+   },
+   "meta_gem": {
+    "item_id": "41401",
+    "name": "Insightful Earthsiege Diamond",
+    "used_by": 8
+   },
+   "nightmare_tear_share": 0.0,
+   "stat_caps": []
+  },
   "Warlock|Affliction|": {
    "sample_size": 12,
    "gs_range": [
@@ -6168,19 +7270,24 @@
    ]
   },
   "Warlock|Demonology|": {
-   "sample_size": 7,
+   "sample_size": 12,
    "gs_range": [
-    6171,
-    6557
+    6426,
+    6566
    ],
    "players": [
+    "Girth",
     "Lockver",
+    "Tompa",
     "Olitis",
     "Afri",
     "Jaliana",
+    "Demorgius",
+    "Seoeunsoo",
     "Blowbang",
-    "Matlaus",
-    "Affri"
+    "Halloweem",
+    "Soularis",
+    "Gottisttot"
    ],
    "slots": {
     "Head": {
@@ -6188,7 +7295,7 @@
       {
        "item_id": "51231",
        "item_name": "Sanctified Dark Coven Hood",
-       "used_by": 6
+       "used_by": 12
       }
      ],
      "enchant_ids": [
@@ -6201,329 +7308,7 @@
       {
        "item_id": "50658",
        "item_name": "Amulet of the Silent Eulogy",
-       "used_by": 5
-      },
-      {
-       "item_id": "51016",
-       "item_name": "Pendant of Split Veins",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
-    },
-    "Shoulder": {
-     "options": [
-      {
-       "item_id": "51234",
-       "item_name": "Sanctified Dark Coven Shoulderpads",
-       "used_by": 5
-      },
-      {
-       "item_id": "50643",
-       "item_name": "Shoulders of Mercy Killing",
-       "used_by": 1
-      },
-      {
-       "item_id": "51205",
-       "item_name": "Sanctified Dark Coven Shoulderpads",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [
-      "3810"
-     ],
-     "enchant_label": "+24 Spell Power and +15 Critical Strike Rating"
-    },
-    "Back": {
-     "options": [
-      {
-       "item_id": "54583",
-       "item_name": "Cloak of Burning Dusk",
-       "used_by": 4
-      },
-      {
-       "item_id": "50668",
-       "item_name": "Greatcloak of the Turned Champion",
-       "used_by": 1
-      },
-      {
-       "item_id": "50469",
-       "item_name": "Volde's Cloak of the Night Sky",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [
-      "3722"
-     ],
-     "enchant_label": "Lightweave Embroidery"
-    },
-    "Chest": {
-     "options": [
-      {
-       "item_id": "51233",
-       "item_name": "Sanctified Dark Coven Robe",
-       "used_by": 6
-      }
-     ],
-     "enchant_ids": [
-      "3832"
-     ],
-     "enchant_label": "+10 All Stats"
-    },
-    "Wrist": {
-     "options": [
-      {
-       "item_id": "54582",
-       "item_name": "Bracers of Fiery Night",
-       "used_by": 4
-      },
-      {
-       "item_id": "50686",
-       "item_name": "Death Surgeon's Sleeves",
-       "used_by": 2
-      }
-     ],
-     "enchant_ids": [
-      "2332"
-     ],
-     "enchant_label": "+30 Spell Power"
-    },
-    "Hands": {
-     "options": [
-      {
-       "item_id": "51230",
-       "item_name": "Sanctified Dark Coven Gloves",
-       "used_by": 4
-      },
-      {
-       "item_id": "50663",
-       "item_name": "Gunship Captain's Mittens",
-       "used_by": 1
-      },
-      {
-       "item_id": "51209",
-       "item_name": "Sanctified Dark Coven Gloves",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [
-      "3604"
-     ],
-     "enchant_label": "Hyperspeed Accelerators"
-    },
-    "Waist": {
-     "options": [
-      {
-       "item_id": "50613",
-       "item_name": "Crushing Coldwraith Belt",
-       "used_by": 5
-      },
-      {
-       "item_id": "50773",
-       "item_name": "Cord of the Patronizing Practitioner",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
-    },
-    "Legs": {
-     "options": [
-      {
-       "item_id": "50694",
-       "item_name": "Plaguebringer's Stained Pants",
-       "used_by": 4
-      },
-      {
-       "item_id": "51232",
-       "item_name": "Sanctified Dark Coven Leggings",
-       "used_by": 1
-      },
-      {
-       "item_id": "49891",
-       "item_name": "Leggings of Woven Death",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [
-      "3872",
-      "3719"
-     ],
-     "enchant_label": "+50 Spell Power and +20 Spirit / +50 Spell Power and +20 Spirit"
-    },
-    "Feet": {
-     "options": [
-      {
-       "item_id": "50699",
-       "item_name": "Plague Scientist's Boots",
-       "used_by": 5
-      },
-      {
-       "item_id": "49890",
-       "item_name": "Deathfrost Boots",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [
-      "3606"
-     ],
-     "enchant_label": "+24 Critical Strike Rating"
-    },
-    "Finger": {
-     "options": [
-      {
-       "item_id": "50398",
-       "item_name": "Ashen Band of Endless Destruction",
-       "used_by": 7
-      },
-      {
-       "item_id": "50714",
-       "item_name": "Valanar's Other Signet Ring",
-       "used_by": 6
-      }
-     ],
-     "enchant_ids": [
-      "3840"
-     ],
-     "enchant_label": "+23 Spell Power"
-    },
-    "Trinket": {
-     "options": [
-      {
-       "item_id": "50365",
-       "item_name": "Phylactery of the Nameless Lich",
-       "used_by": 4
-      },
-      {
-       "item_id": "50348",
-       "item_name": "Dislodged Foreign Object",
-       "used_by": 4
-      },
-      {
-       "item_id": "54588",
-       "item_name": "Charred Twilight Scale",
-       "used_by": 2
-      },
-      {
-       "item_id": "50360",
-       "item_name": "Phylactery of the Nameless Lich",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
-    },
-    "Main Hand": {
-     "options": [
-      {
-       "item_id": "50732",
-       "item_name": "Bloodsurge, Kel'Thuzad's Blade of Agony",
-       "used_by": 6
-      },
-      {
-       "item_id": "50725",
-       "item_name": "Dying Light",
-       "used_by": 1
-      }
-     ],
-     "enchant_ids": [
-      "3834"
-     ],
-     "enchant_label": "+63 Spell Power"
-    },
-    "Off Hand": {
-     "options": [
-      {
-       "item_id": "50719",
-       "item_name": "Shadow Silk Spindle",
-       "used_by": 4
-      },
-      {
-       "item_id": "50635",
-       "item_name": "Sundial of Eternal Dusk",
-       "used_by": 2
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
-    },
-    "Ranged": {
-     "options": [
-      {
-       "item_id": "50684",
-       "item_name": "Corpse-Impaling Spike",
-       "used_by": 4
-      },
-      {
-       "item_id": "50631",
-       "item_name": "Nightmare Ender",
-       "used_by": 3
-      }
-     ],
-     "enchant_ids": [],
-     "enchant_label": ""
-    }
-   },
-   "meta_gem": {
-    "item_id": "41285",
-    "name": "Chaotic Skyflare Diamond",
-    "used_by": 7
-   },
-   "nightmare_tear_share": 0.0,
-   "stat_caps": [
-    {
-     "stat_key": "hit_rating",
-     "display_name": "Hit Rating (hechizos)",
-     "cap_value": 426,
-     "cap_label": "lo que tienen 3 de cada 4 top (mediana 464)"
-    }
-   ]
-  },
-  "Warlock|Destruction|": {
-   "sample_size": 6,
-   "gs_range": [
-    6086,
-    6557
-   ],
-   "players": [
-    "Sindrii",
-    "Paxxenarion",
-    "Ebritas",
-    "Darkbind",
-    "Kachna",
-    "Hiiragiutena"
-   ],
-   "slots": {
-    "Head": {
-     "options": [
-      {
-       "item_id": "51231",
-       "item_name": "Sanctified Dark Coven Hood",
-       "used_by": 3
-      },
-      {
-       "item_id": "51208",
-       "item_name": "Sanctified Dark Coven Hood",
-       "used_by": 3
-      }
-     ],
-     "enchant_ids": [
-      "3820"
-     ],
-     "enchant_label": "+30 Spell Power and 20 Critical strike rating."
-    },
-    "Neck": {
-     "options": [
-      {
-       "item_id": "50658",
-       "item_name": "Amulet of the Silent Eulogy",
-       "used_by": 4
-      },
-      {
-       "item_id": "50724",
-       "item_name": "Blood Queen's Crimson Choker",
-       "used_by": 1
+       "used_by": 11
       },
       {
        "item_id": "50609",
@@ -6537,14 +7322,14 @@
     "Shoulder": {
      "options": [
       {
-       "item_id": "51205",
-       "item_name": "Sanctified Dark Coven Shoulderpads",
-       "used_by": 4
-      },
-      {
        "item_id": "51234",
        "item_name": "Sanctified Dark Coven Shoulderpads",
-       "used_by": 2
+       "used_by": 11
+      },
+      {
+       "item_id": "51205",
+       "item_name": "Sanctified Dark Coven Shoulderpads",
+       "used_by": 1
       }
      ],
      "enchant_ids": [
@@ -6555,19 +7340,359 @@
     "Back": {
      "options": [
       {
-       "item_id": "53489",
-       "item_name": "Cloak of Burning Dusk",
-       "used_by": 2
-      },
-      {
        "item_id": "54583",
        "item_name": "Cloak of Burning Dusk",
-       "used_by": 1
+       "used_by": 7
+      },
+      {
+       "item_id": "50628",
+       "item_name": "Frostbinder's Shredded Cape",
+       "used_by": 3
       },
       {
        "item_id": "50668",
        "item_name": "Greatcloak of the Turned Champion",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3722",
+      "3859"
+     ],
+     "enchant_label": "Lightweave Embroidery / +27 Spell Power"
+    },
+    "Chest": {
+     "options": [
+      {
+       "item_id": "51233",
+       "item_name": "Sanctified Dark Coven Robe",
+       "used_by": 11
+      },
+      {
+       "item_id": "50717",
+       "item_name": "Sanguine Silk Robes",
        "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3832",
+      "1144"
+     ],
+     "enchant_label": "+10 All Stats / +15 Spirit"
+    },
+    "Wrist": {
+     "options": [
+      {
+       "item_id": "54582",
+       "item_name": "Bracers of Fiery Night",
+       "used_by": 9
+      },
+      {
+       "item_id": "50686",
+       "item_name": "Death Surgeon's Sleeves",
+       "used_by": 2
+      },
+      {
+       "item_id": "53486",
+       "item_name": "Bracers of Fiery Night",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "2332"
+     ],
+     "enchant_label": "+30 Spell Power"
+    },
+    "Hands": {
+     "options": [
+      {
+       "item_id": "51230",
+       "item_name": "Sanctified Dark Coven Gloves",
+       "used_by": 11
+      },
+      {
+       "item_id": "50663",
+       "item_name": "Gunship Captain's Mittens",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3604"
+     ],
+     "enchant_label": "Hyperspeed Accelerators"
+    },
+    "Waist": {
+     "options": [
+      {
+       "item_id": "50613",
+       "item_name": "Crushing Coldwraith Belt",
+       "used_by": 12
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Legs": {
+     "options": [
+      {
+       "item_id": "50694",
+       "item_name": "Plaguebringer's Stained Pants",
+       "used_by": 10
+      },
+      {
+       "item_id": "51232",
+       "item_name": "Sanctified Dark Coven Leggings",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [
+      "3719",
+      "3872"
+     ],
+     "enchant_label": "+50 Spell Power and +20 Spirit / +50 Spell Power and +20 Spirit"
+    },
+    "Feet": {
+     "options": [
+      {
+       "item_id": "50699",
+       "item_name": "Plague Scientist's Boots",
+       "used_by": 12
+      }
+     ],
+     "enchant_ids": [
+      "3606"
+     ],
+     "enchant_label": "+24 Critical Strike Rating"
+    },
+    "Finger": {
+     "options": [
+      {
+       "item_id": "50398",
+       "item_name": "Ashen Band of Endless Destruction",
+       "used_by": 12
+      },
+      {
+       "item_id": "50714",
+       "item_name": "Valanar's Other Signet Ring",
+       "used_by": 11
+      },
+      {
+       "item_id": "50636",
+       "item_name": "Memory of Malygos",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3840"
+     ],
+     "enchant_label": "+23 Spell Power"
+    },
+    "Trinket": {
+     "options": [
+      {
+       "item_id": "50365",
+       "item_name": "Phylactery of the Nameless Lich",
+       "used_by": 8
+      },
+      {
+       "item_id": "50348",
+       "item_name": "Dislodged Foreign Object",
+       "used_by": 7
+      },
+      {
+       "item_id": "54588",
+       "item_name": "Charred Twilight Scale",
+       "used_by": 5
+      },
+      {
+       "item_id": "54572",
+       "item_name": "Charred Twilight Scale",
+       "used_by": 2
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Main Hand": {
+     "options": [
+      {
+       "item_id": "50732",
+       "item_name": "Bloodsurge, Kel'Thuzad's Blade of Agony",
+       "used_by": 9
+      },
+      {
+       "item_id": "50731",
+       "item_name": "Archus, Greatstaff of Antonidas",
+       "used_by": 1
+      },
+      {
+       "item_id": "50704",
+       "item_name": "Rigormortis",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3834"
+     ],
+     "enchant_label": "+63 Spell Power"
+    },
+    "Ranged": {
+     "options": [
+      {
+       "item_id": "50684",
+       "item_name": "Corpse-Impaling Spike",
+       "used_by": 8
+      },
+      {
+       "item_id": "50631",
+       "item_name": "Nightmare Ender",
+       "used_by": 3
+      },
+      {
+       "item_id": "50033",
+       "item_name": "Corpse-Impaling Spike",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Off Hand": {
+     "options": [
+      {
+       "item_id": "50719",
+       "item_name": "Shadow Silk Spindle",
+       "used_by": 8
+      },
+      {
+       "item_id": "50635",
+       "item_name": "Sundial of Eternal Dusk",
+       "used_by": 3
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    }
+   },
+   "meta_gem": {
+    "item_id": "41285",
+    "name": "Chaotic Skyflare Diamond",
+    "used_by": 12
+   },
+   "nightmare_tear_share": 0.0,
+   "stat_caps": [
+    {
+     "stat_key": "hit_rating",
+     "display_name": "Hit Rating (hechizos)",
+     "cap_value": 439,
+     "cap_label": "lo que tienen 3 de cada 4 top (mediana 464)"
+    }
+   ]
+  },
+  "Warlock|Destruction|": {
+   "sample_size": 12,
+   "gs_range": [
+    5892,
+    6557
+   ],
+   "players": [
+    "Sindrii",
+    "Demetriius",
+    "Paxxenarion",
+    "Kickmepls",
+    "Ebritas",
+    "Darkbind",
+    "Almanegra",
+    "Mycherrypie",
+    "Kachna",
+    "Hiiragiutena",
+    "Elwee",
+    "Cetx"
+   ],
+   "slots": {
+    "Head": {
+     "options": [
+      {
+       "item_id": "51208",
+       "item_name": "Sanctified Dark Coven Hood",
+       "used_by": 7
+      },
+      {
+       "item_id": "51231",
+       "item_name": "Sanctified Dark Coven Hood",
+       "used_by": 4
+      },
+      {
+       "item_id": "50661",
+       "item_name": "Corp'rethar Ceremonial Crown",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3820"
+     ],
+     "enchant_label": "+30 Spell Power and 20 Critical strike rating."
+    },
+    "Neck": {
+     "options": [
+      {
+       "item_id": "50658",
+       "item_name": "Amulet of the Silent Eulogy",
+       "used_by": 7
+      },
+      {
+       "item_id": "50609",
+       "item_name": "Bone Sentinel's Amulet",
+       "used_by": 2
+      },
+      {
+       "item_id": "50724",
+       "item_name": "Blood Queen's Crimson Choker",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [],
+     "enchant_label": ""
+    },
+    "Shoulder": {
+     "options": [
+      {
+       "item_id": "51205",
+       "item_name": "Sanctified Dark Coven Shoulderpads",
+       "used_by": 8
+      },
+      {
+       "item_id": "51234",
+       "item_name": "Sanctified Dark Coven Shoulderpads",
+       "used_by": 3
+      },
+      {
+       "item_id": "50244",
+       "item_name": "Dark Coven Shoulderpads",
+       "used_by": 1
+      }
+     ],
+     "enchant_ids": [
+      "3810"
+     ],
+     "enchant_label": "+24 Spell Power and +15 Critical Strike Rating"
+    },
+    "Back": {
+     "options": [
+      {
+       "item_id": "54583",
+       "item_name": "Cloak of Burning Dusk",
+       "used_by": 2
+      },
+      {
+       "item_id": "50205",
+       "item_name": "Frostbinder's Shredded Cape",
+       "used_by": 2
+      },
+      {
+       "item_id": "50628",
+       "item_name": "Frostbinder's Shredded Cape",
+       "used_by": 2
       }
      ],
      "enchant_ids": [
@@ -6581,16 +7706,16 @@
       {
        "item_id": "51206",
        "item_name": "Sanctified Dark Coven Robe",
-       "used_by": 4
-      },
-      {
-       "item_id": "50629",
-       "item_name": "Robe of the Waking Nightmare",
-       "used_by": 1
+       "used_by": 9
       },
       {
        "item_id": "51233",
        "item_name": "Sanctified Dark Coven Robe",
+       "used_by": 2
+      },
+      {
+       "item_id": "50629",
+       "item_name": "Robe of the Waking Nightmare",
        "used_by": 1
       }
      ],
@@ -6602,19 +7727,19 @@
     "Wrist": {
      "options": [
       {
-       "item_id": "54582",
-       "item_name": "Bracers of Fiery Night",
-       "used_by": 2
-      },
-      {
        "item_id": "53486",
        "item_name": "Bracers of Fiery Night",
-       "used_by": 2
+       "used_by": 5
+      },
+      {
+       "item_id": "54582",
+       "item_name": "Bracers of Fiery Night",
+       "used_by": 3
       },
       {
        "item_id": "49994",
        "item_name": "The Lady's Brittle Bracers",
-       "used_by": 1
+       "used_by": 3
       }
      ],
      "enchant_ids": [
@@ -6625,19 +7750,19 @@
     "Hands": {
      "options": [
       {
-       "item_id": "50663",
-       "item_name": "Gunship Captain's Mittens",
-       "used_by": 3
-      },
-      {
        "item_id": "51209",
        "item_name": "Sanctified Dark Coven Gloves",
-       "used_by": 2
+       "used_by": 5
+      },
+      {
+       "item_id": "50663",
+       "item_name": "Gunship Captain's Mittens",
+       "used_by": 4
       },
       {
        "item_id": "51230",
        "item_name": "Sanctified Dark Coven Gloves",
-       "used_by": 1
+       "used_by": 2
       }
      ],
      "enchant_ids": [
@@ -6651,17 +7776,17 @@
       {
        "item_id": "50613",
        "item_name": "Crushing Coldwraith Belt",
-       "used_by": 2
+       "used_by": 3
       },
       {
        "item_id": "50997",
        "item_name": "Circle of Ossus",
-       "used_by": 2
+       "used_by": 3
       },
       {
-       "item_id": "50702",
-       "item_name": "Lingering Illness",
-       "used_by": 1
+       "item_id": "49978",
+       "item_name": "Crushing Coldwraith Belt",
+       "used_by": 3
       }
      ],
      "enchant_ids": [],
@@ -6670,42 +7795,43 @@
     "Legs": {
      "options": [
       {
-       "item_id": "51232",
-       "item_name": "Sanctified Dark Coven Leggings",
-       "used_by": 2
-      },
-      {
-       "item_id": "51207",
-       "item_name": "Sanctified Dark Coven Leggings",
-       "used_by": 2
-      },
-      {
        "item_id": "50694",
        "item_name": "Plaguebringer's Stained Pants",
+       "used_by": 4
+      },
+      {
+       "item_id": "49891",
+       "item_name": "Leggings of Woven Death",
+       "used_by": 3
+      },
+      {
+       "item_id": "51232",
+       "item_name": "Sanctified Dark Coven Leggings",
        "used_by": 2
       }
      ],
      "enchant_ids": [
-      "3719"
+      "3719",
+      "3872"
      ],
-     "enchant_label": "+50 Spell Power and +20 Spirit"
+     "enchant_label": "+50 Spell Power and +20 Spirit / +50 Spell Power and +20 Spirit"
     },
     "Feet": {
      "options": [
       {
        "item_id": "50699",
        "item_name": "Plague Scientist's Boots",
-       "used_by": 3
-      },
-      {
-       "item_id": "49890",
-       "item_name": "Deathfrost Boots",
-       "used_by": 2
+       "used_by": 4
       },
       {
        "item_id": "50062",
        "item_name": "Plague Scientist's Boots",
-       "used_by": 1
+       "used_by": 4
+      },
+      {
+       "item_id": "49890",
+       "item_name": "Deathfrost Boots",
+       "used_by": 4
       }
      ],
      "enchant_ids": [
@@ -6719,12 +7845,12 @@
       {
        "item_id": "50398",
        "item_name": "Ashen Band of Endless Destruction",
-       "used_by": 6
+       "used_by": 12
       },
       {
        "item_id": "50664",
        "item_name": "Ring of Rapid Ascent",
-       "used_by": 3
+       "used_by": 6
       },
       {
        "item_id": "50614",
@@ -6732,8 +7858,8 @@
        "used_by": 2
       },
       {
-       "item_id": "49990",
-       "item_name": "Ring of Maddening Whispers",
+       "item_id": "50714",
+       "item_name": "Valanar's Other Signet Ring",
        "used_by": 1
       }
      ],
@@ -6745,7 +7871,12 @@
       {
        "item_id": "50345",
        "item_name": "Muradin's Spyglass",
-       "used_by": 4
+       "used_by": 6
+      },
+      {
+       "item_id": "54572",
+       "item_name": "Charred Twilight Scale",
+       "used_by": 3
       },
       {
        "item_id": "54588",
@@ -6755,12 +7886,7 @@
       {
        "item_id": "50365",
        "item_name": "Phylactery of the Nameless Lich",
-       "used_by": 1
-      },
-      {
-       "item_id": "47182",
-       "item_name": "Reign of the Unliving",
-       "used_by": 1
+       "used_by": 2
       }
      ],
      "enchant_ids": [],
@@ -6771,12 +7897,12 @@
       {
        "item_id": "50608",
        "item_name": "Frozen Bonespike",
-       "used_by": 2
+       "used_by": 3
       },
       {
        "item_id": "50732",
        "item_name": "Bloodsurge, Kel'Thuzad's Blade of Agony",
-       "used_by": 1
+       "used_by": 2
       },
       {
        "item_id": "50704",
@@ -6794,17 +7920,17 @@
       {
        "item_id": "50719",
        "item_name": "Shadow Silk Spindle",
-       "used_by": 2
+       "used_by": 4
       },
       {
        "item_id": "50309",
        "item_name": "Shriveled Heart",
-       "used_by": 1
+       "used_by": 2
       },
       {
        "item_id": "50173",
        "item_name": "Shadow Silk Spindle",
-       "used_by": 1
+       "used_by": 2
       }
      ],
      "enchant_ids": [],
@@ -6815,17 +7941,17 @@
       {
        "item_id": "50684",
        "item_name": "Corpse-Impaling Spike",
-       "used_by": 2
+       "used_by": 4
       },
       {
        "item_id": "50472",
        "item_name": "Nightmare Ender",
-       "used_by": 2
+       "used_by": 3
       },
       {
-       "item_id": "51326",
-       "item_name": "Wand of Ruby Claret",
-       "used_by": 1
+       "item_id": "50033",
+       "item_name": "Corpse-Impaling Spike",
+       "used_by": 3
       }
      ],
      "enchant_ids": [],
@@ -6835,15 +7961,15 @@
    "meta_gem": {
     "item_id": "41285",
     "name": "Chaotic Skyflare Diamond",
-    "used_by": 6
+    "used_by": 12
    },
-   "nightmare_tear_share": 0.0,
+   "nightmare_tear_share": 0.17,
    "stat_caps": [
     {
      "stat_key": "hit_rating",
      "display_name": "Hit Rating (hechizos)",
-     "cap_value": 424,
-     "cap_label": "lo que tienen 3 de cada 4 top (mediana 426)"
+     "cap_value": 417,
+     "cap_label": "lo que tienen 3 de cada 4 top (mediana 451)"
     }
    ]
   },
@@ -7523,6 +8649,7 @@
   "19032": "Stormpike Battle Tabard",
   "2105": "Thug Shirt",
   "23345": "Scout's Shirt",
+  "23473": "Recruit's Shirt",
   "23705": "Tabard of Flame",
   "2575": "Red Linen Shirt",
   "31404": "Green Trophy Tabard of the Illidari",
@@ -7542,21 +8669,28 @@
   "38310": "Tabard of the Arcane",
   "38311": "Tabard of the Void",
   "40207": "Sigil of Awareness",
+  "40682": "Sundial of the Exiled",
   "40684": "Mirror of Truth",
   "40705": "Libram of Renewal",
   "40714": "Sigil of the Unfaltering Knight",
+  "40792": "Relentless Gladiator's Scaled Chestpiece",
   "40807": "Furious Gladiator's Plate Gauntlets",
   "40830": "Relentless Gladiator's Dreadplate Helm",
+  "40831": "Relentless Gladiator's Scaled Helm",
+  "40852": "Relentless Gladiator's Scaled Legguards",
   "40871": "Relentless Gladiator's Dreadplate Shoulders",
-  "40872": "Relentless Gladiator's Scaled Shoulders",
+  "40884": "Relentless Gladiator's Greaves of Triumph",
+  "41088": "Relentless Gladiator's Chain Armor",
+  "41158": "Relentless Gladiator's Chain Helm",
   "41248": "Red Lumberjack Shirt",
   "41249": "Blue Lumberjack Shirt",
   "41251": "Yellow Lumberjack Shirt",
   "41252": "Red Workman's Shirt",
   "41254": "Rustic Workman's Shirt",
-  "41870": "Relentless Gladiator's Mooncloth Mantle",
-  "41994": "Relentless Gladiator's Felweave Cowl",
+  "42119": "Relentless Gladiator's Band of Victory",
+  "42137": "Battlemaster's Ruination",
   "42360": "Ebon Filigreed Doublet",
+  "42361": "Cerulean Filigreed Doublet",
   "42369": "Ebon Filigreed Shirt",
   "42374": "Blue Martial Shirt",
   "43154": "Tabard of the Argent Crusade",
@@ -7569,8 +8703,8 @@
   "43348": "Tabard of the Explorer",
   "4335": "Rich Purple Silk Shirt",
   "44253": "Darkmoon Card: Greatness",
-  "44693": "Wound Dressing",
   "44694": "Antiseptic-Soaked Dressing",
+  "44914": "Anvil of Titans",
   "45": "Squire's Shirt",
   "45037": "Epic Purple Shirt",
   "45145": "Libram of the Sacred Shield",
@@ -7579,8 +8713,10 @@
   "46017": "Val'anyr, Hammer of Ancient Kings",
   "46038": "Dark Matter",
   "46051": "Meteorite Crystal",
+  "46086": "Platinum Disks of Battle",
   "46818": "Sunreaver Tabard",
   "46874": "Argent Crusader's Tabard",
+  "46972": "Cord of the Tenebrous Mist",
   "46995": "Talonstrike",
   "47041": "Solace of the Defeated",
   "47059": "Solace of the Defeated",
@@ -7592,22 +8728,26 @@
   "47151": "Bracers of Dark Determination",
   "47182": "Reign of the Unliving",
   "47213": "Abyssal Rune",
+  "47214": "Banner of Victory",
   "47258": "Belt of the Tenebrous Mist",
+  "47266": "Blood Fury",
   "47267": "Death's Head Crossbow",
   "47271": "Solace of the Fallen",
   "47281": "Bracers of the Silent Massacre",
+  "47282": "Band of Callous Aggression",
   "47303": "Death's Choice",
   "47329": "Hellion Glaive",
   "47428": "Death's Head Crossbow",
   "47432": "Solace of the Fallen",
   "47437": "Talisman of Heedless Sins",
-  "47464": "Death's Choice",
   "47545": "Vereesa's Dexterity",
   "47546": "Sylvanas' Cunning",
   "47547": "Varian's Furor",
   "47586": "Bejeweled Wizard's Bracers",
+  "47658": "Brimstone Igniter",
   "47659": "Crimson Star",
   "47661": "Libram of Valiance",
+  "47665": "Totem of Calming Tides",
   "47666": "Totem of Electrifying Wind",
   "47668": "Idol of Mutilation",
   "47672": "Sigil of Insolence",
@@ -7616,15 +8756,21 @@
   "47705": "Pauldrons of the Devourer",
   "47730": "Dexterous Brightstone Ring",
   "47734": "Mark of Supremacy",
+  "47753": "Khadgar's Gauntlets of Triumph",
+  "47754": "Khadgar's Hood of Triumph",
+  "47850": "Bracers of the Northern Stalker",
   "47853": "Acidmaw Treads",
   "47879": "Fetish of Volatile Power",
   "47983": "Velen's Gloves of Triumph",
   "47987": "Velen's Shoulderpads of Triumph",
+  "48273": "Windrunner's Handguards of Triumph",
   "48276": "Windrunner's Handguards of Conquest",
   "48277": "Windrunner's Headpiece of Conquest",
+  "48722": "Shard of the Crystal Heart",
   "48724": "Talisman of Resurgence",
   "49": "Footpad's Shirt",
   "49074": "Coren's Chromium Coaster",
+  "49489": "Signified Ring of Binding",
   "49623": "Shadowmourne",
   "49888": "Shadow's Edge",
   "49890": "Deathfrost Boots",
@@ -7636,6 +8782,10 @@
   "49903": "Legplates of Painful Death",
   "49906": "Hellfrozen Bonegrinders",
   "49950": "Frostbitten Fur Boots",
+  "49967": "Marrowgar's Frigid Eye",
+  "49968": "Frozen Bonespike",
+  "49975": "Bone Sentinel's Amulet",
+  "49977": "Loop of the Endless Labyrinth",
   "49978": "Crushing Coldwraith Belt",
   "49981": "Fal'inrush, Defender of Quel'thalas",
   "49983": "Blood-Soaked Saronite Stompers",
@@ -7645,19 +8795,29 @@
   "49994": "The Lady's Brittle Bracers",
   "49995": "Fallen Lord's Handguards",
   "50001": "Ikfirus's Sack of Wonder",
+  "50012": "Havoc's Call, Blade of Lordaeron Kings",
+  "50014": "Greatcloak of the Turned Champion",
+  "50016": "Rib Spreader",
   "50021": "Aldriana's Gloves of Secrecy",
   "50025": "Seal of Many Mouths",
+  "50030": "Bloodsunder's Bracers",
   "50032": "Death Surgeon's Sleeves",
   "50033": "Corpse-Impaling Spike",
   "50034": "Zod's Repeating Longbow",
   "50038": "Carapace of Forgotten Kings",
   "50040": "Distant Land",
+  "50047": "Quel'Delar, Lens of the Mind",
   "50056": "Plaguebringer's Stained Pants",
   "50061": "Holiday's Grace",
   "50062": "Plague Scientist's Boots",
+  "50063": "Lingering Illness",
   "50067": "Astrylian's Sutured Cinch",
   "50068": "Rigormortis",
   "50071": "Treads of the Wasteland",
+  "50114": "Ahn'Kahar Blood Hunter's Handguards",
+  "50115": "Ahn'Kahar Blood Hunter's Headpiece",
+  "50117": "Ahn'Kahar Blood Hunter's Spaulders",
+  "50170": "Valanar's Other Signet Ring",
   "50172": "Sanguine Silk Robes",
   "50173": "Shadow Silk Spindle",
   "50178": "Bloodfall",
@@ -7665,8 +8825,12 @@
   "50182": "Blood Queen's Crimson Choker",
   "50198": "Needle-Encrusted Scorpion",
   "50205": "Frostbinder's Shredded Cape",
+  "50240": "Dark Coven Gloves",
+  "50244": "Dark Coven Shoulderpads",
   "50259": "Nevermelting Ice Crystal",
   "50271": "Band of Stained Souls",
+  "50278": "Bloodmage Robe",
+  "50279": "Bloodmage Shoulderpads",
   "50309": "Shriveled Heart",
   "50315": "Seven-Fingered Claws",
   "50319": "Unsharpened Ice Razor",
@@ -7679,7 +8843,7 @@
   "50351": "Tiny Abomination in a Jar",
   "50353": "Dislodged Foreign Object",
   "50355": "Herkuml War Token",
-  "50357": "Maghia's Misguided Quill",
+  "50356": "Corroded Skeleton Key",
   "50358": "Purified Lunar Dust",
   "50360": "Phylactery of the Nameless Lich",
   "50362": "Deathbringer's Will",
@@ -7687,6 +8851,7 @@
   "50364": "Sindragosa's Flawless Fang",
   "50365": "Phylactery of the Nameless Lich",
   "50366": "Althor's Abacus",
+  "50384": "Ashen Band of Greater Destruction",
   "50387": "Ashen Band of Greater Vengeance",
   "50398": "Ashen Band of Endless Destruction",
   "50400": "Ashen Band of Endless Wisdom",
@@ -7701,6 +8866,7 @@
   "50427": "Bloodsurge, Kel'Thuzad's Blade of Agony",
   "50428": "Royal Scepter of Terenas II",
   "50444": "Rowan's Rifle of Silver Bullets",
+  "50447": "Harbinger's Bone Band",
   "50449": "Stiffened Corpse Shoulderpads",
   "50452": "Wodin's Lucky Necklace",
   "50453": "Ring of Rotting Sinew",
@@ -7714,7 +8880,9 @@
   "50462": "Sigil of the Bone Gryphon",
   "50463": "Totem of the Avalanche",
   "50464": "Totem of the Surging Sea",
+  "50466": "Sentinel's Winter Cloak",
   "50467": "Might of the Ocean Serpent",
+  "50468": "Drape of the Violet Tower",
   "50469": "Volde's Cloak of the Night Sky",
   "50470": "Recovered Scarlet Onslaught Cape",
   "50472": "Nightmare Ender",
@@ -7748,7 +8916,6 @@
   "50636": "Memory of Malygos",
   "50640": "Broken Ram Skull Helm",
   "50642": "Juggernaut Band",
-  "50643": "Shoulders of Mercy Killing",
   "50644": "Ring of Maddening Whispers",
   "50645": "Leggings of Northern Lights",
   "50646": "Cultist's Bloodsoaked Spaulders",
@@ -7778,6 +8945,7 @@
   "50684": "Corpse-Impaling Spike",
   "50685": "Trauma",
   "50686": "Death Surgeon's Sleeves",
+  "50687": "Bloodsunder's Bracers",
   "50688": "Nerub'ar Stalker's Cord",
   "50689": "Carapace of Forgotten Kings",
   "50690": "Fleshrending Gauntlets",
@@ -7785,6 +8953,7 @@
   "50692": "Black Bruise",
   "50693": "Might of Blight",
   "50694": "Plaguebringer's Stained Pants",
+  "50695": "Distant Land",
   "50697": "Gangrenous Leggings",
   "50698": "Horrific Flesh Epaulets",
   "50699": "Plague Scientist's Boots",
@@ -7818,12 +8987,16 @@
   "50735": "Oathbinder, Charge of the Ranger-General",
   "50736": "Heaven's Fall, Kryss of a Thousand Lies",
   "50737": "Havoc's Call, Blade of Lordaeron Kings",
+  "50738": "Mithrios, Bronzebeard's Legacy",
+  "50763": "Marrowgar's Scratching Choker",
   "50764": "Shawl of Nerubian Silk",
   "50765": "Crimson Acolyte Hood",
   "50768": "Crimson Acolyte Robe",
   "50769": "Crimson Acolyte Leggings",
-  "50773": "Cord of the Patronizing Practitioner",
+  "50771": "Frost Needle",
   "50775": "Corrupted Silverplate Leggings",
+  "50776": "Njorndar Bone Bow",
+  "50781": "Scourgelord's Baton",
   "50799": "Scourge Stranglers",
   "50803": "Saurfang's Cold-Forged Band",
   "50805": "Mag'hari Chieftain's Staff",
@@ -7831,12 +9004,14 @@
   "50974": "Meteor Chaser's Raiment",
   "50975": "Ermine Coronation Robes",
   "50977": "Gatecrasher's Gauntlets",
+  "50987": "Malevolent Girdle",
+  "50991": "Verdigris Chain Belt",
   "50993": "Band of the Night Raven",
   "50995": "Vengeful Noose",
   "50996": "Belt of Omission",
   "50997": "Circle of Ossus",
-  "51016": "Pendant of Split Veins",
   "51022": "Hersir's Greatspear",
+  "5107": "Deckhand's Shirt",
   "51125": "Sanctified Scourgelord Shoulderplates",
   "51126": "Sanctified Scourgelord Legplates",
   "51127": "Sanctified Scourgelord Helmet",
@@ -7855,6 +9030,10 @@
   "51165": "Sanctified Lightsworn Tunic",
   "51166": "Sanctified Lightsworn Spaulders",
   "51169": "Sanctified Lightsworn Gloves",
+  "51170": "Sanctified Lightsworn Shoulderguards",
+  "51171": "Sanctified Lightsworn Legguards",
+  "51172": "Sanctified Lightsworn Handguards",
+  "51173": "Sanctified Lightsworn Faceguard",
   "51175": "Sanctified Crimson Acolyte Shoulderpads",
   "51176": "Sanctified Crimson Acolyte Robe",
   "51177": "Sanctified Crimson Acolyte Leggings",
@@ -7866,6 +9045,10 @@
   "51184": "Sanctified Crimson Acolyte Cowl",
   "51186": "Sanctified Shadowblade Legplates",
   "51188": "Sanctified Shadowblade Gauntlets",
+  "51190": "Sanctified Frost Witch's Tunic",
+  "51192": "Sanctified Frost Witch's Headpiece",
+  "51193": "Sanctified Frost Witch's Legguards",
+  "51194": "Sanctified Frost Witch's Spaulders",
   "51196": "Sanctified Frost Witch's Grips",
   "51199": "Sanctified Frost Witch's Shoulderguards",
   "51205": "Sanctified Dark Coven Shoulderpads",
@@ -7914,7 +9097,10 @@
   "51262": "Sanctified Crimson Acolyte Leggings",
   "51263": "Sanctified Crimson Acolyte Robe",
   "51264": "Sanctified Crimson Acolyte Shoulderpads",
+  "51265": "Sanctified Lightsworn Chestguard",
+  "51266": "Sanctified Lightsworn Faceguard",
   "51267": "Sanctified Lightsworn Handguards",
+  "51268": "Sanctified Lightsworn Legguards",
   "51269": "Sanctified Lightsworn Shoulderguards",
   "51272": "Sanctified Lightsworn Headpiece",
   "51273": "Sanctified Lightsworn Spaulders",
@@ -7955,71 +9141,80 @@
   "51313": "Sanctified Scourgelord Legplates",
   "51314": "Sanctified Scourgelord Shoulderplates",
   "51326": "Wand of Ruby Claret",
-  "51327": "Wrathful Gladiator's Cord of Dominance",
-  "51328": "Wrathful Gladiator's Treads of Dominance",
   "51330": "Wrathful Gladiator's Cloak of Dominance",
   "51332": "Wrathful Gladiator's Cloak of Subjugation",
   "51333": "Wrathful Gladiator's Pendant of Subjugation",
-  "51336": "Wrathful Gladiator's Band of Dominance",
+  "51337": "Wrathful Gladiator's Cord of Alacrity",
+  "51338": "Wrathful Gladiator's Treads of Alacrity",
   "51339": "Wrathful Gladiator's Cuffs of Alacrity",
+  "51350": "Wrathful Gladiator's Waistguard of Triumph",
   "51351": "Wrathful Gladiator's Sabatons of Triumph",
+  "51352": "Wrathful Gladiator's Wristguards of Triumph",
   "51354": "Wrathful Gladiator's Cloak of Triumph",
   "51355": "Wrathful Gladiator's Pendant of Triumph",
   "51357": "Wrathful Gladiator's Pendant of Victory",
+  "51358": "Wrathful Gladiator's Band of Triumph",
   "51362": "Wrathful Gladiator's Girdle of Triumph",
   "51364": "Wrathful Gladiator's Bracers of Triumph",
-  "51365": "Wrathful Gladiator's Cord of Salvation",
-  "51366": "Wrathful Gladiator's Treads of Salvation",
   "51377": "Medallion of the Alliance",
   "51378": "Medallion of the Horde",
+  "51407": "Wrathful Gladiator's Compendium",
   "51413": "Wrathful Gladiator's Dreadplate Chestpiece",
   "51414": "Wrathful Gladiator's Dreadplate Gauntlets",
   "51415": "Wrathful Gladiator's Dreadplate Helm",
   "51416": "Wrathful Gladiator's Dreadplate Legguards",
   "51458": "Wrathful Gladiator's Chain Armor",
   "51459": "Wrathful Gladiator's Chain Gauntlets",
-  "51474": "Wrathful Gladiator's Scaled Chestpiece",
-  "51475": "Wrathful Gladiator's Scaled Gauntlets",
-  "51476": "Wrathful Gladiator's Scaled Helm",
-  "51477": "Wrathful Gladiator's Scaled Legguards",
-  "51482": "Wrathful Gladiator's Mooncloth Robe",
-  "51483": "Wrathful Gladiator's Mooncloth Gloves",
-  "51485": "Wrathful Gladiator's Mooncloth Leggings",
+  "51461": "Wrathful Gladiator's Chain Leggings",
+  "51463": "Wrathful Gladiator's Silk Raiment",
+  "51464": "Wrathful Gladiator's Silk Handguards",
+  "51465": "Wrathful Gladiator's Silk Cowl",
+  "51466": "Wrathful Gladiator's Silk Trousers",
   "51503": "Wrathful Gladiator's Linked Armor",
   "51504": "Wrathful Gladiator's Linked Gauntlets",
   "51505": "Wrathful Gladiator's Linked Helm",
   "51506": "Wrathful Gladiator's Linked Leggings",
   "51508": "Wrathful Gladiator's Linked Spaulders",
-  "51536": "Wrathful Gladiator's Felweave Raiment",
-  "51537": "Wrathful Gladiator's Felweave Handguards",
-  "51539": "Wrathful Gladiator's Felweave Trousers",
+  "51531": "Wrathful Gladiator's Piercing Touch",
   "51541": "Wrathful Gladiator's Plate Chestpiece",
   "51543": "Wrathful Gladiator's Plate Helm",
   "51544": "Wrathful Gladiator's Plate Legguards",
+  "51572": "Titan-Forged Shoulderpads of Salvation",
+  "51577": "Titan-Forged Shoulders of Triumph",
   "51580": "Titan-Forged Shoulderplates of Triumph",
   "51779": "Rimetooth Pendant",
   "51797": "Tainted Twig of Nordrassil",
   "51802": "Windrunner's Heartseeker",
   "51803": "Tel'thas, Dagger of the Blood King",
+  "51827": "Stormbringer Gloves",
   "51828": "Sister Svalna's Aether Staff",
+  "51829": "Legguards of the Twisted Dream",
   "51842": "Collar of Haughty Disdain",
   "51843": "Seal of the Twilight Queen",
   "51845": "Stakethrower",
   "51850": "Pale Corpse Boots",
   "51852": "Wand of Ruby Claret",
   "51853": "Blood-Drinker's Girdle",
+  "51855": "Thrice Fanged Signet",
   "51872": "Ether-Soaked Bracers",
   "51880": "Gluth's Fetching Knife",
+  "51881": "Shaft of Glacial Ice",
   "51890": "Precious's Putrid Collar",
   "51894": "Soulcleave Pendant",
   "51896": "Thaumaturge's Crackling Cowl",
   "51898": "Mag'hari Chieftain's Staff",
+  "51899": "Icecrown Spire Sandals",
   "51900": "Saurfang's Cold-Forged Band",
+  "51901": "Gargoyle Spit Bracers",
   "51903": "Hauberk of a Thousand Cuts",
   "51905": "Ramaladni's Blade of Culling",
+  "51909": "Neverending Winter",
+  "51910": "Midnight Sun",
   "51913": "Abomination's Bloody Ring",
   "51914": "Icecrown Rampart Bracers",
   "51915": "Bone Drake's Enameled Boots",
+  "51916": "Frost Giant's Cleaver",
+  "51920": "Boots of the Frozen Seed",
   "51922": "Scourgelord's Baton",
   "51925": "Soulthief's Braided Belt",
   "51927": "Njorndar Bone Bow",
@@ -8035,13 +9230,15 @@
   "53133": "Signet of Twilight",
   "53486": "Bracers of Fiery Night",
   "53487": "Foreshadow Steps",
+  "53488": "Split Shape Belt",
   "53489": "Cloak of Burning Dusk",
   "53490": "Ring of Phased Regeneration",
   "54556": "Abduction's Cover",
-  "54557": "Baltharus' Gift",
   "54558": "Boots of Divided Being",
   "54560": "Changeling Gloves",
+  "54564": "Scion's Treads",
   "54569": "Sharpened Twilight Scale",
+  "54571": "Petrified Twilight Scale",
   "54572": "Charred Twilight Scale",
   "54573": "Glowing Twilight Scale",
   "54576": "Signet of Twilight",
@@ -8066,6 +9263,7 @@
   "6097": "Acolyte's Shirt",
   "6134": "Primitive Mantle",
   "6795": "White Swashbuckler's Shirt",
-  "6796": "Red Swashbuckler's Shirt"
+  "6796": "Red Swashbuckler's Shirt",
+  "859": "Fine Cloth Shirt"
  }
 }
