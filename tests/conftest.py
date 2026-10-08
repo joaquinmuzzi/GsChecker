@@ -9,12 +9,14 @@ que los tests hagan assertions sobre lo que el bot habría enviado.
 
 from __future__ import annotations
 
+import copy
 import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import discord
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -103,6 +105,26 @@ class FakeFollowup:
 
 
 @dataclass
+class FakeMessage:
+    content: str | None = None
+    embeds: list[Any] = field(default_factory=list)
+    edited_at: Any = None
+
+
+def _stored_message(payload: SentPayload) -> FakeMessage:
+    """El mensaje como lo devuelve Discord: otro objeto Embed, con los
+    valores de los campos recortados."""
+    embeds = []
+    if payload.embed is not None:
+        # to_dict() comparte los dicts de los campos: copiar antes de tocar.
+        data = copy.deepcopy(payload.embed.to_dict())
+        for f in data.get("fields", []):
+            f["value"] = f["value"].strip()
+        embeds.append(discord.Embed.from_dict(data))
+    return FakeMessage(content=payload.content, embeds=embeds)
+
+
+@dataclass
 class FakeInteraction:
     user: FakeUser = field(default_factory=FakeUser)
     guild: FakeGuild = field(default_factory=FakeGuild)
@@ -110,6 +132,10 @@ class FakeInteraction:
     response: FakeResponse = field(init=False)
     followup: FakeFollowup = field(init=False)
     command: Any = None
+    # Simula que Discord se quedó con la anteúltima edición (/p Kuvez,
+    # 2026-10-07).
+    keeps_previous_edit: bool = False
+    _original: FakeMessage | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         self.response = FakeResponse(self)
@@ -121,10 +147,18 @@ class FakeInteraction:
         content: str | None = None,
         embed: Any = None,
         view: Any = None,
-    ) -> None:
-        self.sent.append(
-            SentPayload(kind="edit", content=content, embed=embed, view=view)
-        )
+    ) -> FakeMessage:
+        payload = SentPayload(kind="edit", content=content, embed=embed, view=view)
+        self.sent.append(payload)
+        return _stored_message(payload)
+
+    async def original_response(self) -> FakeMessage:
+        # Como discord.py: solo la primera llamada lee de Discord.
+        if self._original is None:
+            edits = [s for s in self.sent if s.kind == "edit"]
+            stored = edits[-2] if self.keeps_previous_edit else edits[-1]
+            self._original = _stored_message(stored)
+        return self._original
 
     def last_edit(self) -> SentPayload | None:
         for s in reversed(self.sent):
@@ -139,3 +173,8 @@ class FakeInteraction:
 @pytest.fixture
 def interaction() -> FakeInteraction:
     return FakeInteraction()
+
+
+@pytest.fixture(autouse=True)
+def _no_final_edit_check_wait(monkeypatch):
+    monkeypatch.setattr("src.controller.commands.PERSONAJE_FINAL_CHECK_SECONDS", 0)

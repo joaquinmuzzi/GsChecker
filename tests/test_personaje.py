@@ -384,3 +384,29 @@ async def test_storming_the_citadel_marks_kills_without_waiting_uwu(
     for boss in ("Marrowgar", "Deathwhisper"):
         cells = [c.strip() for c in _icc_line(first_embed, boss).split("|")]
         assert cells[3].startswith("✅"), cells  # columna 25N
+
+
+@pytest.mark.asyncio
+async def test_final_embed_is_resent_when_discord_keeps_the_loading_one(
+    bot, interaction, patched_fetchers
+):
+    # /p Kuvez (2026-10-07): Discord aceptó la edición final sin error, pero el
+    # mensaje quedó con el embed de carga (⌛ en Marrowgar/Deathwhisper).
+    interaction.keeps_previous_edit = True
+    await _find_command(bot, "p").callback(interaction, nombre="Kuvez")
+
+    edits = [s for s in interaction.sent if s.kind == "edit"]
+    assert edits[-1].embed is edits[-2].embed, "the final embed should be re-sent"
+    for boss in ("Marrowgar", "Deathwhisper"):
+        line = _icc_line(edits[-1].embed, boss)
+        assert "⌛" not in line and "⏳" not in line, line
+
+
+@pytest.mark.asyncio
+async def test_final_embed_is_sent_once_when_discord_keeps_it(
+    bot, interaction, patched_fetchers
+):
+    await _find_command(bot, "p").callback(interaction, nombre="Kuvez")
+
+    edits = [s for s in interaction.sent if s.kind == "edit"]
+    assert edits[-1].embed is not edits[-2].embed

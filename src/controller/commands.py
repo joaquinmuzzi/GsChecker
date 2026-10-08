@@ -108,6 +108,9 @@ DPS_COMMAND_TIMEOUT_SECONDS = 45
 # /p: cuánto se espera a uwu-logs para las kills de Marrowgar/Deathwhisper
 # antes de mostrar el estado final con "?" en lo que falte.
 PERSONAJE_UWU_WAIT_SECONDS = 25
+# /p: cuánto después de la edición final se relee el mensaje para confirmar
+# que Discord se quedó con el embed final y no con uno de carga.
+PERSONAJE_FINAL_CHECK_SECONDS = 3.0
 ITEM_SOURCE_TTL = 86400
 CONFIRMED_KILLS_TTL = 315360000
 ICC_SPECIAL_BOSSES = ("Marrowgar", "Deathwhisper")
@@ -1001,6 +1004,9 @@ async def _safe_defer(interaction: discord.Interaction) -> None:
     except discord.HTTPException as exc:
         if getattr(exc, "code", None) != 40060:
             raise
+        # Otro proceso con el mismo token ya respondió esta interacción: los
+        # dos editarían el mismo mensaje.
+        logger.warning("defer: interacción ya respondida (40060): %s", exc)
 
 
 def _http_retry_after(exc: discord.HTTPException) -> float:
@@ -1022,15 +1028,15 @@ def _is_expired_token(exc: discord.HTTPException) -> bool:
 
 async def _safe_edit_original_response(
     interaction: discord.Interaction, *, content=None, embed=None, view=None
-) -> None:
+):
+    """Devuelve el mensaje que respondió Discord, o None si no se pudo editar."""
     last_exc = None
     for attempt in range(4):
         try:
             kwargs = {"content": content, "embed": embed}
             if view is not None:
                 kwargs["view"] = view
-            await interaction.edit_original_response(**kwargs)
-            return
+            return await interaction.edit_original_response(**kwargs)
         except discord.NotFound:
             logger.warning(
                 "edit_original_response NotFound (mensaje o interacción inexistente) "
@@ -1048,6 +1054,55 @@ async def _safe_edit_original_response(
             await asyncio.sleep(wait_for)
     if last_exc:
         raise last_exc
+
+
+def _embed_fields_signature(embed) -> list[tuple[str, str]]:
+    # Discord recorta espacios al final de los valores: se comparan sin ellos.
+    return [(str(f.name), " ".join(str(f.value).split())) for f in embed.fields]
+
+
+def _message_has_embed(message, embed: discord.Embed) -> bool:
+    embeds = getattr(message, "embeds", None) or []
+    return bool(embeds) and _embed_fields_signature(embeds[0]) == _embed_fields_signature(
+        embed
+    )
+
+
+async def _ensure_final_edit_landed(
+    interaction: discord.Interaction, embed: discord.Embed, view, patched=None
+) -> None:
+    """/p Kuvez (2026-10-07): Discord aceptó la edición final sin error (el
+    edited_timestamp del mensaje es de ese momento) pero el mensaje quedó con
+    el embed de carga (⌛). Se relee el mensaje y, si no tiene el embed final,
+    se lo vuelve a mandar una vez. `patched` es la respuesta de Discord a la
+    edición final: el log dice si ya venía mal o si se pisó después."""
+    try:
+        await asyncio.sleep(PERSONAJE_FINAL_CHECK_SECONDS)
+        message = await interaction.original_response()
+        if _message_has_embed(message, embed):
+            return
+        stored = message.embeds[0] if message.embeds else None
+        stored_text = (
+            " ".join(str(f.value) for f in stored.fields) if stored else message.content
+        )
+        logger.warning(
+            "final edit not kept by Discord edited_at=%s loading=%s content=%r "
+            "patch_response_final=%s patch_edited_at=%s — re-sending",
+            message.edited_at,
+            any(frame in str(stored_text) for frame in LOADING_FRAMES),
+            message.content,
+            _message_has_embed(patched, embed),
+            getattr(patched, "edited_at", None),
+        )
+        await _safe_edit_original_response(
+            interaction, content=None, embed=embed, view=view
+        )
+    except discord.NotFound:
+        return
+    except Exception as exc:
+        if isinstance(exc, discord.HTTPException) and _is_expired_token(exc):
+            return
+        logger.exception("final edit check failed")
 
 
 async def _safe_send_error(interaction: discord.Interaction, message: str) -> None:
@@ -1342,12 +1397,15 @@ async def _personaje_impl(
                         realm,
                     )
                     embed_final = _build_personaje_embed_from_cache(stale_payload)
-        await _safe_edit_original_response(
+        patched = await _safe_edit_original_response(
             interaction, content=None, embed=embed_final, view=personaje_view
         )
         logger.info(
             "personaje done character='%s' realm='%s' elapsed=%.1fs",
             nombre_char, realm, loop.time() - started_at,
+        )
+        await _ensure_final_edit_landed(
+            interaction, embed_final, personaje_view, patched
         )
 
     except discord.NotFound:
