@@ -6,7 +6,8 @@ A diferencia de `preload_character_gs` (que solo calcula un número de GS por sp
 tocando summary+specs+gear), este trae TODO lo que `/personaje` necesita —
 achievements, stats, profesiones, guild rank, DPS de uwu-logs — así que se limita
 a los personajes efectivamente buscados (tabla `tracked_characters`, alimentada por
-cada uso real del comando), no a la lista semilla completa de miles de nombres.
+cada uso real del comando que encuentra al personaje y es 80), no a la lista semilla
+completa de miles de nombres.
 Ampliar el scope a esa lista completa multiplicaría por ~5 el volumen de requests
 al armory del preload diario.
 

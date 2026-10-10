@@ -92,16 +92,21 @@ def _log_command_usage(
         extras,
     )
 
-    # Fire-and-forget: register the character in Postgres so the cron job
-    # includes it in the next preload batch. DB errors never block the command.
-    clean_nombre = str(nombre or "").strip()
-    clean_realm = str(realm or "").strip()
-    if clean_nombre and clean_nombre != "-" and clean_realm and clean_realm != "-":
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(async_track_character_lookup(clean_nombre, clean_realm))
-        except RuntimeError:
-            pass
+
+def _track_character(nombre_char: str, realm: str) -> None:
+    """Registra el personaje en Postgres para que el cron lo precargue.
+
+    Solo se llama cuando el armory confirmó que existe en ese reino y es 80.
+    Antes se registraba al usar el comando y los typos, los reinos equivocados
+    y los personajes que no son 80 quedaban en la lista para siempre: el cron
+    los reintentaba todos los días (16 SKIP diarios, 2026-10-10).
+    Fire-and-forget: los errores de DB nunca frenan el comando.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(async_track_character_lookup(nombre_char, realm))
+    except RuntimeError:
+        pass
 
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
@@ -1146,6 +1151,8 @@ async def _personaje_impl(
             "command_personaje", personaje_cache_key, COMMAND_PERSONAJE_TTL
         )
         if isinstance(cached_payload, dict):
+            # Un payload cacheado ya pasó _is_valid_personaje_payload (existe y es 80).
+            _track_character(cached_payload["nombre_char"], realm)
             if not (cached_payload.get("uwu_performance") or {}).get("rank"):
                 # Perfil cacheado sin ranking de uwu-logs (de antes de que /p lo
                 # mostrara, o uwu-logs no respondió cuando corrió el cron; dura
@@ -1186,6 +1193,7 @@ async def _personaje_impl(
                     nombre,
                     realm,
                 )
+                _track_character(stale_payload["nombre_char"], realm)
                 embed_stale = _build_personaje_embed_from_cache(stale_payload)
                 view_stale = _build_personaje_view(
                     stale_payload["nombre_char"],
@@ -1244,6 +1252,8 @@ async def _personaje_impl(
                 embed=None,
             )
             return
+
+        _track_character(nombre_char, realm)
 
         # uwu-logs en paralelo con el resto del armory. Va después del summary
         # porque usa la clase del armory cuando uwu-logs no tiene perfil.
@@ -1517,6 +1527,9 @@ def register_commands(bot):
                 return
 
             nombre_char = str(summary.get("name") or nombre)
+            # /dps no exige nivel 80, pero el cron solo puede precargar a los 80.
+            if summary.get("level") == 80:
+                _track_character(nombre_char, "Lordaeron")
 
             # --- Fase 1: overview rápido (rank/points/dps por boss) ---
             overview_future = loop.run_in_executor(
@@ -1923,6 +1936,7 @@ def register_commands(bot):
 
             char_class = str(summary.get("class") or "")
             nombre_char = str(summary.get("name") or nombre)
+            _track_character(nombre_char, realm)
 
             # Determinar spec activa y stats del personaje en paralelo
             from profile_scraper import get_character_stats as _ps_get_char_stats

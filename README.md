@@ -145,7 +145,7 @@ El cron combina dos fuentes y deduplica:
    Frodo, Icecrown
    ```
 
-2. **Tabla `tracked_characters` en Postgres** — auto-populada por el bot cada vez que se usa un comando de personaje (`/p`, `/personaje`, `/dps`, `/ptoc`, `/ia`).
+2. **Tabla `tracked_characters` en Postgres** — auto-populada por el bot cada vez que `/p`, `/personaje`, `/dps` o `/ia` encuentran al personaje en el armory y es nivel 80. Los typos, los reinos equivocados y los personajes que no son 80 no se registran, porque el cron los reintentaría todos los días sin poder precargarlos. `/ptoc` y `/logs` no registran nada porque no le preguntan al armory si el personaje existe.
 
 Los nombres se validan en todos los puntos de entrada (`src/functions/names.py`: solo letras, 2–12 caracteres), así que basura como los placeholders `C_1234567` de uwu-logs no entra ni se consulta.
 
@@ -216,7 +216,7 @@ Con ~19.6k nombres, 500 por corrida y una corrida por día, la lista completa se
 
 ### Flujo end-to-end
 
-1. Un usuario ejecuta `/p Samsara Lordaeron` → el bot registra `(Samsara, Lordaeron)` en `tracked_characters`.
+1. Un usuario ejecuta `/p Samsara Lordaeron` → el armory confirma que existe y es 80 → el bot registra `(Samsara, Lordaeron)` en `tracked_characters`.
 2. En la próxima corrida, el cron recalcula el perfil completo y lo guarda como `command_personaje` (y el GS por spec como `character_spec_gs`).
 3. La próxima vez que alguien consulte a Samsara, `/p` responde desde Postgres al instante. Si el cache venció y el armory está rate-limitado, sirve el último perfil bueno (stale) en vez de fallar.
 
