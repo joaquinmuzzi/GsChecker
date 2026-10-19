@@ -330,7 +330,7 @@ def get_specs(char_name: str, server: str) -> list[dict]:
                 specs.append(
                     {
                         "name": td.get_text(strip=True),
-                        "active": "selected" in td.get("class", []),
+                        "active": "selected" in (td.get("class") or []),
                     }
                 )
             if specs:
@@ -342,12 +342,12 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             return []
 
         payload = api_resp.json()
-        talents = payload.get("talents") if isinstance(payload, dict) else None
-        if not isinstance(talents, list):
+        api_talents = payload.get("talents") if isinstance(payload, dict) else None
+        if not isinstance(api_talents, list):
             return []
 
         specs = []
-        for idx, talent in enumerate(talents):
+        for idx, talent in enumerate(api_talents):
             if not isinstance(talent, dict):
                 continue
             name = str(talent.get("tree") or "").strip()
@@ -517,15 +517,15 @@ def get_gear_data(char_name: str, server: str = "Lordaeron"):
     if resp is None or resp.status_code != 200:
         return []
     soup = BeautifulSoup(resp.text, "html.parser")
-    try:
-        equipment = soup.find(class_="item-model").find_all("a")
-    except AttributeError:
+    item_model = soup.find(class_="item-model")
+    if item_model is None:
         logger.warning(
             "get_gear_data: no .item-model in HTML for '%s'/%s (page changed or empty)",
             char_name,
             server,
         )
         return []
+    equipment = item_model.find_all("a")
     gear_data = []
     for idx, slot in enumerate(equipment):
         item_properties = parse_slot(slot)

@@ -230,10 +230,10 @@ def _collect_character_gems(
                 if found_meta is None:
                     found_meta = item_id
                 continue  # don't add meta to non-meta counter
-            item_id = _resolve_gem_item_id(eid)
-            if item_id:
-                slot_gems.append(item_id)
-                gem_counter[item_id] += 1
+            gem_item_id = _resolve_gem_item_id(eid)
+            if gem_item_id:
+                slot_gems.append(gem_item_id)
+                gem_counter[gem_item_id] += 1
         gems_by_slot[item.slot] = slot_gems
 
     return gems_by_slot, gem_counter, found_meta

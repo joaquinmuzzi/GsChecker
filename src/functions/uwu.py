@@ -2,6 +2,7 @@ import json
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
+from typing import Any
 
 from src.db.postgres import get_external_cache, set_external_cache
 from src.functions.cache import _cache_get, _cache_set
@@ -459,7 +460,7 @@ def _fetch_uwu_player_rows(
     if not isinstance(top_rows, list):
         return {"__error__": "uwu top: respuesta inesperada"}
 
-    result = {
+    result: dict[str, Any] = {
         "rows": [
             row
             for row in top_rows
@@ -917,7 +918,7 @@ def _fetch_uwu_recent_logs(nombre: str, server: str):
         return None
     # El id empieza con "AA-MM-DD--HH-MM": ordenarlo como texto es por fecha.
     recent = sorted(set(ids), reverse=True)[:UWU_LOGS_LIMIT]
-    result = {"total": len(set(ids)), "reports": []}
+    result: dict[str, Any] = {"total": len(set(ids)), "reports": []}
     if not recent:
         return result
 
@@ -1078,7 +1079,7 @@ def _build_uwu_dps_summary(
     rows = []
     for boss_name in boss_names:
         for mode in UWU_MODES_ALL:
-            player_rows = []
+            player_rows: list[Any] = []
             truncated = False
             any_fetch_ok = False
             answered = False

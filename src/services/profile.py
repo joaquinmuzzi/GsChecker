@@ -146,7 +146,8 @@ def _compute_personaje_base(
 
     Devuelve los kwargs de `_serialize_personaje_payload` menos `uwu_icc_kills`.
     """
-    nombre_char = summary.get("name")
+    # Los dos llamadores (/p y el cron) pasan {**summary, "name": nombre_char}.
+    nombre_char: str = summary["name"]
     clase = summary.get("class", "N/A")
     active_specs, inactive_specs = _split_active_inactive_specs(talents, clase)
 

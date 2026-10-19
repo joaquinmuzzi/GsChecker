@@ -46,7 +46,7 @@ def _row(name, useful_amount, duration=100.0):
 
 
 def _character(spec_with_data: int, spec_i: int, name: str, class_i: int = 3):
-    bosses = {"The Lich King": {}, "Lord Marrowgar": {}}
+    bosses: dict[str, dict[str, float]] = {"The Lich King": {}, "Lord Marrowgar": {}}
     if spec_i == spec_with_data:
         bosses["The Lich King"] = {"raids": 40, "dps_max": 13713.81}
     return {"name": name, "class_i": class_i, "overall_points": 0, "bosses": bosses}

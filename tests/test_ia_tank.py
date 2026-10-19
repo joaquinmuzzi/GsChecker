@@ -76,6 +76,7 @@ async def test_ia_audits_blood_tank_with_tank_guide(bot, interaction, patched_fe
         await _find_command(bot, "ia").callback(interaction, nombre="Srpingu")
 
     audit.assert_awaited_once()
+    assert audit.await_args is not None
     kwargs = audit.await_args.kwargs
     assert kwargs["role"] == "Tank"
     assert kwargs["server"] == "Lordaeron"

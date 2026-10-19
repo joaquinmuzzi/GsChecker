@@ -2,6 +2,7 @@ import logging
 import random
 import re
 import time
+from typing import Any
 from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
@@ -472,7 +473,7 @@ def _parse_specs_from_html(html: str) -> list[dict]:
         return []
     soup = BeautifulSoup(html, "html.parser")
     stubs = soup.select("div.specialization div.stub")
-    specs = []
+    specs: list[dict[str, Any]] = []
     for stub in stubs:
         text_node = stub.select_one("div.text")
         if not text_node:
@@ -489,7 +490,7 @@ def _parse_specs_from_html(html: str) -> list[dict]:
             value_span.extract()
         spec_name = _normalize_spec_name(" ".join(text_copy.get_text(" ", strip=True).split()))
         if spec_name and spec_name in WOW_CLASSIC_SPEC_NAMES:
-            stub_classes = stub.get("class") or []
+            stub_classes: str | list[str] = stub.get("class") or []
             is_active = "active" in stub_classes or "selected" in stub_classes
             specs.append(
                 {
@@ -790,7 +791,7 @@ def _fetch_achievements(nombre: str, server: str):
         all_achievements = soup.find_all("div", class_="achievement")
         completed_achievements = []
         for ach in all_achievements:
-            classes = ach.get("class") or []
+            classes: str | list[str] = ach.get("class") or []
             if isinstance(classes, str):
                 class_list = classes.split()
             elif isinstance(classes, list):
@@ -1001,7 +1002,7 @@ def _fetch_toc_achievements(nombre: str, server: str):
             key = target_titles.get(title)
             if not key:
                 continue
-            classes = ach_div.get("class") or []
+            classes: str | list[str] = ach_div.get("class") or []
             if isinstance(classes, str):
                 class_list = classes.split()
             elif isinstance(classes, list):

@@ -38,12 +38,12 @@ def test_publish_refuses_an_incomplete_run():
 
 
 def test_bot_prefers_postgres_and_falls_back_to_repo_files():
-    bis_guides._load_realm.cache_clear()
+    bis_guides.clear_realm_cache()
     with patch.object(bis_guides, "get_app_state", return_value=_data(3)):
         assert len(bis_guides._load_realm("Lordaeron")["guides"]) == 3
 
-    bis_guides._load_realm.cache_clear()
+    bis_guides.clear_realm_cache()
     with patch.object(bis_guides, "get_app_state", return_value=None):
         # static/bis/lordaeron.json versionado en el repo
         assert len(bis_guides._load_realm("Lordaeron")["guides"]) > 20
-    bis_guides._load_realm.cache_clear()
+    bis_guides.clear_realm_cache()

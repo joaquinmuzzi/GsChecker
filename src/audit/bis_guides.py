@@ -98,7 +98,9 @@ def _load_realm(realm: str) -> dict:
     return data
 
 
-_load_realm.cache_clear = _REALM_CACHE.clear
+def clear_realm_cache() -> None:
+    """Olvida las guías ya leídas (la próxima consulta las vuelve a cargar)."""
+    _REALM_CACHE.clear()
 
 
 def available_guides(realm: str) -> list[str]:

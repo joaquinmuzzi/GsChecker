@@ -77,7 +77,8 @@ def test_format_line():
 
 
 def test_embed_shows_field_only_with_points():
-    args = (
+    # Tipado exacto: con tuple[Any, ...] mypy no sabe que uwu_performance queda afuera.
+    args: tuple[str, int, int, str, str, str, str, bool, bool, bool, bool, dict, dict, list, list] = (
         "Whothefock",
         6000,
         80,

@@ -134,7 +134,8 @@ async def generate_coach_summary(
             "or pass api_key= to generate_coach_summary()."
         )
 
-    resolved_model = model or os.getenv("GROQ_MODEL", _DEFAULT_MODEL)
+    env_model = os.getenv("GROQ_MODEL", _DEFAULT_MODEL)
+    resolved_model = model or env_model
     resolved_max = max_tokens or int(os.getenv("GROQ_MAX_TOKENS", str(_DEFAULT_MAX_TOKENS)))
 
     client = AsyncGroq(api_key=resolved_key)

@@ -135,7 +135,7 @@ def collect_from_guilds(server: str, delay: float) -> set[str]:
         print("[GUILDS] No guilds found. Check connectivity / rate limits.")
         return set()
 
-    all_names = set()
+    all_names: set[str] = set()
     start = time.time()
 
     for idx, guild in enumerate(guild_names, 1):

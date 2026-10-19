@@ -7,6 +7,7 @@ filtra los que tienen esa pelea.
 
 from __future__ import annotations
 
+import discord
 import pytest
 
 import src.functions.uwu as uwu
@@ -81,7 +82,9 @@ def test_embed_and_view():
         "[ver](https://uwu-logs.xyz/reports/26-09-27--19-01--Myamoto--Lordaeron/)"
     )
     assert embed.footer.text == "Lordaeron · 479 reportes en total"
-    assert view.children[0].url == ("https://uwu-logs.xyz/logs_list?server=Lordaeron&player=Flappyaladin")
+    button = view.children[0]
+    assert isinstance(button, discord.ui.Button)
+    assert button.url == ("https://uwu-logs.xyz/logs_list?server=Lordaeron&player=Flappyaladin")
 
 
 @pytest.mark.asyncio

@@ -200,14 +200,14 @@ def main():
     load_dotenv()
     init_database()
 
-    names = {_normalize_name(name) for name in args.name if str(name).strip()}
+    name_set = {_normalize_name(name) for name in args.name if str(name).strip()}
 
     if args.names_file:
-        names.update(_collect_names_from_file(args.names_file))
+        name_set.update(_collect_names_from_file(args.names_file))
 
     if args.seed_uwu:
         print("[INFO] Recolectando nombres desde UwU Logs...")
-        names.update(
+        name_set.update(
             _collect_names_from_uwu(
                 args.server,
                 limit=args.uwu_limit,
@@ -215,7 +215,7 @@ def main():
             )
         )
 
-    names = sorted(name for name in names if name)
+    names = sorted(name for name in name_set if name)
     if args.max_characters and args.max_characters > 0:
         names = names[: args.max_characters]
 
