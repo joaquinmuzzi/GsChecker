@@ -50,8 +50,8 @@ def _cron_payload() -> dict:
 
     with ExitStack() as stack:
         _patch_fetchers(stack, "tools.preload_personaje_cache")
-        # El guild rank lo pide la lógica compartida en commands.py.
-        _patch_fetchers(stack, "src.controller.commands")
+        # El guild rank lo pide la lógica compartida (src/services/profile.py).
+        _patch_fetchers(stack, "src.services.profile")
         stack.enter_context(patch("tools.preload_personaje_cache.set_external_cache"))
         payload = build_personaje_cache_entry("Samsara", "Lordaeron")
     assert payload is not None
@@ -62,6 +62,7 @@ def _cron_payload() -> dict:
 async def test_live_and_cron_cache_the_same_payload(bot, interaction):  # noqa: F811
     with ExitStack() as stack:
         _patch_fetchers(stack, "src.controller.commands")
+        _patch_fetchers(stack, "src.services.profile")
         mock_set = stack.enter_context(
             patch("src.controller.commands.async_set_external_cache", new_callable=AsyncMock)
         )

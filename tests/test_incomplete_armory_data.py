@@ -2,7 +2,7 @@
 no debe persistirse: los ❌ que mostraría son "no pudimos leerlo", no "no lo hizo"."""
 from unittest.mock import patch
 
-from src.controller.commands import (
+from src.services.profile import (
     _is_personaje_data_complete,
     _is_valid_personaje_payload,
     _serialize_personaje_payload,

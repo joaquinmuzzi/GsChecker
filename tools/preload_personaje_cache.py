@@ -32,15 +32,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from dotenv import load_dotenv
 
-from src.controller.commands import (
-    _build_personaje_cache_key,
-    _compute_personaje_base,
-    _is_valid_personaje_payload,
-    _load_confirmed_icc_kills,
-    _normalize_character_realm,
-    _resolve_uwu_icc_kills,
-    _serialize_personaje_payload,
-)
 from src.db.postgres import (
     init_database,
     list_tracked_characters,
@@ -57,6 +48,14 @@ from src.functions.warmane import (
     _fetch_summary,
 )
 from src.schemas.constants import ARMORY_CIRCUIT, COMMAND_PERSONAJE_TTL
+from src.services.cache_keys import _build_personaje_cache_key
+from src.services.character_input import _normalize_character_realm
+from src.services.icc_kills import _load_confirmed_icc_kills, _resolve_uwu_icc_kills
+from src.services.profile import (
+    _compute_personaje_base,
+    _is_valid_personaje_payload,
+    _serialize_personaje_payload,
+)
 
 logger = logging.getLogger("gschecker.preload_personaje_cache")
 

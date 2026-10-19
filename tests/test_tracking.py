@@ -23,7 +23,7 @@ from tests.test_personaje import (  # noqa: F401  (fixtures)
 @pytest.fixture
 def tracked():
     with patch(
-        "src.controller.commands.async_track_character_lookup", new_callable=AsyncMock
+        "src.services.tracking.async_track_character_lookup", new_callable=AsyncMock
     ) as m:
         yield m
 

@@ -98,7 +98,7 @@ def patched_fetchers():
         "gear": "src.controller.commands._fetch_gear_data",
         "achievements": "src.controller.commands._fetch_achievements",
         "statistics": "src.controller.commands._fetch_statistics",
-        "guild_rank": "src.controller.commands._fetch_guild_rank",
+        "guild_rank": "src.services.profile._fetch_guild_rank",
         "uwu_icc": "src.controller.commands._uwu_icc_bugfix_kills",
         "uwu_perf": "src.controller.commands._fetch_uwu_performance",
     }
