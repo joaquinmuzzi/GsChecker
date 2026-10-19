@@ -4,6 +4,10 @@ import asyncio
 
 from src.db.postgres import async_track_character_lookup
 
+# El event loop solo guarda referencias débiles a las tareas: sin una referencia
+# propia, un registro en curso podía ser recolectado antes de terminar.
+_PENDING_TASKS: set[asyncio.Task] = set()
+
 
 def _track_character(nombre_char: str, realm: str) -> None:
     """Registra el personaje en Postgres para que el cron lo precargue.
@@ -16,6 +20,8 @@ def _track_character(nombre_char: str, realm: str) -> None:
     """
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(async_track_character_lookup(nombre_char, realm))
+        task = loop.create_task(async_track_character_lookup(nombre_char, realm))
     except RuntimeError:
-        pass
+        return
+    _PENDING_TASKS.add(task)
+    task.add_done_callback(_PENDING_TASKS.discard)

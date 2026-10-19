@@ -14,6 +14,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.services import tracking
+from src.services.tracking import _track_character
 from tests.helpers import _find_command
 
 
@@ -99,3 +101,24 @@ async def test_ptoc_does_not_track(bot, interaction, tracked):
         await _run(bot, "ptoc", interaction, nombre="Kynrwe")
 
     tracked.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tracking_task_is_kept_until_it_finishes(tracked):
+    # asyncio solo guarda referencias débiles a las tareas: si nadie más la
+    # referencia, el garbage collector puede cortar el registro a la mitad.
+    release = asyncio.Event()
+
+    async def slow_insert(*args):
+        await release.wait()
+
+    tracked.side_effect = slow_insert
+    _track_character("Samsara", "Lordaeron")
+    await asyncio.sleep(0)
+    assert len(tracking._PENDING_TASKS) == 1
+
+    release.set()
+    for _ in range(3):
+        await asyncio.sleep(0)
+    assert not tracking._PENDING_TASKS
+    tracked.assert_awaited_once_with("Samsara", "Lordaeron")
