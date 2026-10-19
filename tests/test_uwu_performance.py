@@ -4,6 +4,7 @@ Datos reales de Lordaeron (2026-09-28): Whothefock (Fire) tiene
 overall_points=9869.3 y overall_rank=37 en /character, y /top_points de Fire
 devuelve 3174 jugadores.
 """
+
 from __future__ import annotations
 
 import src.functions.uwu as uwu
@@ -19,13 +20,15 @@ class PointsSession(FakeSession):
     def get(self, url, timeout=None):
         spec_i = int(url.rsplit("/", 1)[1])
         points = 9869.29607804684 if spec_i == 2 else 0.0
-        return FakeResp({
-            "name": self.name,
-            "class_i": 3,
-            "overall_points": points,
-            "overall_rank": 37 if spec_i == 2 else 0,
-            "bosses": {"The Lich King": {"raids": 40} if spec_i == 2 else {}},
-        })
+        return FakeResp(
+            {
+                "name": self.name,
+                "class_i": 3,
+                "overall_points": points,
+                "overall_rank": 37 if spec_i == 2 else 0,
+                "bosses": {"The Lich King": {"raids": 40} if spec_i == 2 else {}},
+            }
+        )
 
     def post(self, url, json=None, timeout=None, stream=False):
         self.posts.append((url, json))
@@ -74,15 +77,32 @@ def test_format_line():
 
 
 def test_embed_shows_field_only_with_points():
-    args = ("Whothefock", 6000, 80, "Gnome", "Mage", "Fire", "<Guild>",
-            False, False, False, False, {}, {}, [], [])
+    # Tipado exacto: con tuple[Any, ...] mypy no sabe que uwu_performance queda afuera.
+    args: tuple[str, int, int, str, str, str, str, bool, bool, bool, bool, dict, dict, list, list] = (
+        "Whothefock",
+        6000,
+        80,
+        "Gnome",
+        "Mage",
+        "Fire",
+        "<Guild>",
+        False,
+        False,
+        False,
+        False,
+        {},
+        {},
+        [],
+        [],
+    )
     with_perf = _build_personaje_embed(
         *args, uwu_performance={"spec": "Fire", "points": 98.69, "rank": 37, "total": 3174}
     )
     without = _build_personaje_embed(*args, uwu_performance={})
 
     ranking = [f for f in with_perf.fields if "(top " in f.value]
-    assert len(ranking) == 1 and ranking[0].name == "Leaderboard"
+    assert len(ranking) == 1
+    assert ranking[0].name == "Leaderboard"
     assert not [f for f in without.fields if "(top " in f.value]
 
 
@@ -97,10 +117,15 @@ class MultiSpecSession(FakeSession):
         spec_i = int(url.rsplit("/", 1)[1])
         n_bosses, points, rank = self.specs.get(spec_i, (0, 0.0, 0))
         bosses = {f"Boss{i}": {"raids": 1} for i in range(n_bosses)}
-        return FakeResp({
-            "name": self.name, "class_i": 4, "overall_points": points,
-            "overall_rank": rank, "bosses": bosses,
-        })
+        return FakeResp(
+            {
+                "name": self.name,
+                "class_i": 4,
+                "overall_points": points,
+                "overall_rank": rank,
+                "bosses": bosses,
+            }
+        )
 
     def post(self, url, json=None, timeout=None, stream=False):
         self.posts.append((url, json))
@@ -140,8 +165,10 @@ class UnknownSession(FakeSession):
             if json["spec_i"] == 2:
                 names.insert(1499, self.name)
             return FakeResp([[n, 50.0, 5000] for n in names])
-        rows = [["26-09-07--08-25--X", 100.0, "0000001", f"Other{i}", 1_000_000, 1_000_000, 2, []]
-                for i in range(2000)]
+        rows = [
+            ["26-09-07--08-25--X", 100.0, "0000001", f"Other{i}", 1_000_000, 1_000_000, 2, []]
+            for i in range(2000)
+        ]
         if json["spec_i"] == 2:
             rows.append(["26-09-07--08-25--X", 100.0, "0000002", self.name, 500_000, 500_000, 2, []])
         return FakeResp(rows)
@@ -185,8 +212,9 @@ def test_partial_uwu_failure_is_unknown_not_unranked(monkeypatch):
             spec_i = int(url.rsplit("/", 1)[1])
             if spec_i == 1:
                 raise TimeoutError("Read timed out")
-            return FakeResp({"name": self.name, "class_i": 1, "overall_points": 0.0,
-                             "overall_rank": 1355, "bosses": {}})
+            return FakeResp(
+                {"name": self.name, "class_i": 1, "overall_points": 0.0, "overall_rank": 1355, "bosses": {}}
+            )
 
     monkeypatch.setattr(uwu, "SESSION", PartialSession("Epillef"))
 

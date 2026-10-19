@@ -44,11 +44,11 @@ class TestTokenBucket:
         assert 0.15 <= elapsed <= 0.4
 
     def test_invalid_rate_and_capacity_rejected(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="rate must be > 0"):
             TokenBucket(rate=0, capacity=1)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="rate must be > 0"):
             TokenBucket(rate=-1, capacity=1)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="capacity must be >= 1"):
             TokenBucket(rate=1, capacity=0)
 
     def test_thread_safety_no_over_issue(self):
@@ -92,9 +92,7 @@ class TestCircuitBreaker:
         assert cb.is_open() is False
 
     def test_threshold_opens_only_after_N_failures(self):
-        cb = CircuitBreaker(
-            failure_threshold=3, open_duration_s=0.5, failure_window_s=10
-        )
+        cb = CircuitBreaker(failure_threshold=3, open_duration_s=0.5, failure_window_s=10)
         cb.record_failure(reason="429")
         cb.record_failure(reason="429")
         assert cb.is_open() is False
@@ -104,9 +102,7 @@ class TestCircuitBreaker:
         assert cb.is_open() is True
 
     def test_failures_outside_window_dont_count(self):
-        cb = CircuitBreaker(
-            failure_threshold=3, open_duration_s=0.5, failure_window_s=0.1
-        )
+        cb = CircuitBreaker(failure_threshold=3, open_duration_s=0.5, failure_window_s=0.1)
         cb.record_failure(reason="429")
         cb.record_failure(reason="429")
         time.sleep(0.15)

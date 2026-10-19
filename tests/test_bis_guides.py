@@ -1,4 +1,5 @@
 """Guías BiS por reino generadas desde el armory (static/bis/<reino>.json)."""
+
 from __future__ import annotations
 
 import json
@@ -45,9 +46,9 @@ REALM_DATA = {
 def realm_files(tmp_path, monkeypatch):
     (tmp_path / "lordaeron.json").write_text(json.dumps(REALM_DATA), encoding="utf-8")
     monkeypatch.setattr(bis_guides, "BIS_DIR", tmp_path)
-    bis_guides._load_realm.cache_clear()
+    bis_guides.clear_realm_cache()
     yield
-    bis_guides._load_realm.cache_clear()
+    bis_guides.clear_realm_cache()
 
 
 def test_guide_is_per_realm_and_role(realm_files):
@@ -70,12 +71,14 @@ def test_available_guides_labels(realm_files):
 
 
 def _char(items):
-    return CharacterData(name="Srpingu", server="Lordaeron", char_class="Death Knight",
-                         spec="Blood", items=items)
+    return CharacterData(
+        name="Srpingu", server="Lordaeron", char_class="Death Knight", spec="Blood", items=items
+    )
 
 
 def test_item_issue_shows_equipped_item_name(realm_files):
     guide = bis_guides.get_bis_guide("Death Knight", "Blood", role="Tank")
+    assert guide is not None
     issues, _ = _audit_items(_char([EquippedItem(slot="Head", item_id="51133")]), guide)
     assert "Sanctified Scourgelord Faceguard (tank helm)" in issues[0].message
 
@@ -84,11 +87,13 @@ def test_nightmare_tear_is_recognised(realm_files):
     """El auditor buscaba Nightmare Tear como 44342 (unas piernas de cuero) y le
     marcaba a todos que les faltaba."""
     guide = bis_guides.get_bis_guide("Death Knight", "Blood", role="Tank")
+    assert guide is not None
     head = EquippedItem(slot="Head", item_id="51306", gem_enchant_ids=["3637", "3879"])
     issues, _ = _audit_gems(_char([head]), guide)
     messages = " ".join(i.issue for i in issues)
     assert "Nightmare Tear" not in messages
-    assert "Meta gema" not in messages and "No hay meta" not in messages
+    assert "Meta gema" not in messages
+    assert "No hay meta" not in messages
 
 
 def test_lower_version_of_any_option_is_reported_as_upgrade(realm_files):
@@ -96,6 +101,7 @@ def test_lower_version_of_any_option_is_reported_as_upgrade(realm_files):
     la opción 2 del slot: el mensaje tiene que decir "versión de mayor nivel",
     no "cambialo por la opción 1"."""
     guide = bis_guides.get_bis_guide("Death Knight", "Blood", role="Tank")
+    assert guide is not None
     guide.item_names = {"51133": "Sanctified Scourgelord Faceguard"}
     issues, _ = _audit_items(_char([EquippedItem(slot="Head", item_id="51133")]), guide)
     assert "versión de mayor nivel (51306)" in issues[0].message

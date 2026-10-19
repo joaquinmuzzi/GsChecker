@@ -1,21 +1,41 @@
 """Cuando el armory responde a medias (429 en logros o estadísticas), el perfil
 no debe persistirse: los ❌ que mostraría son "no pudimos leerlo", no "no lo hizo"."""
+
 from unittest.mock import patch
 
-from src.controller.commands import (
+from src.functions import warmane
+from src.schemas.constants import ACHIEVEMENTS_CACHE
+from src.services.profile import (
     _is_personaje_data_complete,
     _is_valid_personaje_payload,
     _serialize_personaje_payload,
 )
-from src.functions import warmane
-from src.schemas.constants import ACHIEVEMENTS_CACHE
 
 
 def _payload(data_complete):
     return _serialize_personaje_payload(
-        "Srpingu", "Lordaeron", 6291, 80, "Night Elf", "Death Knight",
-        "Blood", "<Guild>", None, True, True, True, True, {}, {}, [], [], {},
-        [], "Blood", gear_item_count=18, data_complete=data_complete,
+        "Srpingu",
+        "Lordaeron",
+        6291,
+        80,
+        "Night Elf",
+        "Death Knight",
+        "Blood",
+        "<Guild>",
+        None,
+        True,
+        True,
+        True,
+        True,
+        {},
+        {},
+        [],
+        [],
+        {},
+        [],
+        "Blood",
+        gear_item_count=18,
+        data_complete=data_complete,
     )
 
 
@@ -34,7 +54,7 @@ def test_data_complete_requires_achievements_and_stats():
 
 @patch("src.functions.warmane.time.sleep")
 @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
-def test_failed_category_marks_achievements_incomplete(mock_post, _sleep):
+def test_failed_category_marks_achievements_incomplete(mock_post, mock_sleep):
     ACHIEVEMENTS_CACHE.clear()
     halion_html = '<div class="achievement" id="ach4815"></div>'
 
@@ -56,7 +76,7 @@ def test_failed_category_marks_achievements_incomplete(mock_post, _sleep):
 
 @patch("src.functions.warmane.time.sleep")
 @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
-def test_all_categories_ok_is_complete(mock_post, _sleep):
+def test_all_categories_ok_is_complete(mock_post, mock_sleep):
     ACHIEVEMENTS_CACHE.clear()
     mock_post.return_value = {"content": '<div class="achievement" id="ach4815"></div>'}
     payload = warmane._fetch_achievements("Srpingu", "Lordaeron")

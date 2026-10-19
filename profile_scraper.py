@@ -5,6 +5,7 @@ import random
 import re
 import time
 from functools import lru_cache
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -76,9 +77,7 @@ def _armory_get(url: str, timeout: int = 8):
             except (TypeError, ValueError):
                 retry_after = None
         delay = (
-            retry_after
-            if retry_after is not None
-            else random.uniform(ARMORY_BACKOFF_MIN, ARMORY_BACKOFF_MAX)
+            retry_after if retry_after is not None else random.uniform(ARMORY_BACKOFF_MIN, ARMORY_BACKOFF_MAX)
         )
         logger.warning(
             "armory rate-limited (status=%s) url='%s' retry %s/%s in %.1fs",
@@ -90,6 +89,7 @@ def _armory_get(url: str, timeout: int = 8):
         )
         time.sleep(delay)
     return last_resp
+
 
 WOW_CLASSIC_CLASSES = {
     "Balance",
@@ -157,12 +157,8 @@ ENCHANTABLE_SLOTS = {
 }
 
 ITEM_HEADERS = {"User-Agent": "GsChecker item-sockets/1.0"}
-CACHE_PATH = os.path.join(
-    os.path.dirname(__file__), "static", "item_sockets_cache.json"
-)
-SLOT_CACHE_PATH = os.path.join(
-    os.path.dirname(__file__), "static", "item_slot_cache.json"
-)
+CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_sockets_cache.json")
+SLOT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "static", "item_slot_cache.json")
 GEM_DATA_PATH = os.path.join(os.path.dirname(__file__), "static", "gem_data.json")
 SOCKET_CACHE_ONLY = False
 _SOCKET_CACHE = None
@@ -243,7 +239,7 @@ def _load_socket_cache() -> dict:
     if _SOCKET_CACHE is not None:
         return _SOCKET_CACHE
     try:
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(CACHE_PATH, encoding="utf-8") as f:
             _SOCKET_CACHE = json.load(f)
     except FileNotFoundError:
         _SOCKET_CACHE = {}
@@ -258,7 +254,7 @@ def _load_gem_data() -> dict:
     if _GEM_DATA is not None:
         return _GEM_DATA
     try:
-        with open(GEM_DATA_PATH, "r", encoding="utf-8") as f:
+        with open(GEM_DATA_PATH, encoding="utf-8") as f:
             _GEM_DATA = json.load(f)
     except FileNotFoundError:
         _GEM_DATA = {}
@@ -269,9 +265,7 @@ def _load_gem_data() -> dict:
 
 
 def _is_meta_only(colors: dict) -> bool:
-    return bool(colors.get("meta")) and not any(
-        colors.get(c) for c in ("red", "blue", "yellow")
-    )
+    return bool(colors.get("meta")) and not any(colors.get(c) for c in ("red", "blue", "yellow"))
 
 
 def _load_gem_by_enchant() -> dict:
@@ -309,16 +303,12 @@ def _save_socket_cache(cache: dict) -> None:
 
 def get_specs(char_name: str, server: str) -> list[dict]:
     try:
-        profile_url = (
-            f"https://armory.warmane.com/character/{char_name}/{server}/profile"
-        )
+        profile_url = f"https://armory.warmane.com/character/{char_name}/{server}/profile"
         profile_resp = _armory_get(profile_url)
         if profile_resp is not None and profile_resp.status_code == 200:
             profile_soup = BeautifulSoup(profile_resp.text, "html.parser")
             profile_specs = []
-            for text_node in profile_soup.select(
-                "div.specialization div.stub div.text"
-            ):
+            for text_node in profile_soup.select("div.specialization div.stub div.text"):
                 text_copy = BeautifulSoup(str(text_node), "html.parser")
                 for value_span in text_copy.select("span.value"):
                     value_span.extract()
@@ -340,26 +330,24 @@ def get_specs(char_name: str, server: str) -> list[dict]:
                 specs.append(
                     {
                         "name": td.get_text(strip=True),
-                        "active": "selected" in td.get("class", []),
+                        "active": "selected" in (td.get("class") or []),
                     }
                 )
             if specs:
                 return specs
 
-        api_url = (
-            f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
-        )
+        api_url = f"https://armory.warmane.com/api/character/{char_name}/{server}/talents"
         api_resp = _armory_get(api_url)
         if api_resp is None or api_resp.status_code != 200:
             return []
 
         payload = api_resp.json()
-        talents = payload.get("talents") if isinstance(payload, dict) else None
-        if not isinstance(talents, list):
+        api_talents = payload.get("talents") if isinstance(payload, dict) else None
+        if not isinstance(api_talents, list):
             return []
 
         specs = []
-        for idx, talent in enumerate(talents):
+        for idx, talent in enumerate(api_talents):
             if not isinstance(talent, dict):
                 continue
             name = str(talent.get("tree") or "").strip()
@@ -373,9 +361,7 @@ def get_specs(char_name: str, server: str) -> list[dict]:
             )
         return specs
     except Exception:
-        logger.exception(
-            "get_specs failed for '%s'/%s", char_name, server
-        )
+        logger.exception("get_specs failed for '%s'/%s", char_name, server)
     return []
 
 
@@ -384,7 +370,7 @@ def _load_slot_cache() -> dict:
     if _SLOT_CACHE is not None:
         return _SLOT_CACHE
     try:
-        with open(SLOT_CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(SLOT_CACHE_PATH, encoding="utf-8") as f:
             _SLOT_CACHE = json.load(f)
     except FileNotFoundError:
         _SLOT_CACHE = {}
@@ -531,15 +517,15 @@ def get_gear_data(char_name: str, server: str = "Lordaeron"):
     if resp is None or resp.status_code != 200:
         return []
     soup = BeautifulSoup(resp.text, "html.parser")
-    try:
-        equipment = soup.find(class_="item-model").find_all("a")
-    except AttributeError:
+    item_model = soup.find(class_="item-model")
+    if item_model is None:
         logger.warning(
             "get_gear_data: no .item-model in HTML for '%s'/%s (page changed or empty)",
             char_name,
             server,
         )
         return []
+    equipment = item_model.find_all("a")
     gear_data = []
     for idx, slot in enumerate(equipment):
         item_properties = parse_slot(slot)
@@ -599,9 +585,7 @@ def get_gem_name(gem_id: str) -> str:
     return str(gem_id)
 
 
-def get_suboptimal_gems_from_gear_data(
-    gear_data: list, clase: str, spec: str
-) -> list[str]:
+def get_suboptimal_gems_from_gear_data(gear_data: list, clase: str, spec: str) -> list[str]:
     """
     For each filled (non-meta) gem slot, check whether the gem is a WotLK
     epic gem.  Returns a list of short description strings such as
@@ -647,20 +631,32 @@ def get_suboptimal_gems_from_gear_data(
 
 
 # ── WotLK level-80 stat conversion constants ─────────────────────────────────
-_HIT_RATING_PER_PCT    = 32.789   # 1 % hit      = 32.789 hit rating
-_EXP_RATING_PER_SKILL  = 8.197    # 1 exp skill  = 8.197  expertise rating
-_HASTE_RATING_PER_PCT  = 32.789   # 1 % haste    = 32.789 haste rating
-_CRIT_RATING_PER_PCT   = 45.906   # 1 % crit     = 45.906 crit rating
+_HIT_RATING_PER_PCT = 32.789  # 1 % hit      = 32.789 hit rating
+_EXP_RATING_PER_SKILL = 8.197  # 1 exp skill  = 8.197  expertise rating
+_HASTE_RATING_PER_PCT = 32.789  # 1 % haste    = 32.789 haste rating
+_CRIT_RATING_PER_PCT = 45.906  # 1 % crit     = 45.906 crit rating
 
 # Specs whose *spell* hit column is the relevant one for audit comparisons
-_CASTER_DPS_SPECS: frozenset[str] = frozenset({
-    "Arcane", "Fire", "Frost",
-    "Affliction", "Demonology", "Destruction",
-    "Balance", "Shadow", "Elemental",
-})
-_HEALER_SPECS_SET: frozenset[str] = frozenset({
-    "Holy", "Discipline", "Restoration",
-})
+_CASTER_DPS_SPECS: frozenset[str] = frozenset(
+    {
+        "Arcane",
+        "Fire",
+        "Frost",
+        "Affliction",
+        "Demonology",
+        "Destruction",
+        "Balance",
+        "Shadow",
+        "Elemental",
+    }
+)
+_HEALER_SPECS_SET: frozenset[str] = frozenset(
+    {
+        "Holy",
+        "Discipline",
+        "Restoration",
+    }
+)
 
 
 def get_character_stats(
@@ -689,9 +685,7 @@ def get_character_stats(
             return {}
         return _parse_character_stats_html(resp.text)
     except Exception:
-        logger.exception(
-            "get_character_stats failed for '%s'/%s", char_name, server
-        )
+        logger.exception("get_character_stats failed for '%s'/%s", char_name, server)
         return {}
 
 
@@ -718,31 +712,21 @@ def _parse_character_stats_html(html: str) -> dict[str, float]:
     result: dict[str, float] = {}
 
     # Hit rating – listed three times: Melee, Ranged, Spell
-    hit_matches = re.findall(
-        r"Hit rating:\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE
-    )
+    hit_matches = re.findall(r"Hit rating:\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE)
     if hit_matches:
         result["hit_rating"] = round(float(hit_matches[0]) * _HIT_RATING_PER_PCT, 1)
         if len(hit_matches) >= 3:
-            result["spell_hit_rating"] = round(
-                float(hit_matches[-1]) * _HIT_RATING_PER_PCT, 1
-            )
+            result["spell_hit_rating"] = round(float(hit_matches[-1]) * _HIT_RATING_PER_PCT, 1)
 
     # Expertise – shown as skill integer, NOT as a percentage
     m = re.search(r"Expertise:\s*([0-9]+)", text, re.IGNORECASE)
     if m:
-        result["expertise_rating"] = round(
-            float(m.group(1)) * _EXP_RATING_PER_SKILL, 1
-        )
+        result["expertise_rating"] = round(float(m.group(1)) * _EXP_RATING_PER_SKILL, 1)
 
     # Haste – last occurrence is the Spell section value
-    haste_matches = re.findall(
-        r"Haste:\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE
-    )
+    haste_matches = re.findall(r"Haste:\s*([0-9]+(?:\.[0-9]+)?)\s*%", text, re.IGNORECASE)
     if haste_matches:
-        result["haste_rating"] = round(
-            float(haste_matches[-1]) * _HASTE_RATING_PER_PCT, 1
-        )
+        result["haste_rating"] = round(float(haste_matches[-1]) * _HASTE_RATING_PER_PCT, 1)
 
     # Spell Power
     m = re.search(r"Spell Power:\s*([0-9]+)", text, re.IGNORECASE)

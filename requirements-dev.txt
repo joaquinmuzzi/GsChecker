@@ -1,3 +1,7 @@
 -r requirements.txt
 pytest==9.1.1
 pytest-asyncio==1.4.0
+# Lint, formato y tipos (configurados en pyproject.toml)
+ruff==0.17.0
+mypy==2.4.0
+types-requests==2.33.0.20261006

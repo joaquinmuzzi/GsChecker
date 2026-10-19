@@ -26,10 +26,9 @@ import asyncio
 import logging
 import os
 
-from src.audit.models import CharacterData, CharacterStats, EquippedItem
-from src.audit.bis_guides import get_bis_guide
 from src.audit.auditor import audit_character
-from src.audit.models import AuditReport
+from src.audit.bis_guides import get_bis_guide
+from src.audit.models import AuditReport, CharacterData, CharacterStats, EquippedItem
 
 log = logging.getLogger(__name__)
 
@@ -39,15 +38,13 @@ _ITEM_NAME_CACHE: dict[str, str] = {}
 def _lookup_item_names(item_ids: list[str]) -> dict[str, str]:
     """Nombres de ítems vía tooltips de Wowhead WotLK (Warmane usa los IDs
     originales). Cacheado y tolerante a fallos: si no responde, queda el ID."""
-    import requests  # noqa: PLC0415
+    import requests
 
     for item_id in item_ids:
         if item_id in _ITEM_NAME_CACHE:
             continue
         try:
-            resp = requests.get(
-                f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}", timeout=4
-            )
+            resp = requests.get(f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}", timeout=4)
             name = resp.json().get("name") if resp.ok else None
         except Exception:
             name = None
@@ -64,10 +61,10 @@ def _gear_data_to_equipped_items(gear_data: list[dict]) -> list[EquippedItem]:
     ``gear_data`` format (per item)::
 
         {
-            "slot":  "Head",
-            "item":  "51253",
-            "ench":  "3817",
-            "gems":  ["3986", "0", "0"],   # enchant IDs of socketed gems
+            "slot": "Head",
+            "item": "51253",
+            "ench": "3817",
+            "gems": ["3986", "0", "0"],  # enchant IDs of socketed gems
         }
     """
     items: list[EquippedItem] = []
@@ -76,9 +73,9 @@ def _gear_data_to_equipped_items(gear_data: list[dict]) -> list[EquippedItem]:
         if not item_id:
             continue
 
-        slot       = str(entry.get("slot") or "Unknown")
+        slot = str(entry.get("slot") or "Unknown")
         enchant_id = str(entry.get("ench") or "0") or None
-        gems_raw   = entry.get("gems") or []
+        gems_raw = entry.get("gems") or []
 
         items.append(
             EquippedItem(
@@ -140,12 +137,11 @@ async def run_full_audit(
     # 1. Get gear data
     if gear_data is None:
         try:
-            from profile_scraper import get_gear_data  # noqa: PLC0415
+            from profile_scraper import get_gear_data
+
             # Offload blocking I/O to the default thread-pool executor
             loop = asyncio.get_event_loop()
-            gear_data = await loop.run_in_executor(
-                None, lambda: get_gear_data(char_name, server)
-            )
+            gear_data = await loop.run_in_executor(None, lambda: get_gear_data(char_name, server))
         except Exception as exc:
             log.error("Failed to fetch gear for %s/%s: %s", char_name, server, exc)
             gear_data = []

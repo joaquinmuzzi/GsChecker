@@ -30,13 +30,22 @@ DK_TANK_DODGE_PCT = 18.0
 FERAL_BEAR_STAMINA = 3300
 
 CASTER_SPECS = {
-    ("Druid", "Balance"), ("Mage", "Arcane"), ("Mage", "Fire"), ("Mage", "Frost"),
-    ("Priest", "Shadow"), ("Shaman", "Elemental"), ("Warlock", "Affliction"),
-    ("Warlock", "Demonology"), ("Warlock", "Destruction"),
+    ("Druid", "Balance"),
+    ("Mage", "Arcane"),
+    ("Mage", "Fire"),
+    ("Mage", "Frost"),
+    ("Priest", "Shadow"),
+    ("Shaman", "Elemental"),
+    ("Warlock", "Affliction"),
+    ("Warlock", "Demonology"),
+    ("Warlock", "Destruction"),
 }
 HEALER_SPECS = {
-    ("Druid", "Restoration"), ("Paladin", "Holy"), ("Priest", "Discipline"),
-    ("Priest", "Holy"), ("Shaman", "Restoration"),
+    ("Druid", "Restoration"),
+    ("Paladin", "Holy"),
+    ("Priest", "Discipline"),
+    ("Priest", "Holy"),
+    ("Shaman", "Restoration"),
 }
 # Clases/specs donde el mismo árbol se juega de tanque o de DPS: la guía se
 # separa por rol.
@@ -49,7 +58,7 @@ def is_caster(char_class: str, spec: str) -> bool:
 
 
 def detect_role(char_class: str, spec: str, stats: dict) -> str:
-    """"Tank", "DPS" o "" (specs con un solo rol posible)."""
+    """ "Tank", "DPS" o "" (specs con un solo rol posible)."""
     if spec == "Protection":
         return "Tank"
     if char_class in SPLIT_ROLE_CLASSES:
@@ -89,7 +98,9 @@ def _load_realm(realm: str) -> dict:
     return data
 
 
-_load_realm.cache_clear = _REALM_CACHE.clear
+def clear_realm_cache() -> None:
+    """Olvida las guías ya leídas (la próxima consulta las vuelve a cargar)."""
+    _REALM_CACHE.clear()
 
 
 def available_guides(realm: str) -> list[str]:
@@ -105,9 +116,7 @@ def available_guides(realm: str) -> list[str]:
 _POOLED = {"Finger": ("Finger 1", "Finger 2"), "Trinket": ("Trinket 1", "Trinket 2")}
 
 
-def get_bis_guide(
-    char_class: str, spec: str, realm: str = "Lordaeron", role: str = ""
-) -> BisGuide | None:
+def get_bis_guide(char_class: str, spec: str, realm: str = "Lordaeron", role: str = "") -> BisGuide | None:
     """BiS del reino para clase + spec (+ rol en DK / Feral), o None si no hay
     datos suficientes."""
     realm_name = normalize_realm(realm)

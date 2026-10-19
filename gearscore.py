@@ -6,14 +6,12 @@ possible_paths = [
     os.path.join(os.path.dirname(__file__), "static", "GS.json"),
     os.path.join(os.getcwd(), "static", "GS.json"),
     os.path.join(os.getcwd(), "WarmaneProfileParser", "static", "GS.json"),
-    os.path.join(
-        os.path.dirname(__file__), "..", "WarmaneProfileParser", "static", "GS.json"
-    ),
+    os.path.join(os.path.dirname(__file__), "..", "WarmaneProfileParser", "static", "GS.json"),
 ]
 DATA = None
 for p in possible_paths:
     try:
-        with open(p, "r") as f:
+        with open(p) as f:
             DATA = json.load(f)
             break
     except Exception:
@@ -55,14 +53,11 @@ def main(gear):
     return a list with per-slot GearScore values.
     """
     *armor_IDs, mainhand_item_ID, offhand_item_ID, ranged_item_ID = gear
-    armor_GS = [
-        item_gs(itemID, categoryName)
-        for itemID, categoryName in zip(armor_IDs, SLOT_TYPES)
-    ]
-    mainhand_GS, mainhand_type = get_weapon_GS(mainhand_item_ID)
+    armor_GS = [item_gs(itemID, categoryName) for itemID, categoryName in zip(armor_IDs, SLOT_TYPES)]
+    mainhand_GS, _mainhand_type = get_weapon_GS(mainhand_item_ID)
     offhand_GS, offhand_type = get_weapon_GS(offhand_item_ID)
     if offhand_type == "two_hand":
         mainhand_GS //= 2
         offhand_GS //= 2
     ranged_GS = item_gs(ranged_item_ID, "ranged")
-    return armor_GS + [mainhand_GS, offhand_GS, ranged_GS]
+    return [*armor_GS, mainhand_GS, offhand_GS, ranged_GS]

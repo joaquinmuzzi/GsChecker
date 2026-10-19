@@ -1,6 +1,7 @@
 """/p y el cron tienen que producir exactamente el mismo payload cacheado para
 los mismos datos del armory. Antes eran dos copias de la lógica y los arreglos
 había que hacerlos dos veces (el de Halion se aplicó en ambas por separado)."""
+
 from __future__ import annotations
 
 from contextlib import ExitStack
@@ -8,12 +9,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from tests.test_personaje import (
+from tests.helpers import (
     _find_command,
     _happy_achievements,
     _happy_gear_data,
     _happy_summary,
-    bot,  # noqa: F401  (fixture)
 )
 
 STATS_ROWS = [
@@ -50,8 +50,8 @@ def _cron_payload() -> dict:
 
     with ExitStack() as stack:
         _patch_fetchers(stack, "tools.preload_personaje_cache")
-        # El guild rank lo pide la lógica compartida en commands.py.
-        _patch_fetchers(stack, "src.controller.commands")
+        # El guild rank lo pide la lógica compartida (src/services/profile.py).
+        _patch_fetchers(stack, "src.services.profile")
         stack.enter_context(patch("tools.preload_personaje_cache.set_external_cache"))
         payload = build_personaje_cache_entry("Samsara", "Lordaeron")
     assert payload is not None
@@ -59,11 +59,16 @@ def _cron_payload() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_live_and_cron_cache_the_same_payload(bot, interaction):  # noqa: F811
+async def test_live_and_cron_cache_the_same_payload(bot, interaction):
     with ExitStack() as stack:
-        _patch_fetchers(stack, "src.controller.commands")
+        _patch_fetchers(stack, "src.controller.commands.personaje")
+        _patch_fetchers(stack, "src.controller.commands.personaje_live")
+        _patch_fetchers(stack, "src.services.profile")
         mock_set = stack.enter_context(
-            patch("src.controller.commands.async_set_external_cache", new_callable=AsyncMock)
+            patch(
+                "src.controller.commands.personaje_live.async_set_external_cache",
+                new_callable=AsyncMock,
+            )
         )
         await _find_command(bot, "p").callback(interaction, nombre="Samsara")
 

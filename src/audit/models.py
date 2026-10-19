@@ -10,20 +10,22 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator
 
-
 # ─────────────────────────── enums ───────────────────────────────────────────
 
-class AuditSeverity(str, Enum):
+
+# StrEnum cambiaría str(AuditSeverity.CRITICAL) de "AuditSeverity.CRITICAL" a "critical".
+class AuditSeverity(str, Enum):  # noqa: UP042
     CRITICAL = "critical"  # wrong item / slot completely missing enchant
-    WARNING  = "warning"   # non-epic gem, suboptimal enchant, near-cap miss
-    INFO     = "info"      # alternative available but current is acceptable
+    WARNING = "warning"  # non-epic gem, suboptimal enchant, near-cap miss
+    INFO = "info"  # alternative available but current is acceptable
 
 
 # ─────────────────────────── character input ─────────────────────────────────
+
 
 class EquippedItem(BaseModel):
     """A single item as returned by the Warmane armory scraper."""
@@ -66,16 +68,16 @@ class EquippedItem(BaseModel):
 class CharacterStats(BaseModel):
     """Relevant secondary stats parsed from the character sheet."""
 
-    hit_rating:      float = 0.0
+    hit_rating: float = 0.0
     expertise_rating: float = 0.0
     armor_penetration_rating: float = 0.0
-    haste_rating:    float = 0.0
-    crit_rating:     float = 0.0
-    spell_power:     float = 0.0
-    mp5:             float = 0.0
-    defense_rating:  float = 0.0
-    dodge_rating:    float = 0.0
-    parry_rating:    float = 0.0
+    haste_rating: float = 0.0
+    crit_rating: float = 0.0
+    spell_power: float = 0.0
+    mp5: float = 0.0
+    defense_rating: float = 0.0
+    dodge_rating: float = 0.0
+    parry_rating: float = 0.0
 
     class Config:
         extra = "allow"  # tolerate unknown stats from the armory payload
@@ -84,8 +86,8 @@ class CharacterStats(BaseModel):
 class CharacterData(BaseModel):
     """Full character snapshot fetched from the armory."""
 
-    name:       str
-    server:     str
+    name: str
+    server: str
     char_class: str
     """E.g. 'Warrior', 'Death Knight'."""
 
@@ -103,10 +105,11 @@ class CharacterData(BaseModel):
 
 # ─────────────────────────── BiS guide input ─────────────────────────────────
 
+
 class BisItemOption(BaseModel):
     """One item that is acceptable in a given slot (ordered by priority)."""
 
-    item_id:   str
+    item_id: str
     item_name: str
     tier_note: str = ""
     """E.g. 'ICC 25H', 'crafted', 'badge'."""
@@ -143,19 +146,19 @@ class BisSlot(BaseModel):
 class StatCap(BaseModel):
     """A stat threshold that must be reached (or not exceeded)."""
 
-    stat_key:     str
+    stat_key: str
     """Must match a field name in ``CharacterStats``."""
 
     display_name: str
     """E.g. 'Hit Rating', 'Armor Penetration'."""
 
-    cap_value:    float
+    cap_value: float
     """Numeric cap (e.g. 262 for hit to 8 %)."""
 
-    cap_label:    str = ""
+    cap_label: str = ""
     """Friendly label, e.g. '8% hit cap', '100 % ArP'."""
 
-    must_reach:   bool = True
+    must_reach: bool = True
     """True  → reaching the cap is mandatory (hard cap).
     False → going over the cap is wasteful (soft cap check)."""
 
@@ -166,10 +169,10 @@ class GemRequirement(BaseModel):
     non-meta sockets (or exactly once for Nightmare Tear).
     """
 
-    gem_item_id:    str
+    gem_item_id: str
     """Item ID of the required gem, e.g. '49110' for Nightmare Tear."""
 
-    gem_name:       str
+    gem_name: str
     required_count: int = 1
 
     description: str = ""
@@ -179,16 +182,16 @@ class GemRequirement(BaseModel):
 class BisGuide(BaseModel):
     """Complete BiS reference for a single spec."""
 
-    spec_name:       str
+    spec_name: str
     """Full label used as a lookup key, e.g. 'Warrior Fury'."""
 
-    char_class:      str
-    spec:            str
+    char_class: str
+    spec: str
 
-    slots:           dict[str, BisSlot] = Field(default_factory=dict)
+    slots: dict[str, BisSlot] = Field(default_factory=dict)
     """Keyed by slot name, e.g. 'Head', 'Main Hand'."""
 
-    stat_caps:       list[StatCap] = Field(default_factory=list)
+    stat_caps: list[StatCap] = Field(default_factory=list)
     gem_requirements: list[GemRequirement] = Field(default_factory=list)
 
     meta_gem_id: str | None = None
@@ -208,41 +211,42 @@ class BisGuide(BaseModel):
 
 # ─────────────────────────── audit result ────────────────────────────────────
 
+
 class ItemAuditIssue(BaseModel):
     slot: str
     current_item_id: str
     current_item_name: str = "Unknown"
-    bis_item_id:     str
-    bis_item_name:   str
-    severity:        AuditSeverity
-    message:         str
+    bis_item_id: str
+    bis_item_name: str
+    severity: AuditSeverity
+    message: str
 
 
 class GemAuditIssue(BaseModel):
-    slot:       str
-    gem_id:     str
-    gem_name:   str
-    issue:      str
+    slot: str
+    gem_id: str
+    gem_name: str
+    issue: str
     suggestion: str
-    severity:   AuditSeverity
+    severity: AuditSeverity
 
 
 class EnchantAuditIssue(BaseModel):
-    slot:                  str
-    current_enchant_id:    str | None
+    slot: str
+    current_enchant_id: str | None
     expected_enchant_name: str
-    severity:              AuditSeverity
-    message:               str
+    severity: AuditSeverity
+    message: str
 
 
 class StatCapAuditResult(BaseModel):
-    stat_key:     str
+    stat_key: str
     display_name: str
     current_value: float
-    cap_value:    float
-    cap_label:    str
-    is_capped:    bool
-    delta:        float
+    cap_value: float
+    cap_label: str
+    is_capped: bool
+    delta: float
     """cap_value − current_value.  Negative → overcapped."""
 
     must_reach: bool = True
@@ -262,13 +266,13 @@ class AuditReport(BaseModel):
     """Full audit result returned by ``audit_character()``."""
 
     character_name: str
-    spec_name:      str
-    server:         str
+    spec_name: str
+    server: str
 
-    item_issues:    list[ItemAuditIssue]    = Field(default_factory=list)
-    gem_issues:     list[GemAuditIssue]     = Field(default_factory=list)
+    item_issues: list[ItemAuditIssue] = Field(default_factory=list)
+    gem_issues: list[GemAuditIssue] = Field(default_factory=list)
     enchant_issues: list[EnchantAuditIssue] = Field(default_factory=list)
-    stat_caps:      list[StatCapAuditResult] = Field(default_factory=list)
+    stat_caps: list[StatCapAuditResult] = Field(default_factory=list)
 
     overall_score: Annotated[int, Field(ge=0, le=100)] = 100
     """
@@ -286,8 +290,8 @@ class AuditReport(BaseModel):
     @property
     def critical_count(self) -> int:
         counts = (
-            sum(1 for i in self.item_issues    if i.severity == AuditSeverity.CRITICAL)
-            + sum(1 for i in self.gem_issues   if i.severity == AuditSeverity.CRITICAL)
+            sum(1 for i in self.item_issues if i.severity == AuditSeverity.CRITICAL)
+            + sum(1 for i in self.gem_issues if i.severity == AuditSeverity.CRITICAL)
             + sum(1 for i in self.enchant_issues if i.severity == AuditSeverity.CRITICAL)
         )
         return counts
@@ -295,8 +299,8 @@ class AuditReport(BaseModel):
     @property
     def warning_count(self) -> int:
         return (
-            sum(1 for i in self.item_issues    if i.severity == AuditSeverity.WARNING)
-            + sum(1 for i in self.gem_issues   if i.severity == AuditSeverity.WARNING)
+            sum(1 for i in self.item_issues if i.severity == AuditSeverity.WARNING)
+            + sum(1 for i in self.gem_issues if i.severity == AuditSeverity.WARNING)
             + sum(1 for i in self.enchant_issues if i.severity == AuditSeverity.WARNING)
         )
 

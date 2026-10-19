@@ -1,0 +1,6 @@
+# Commits que solo reformatean el código. git blame los saltea con:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (la vista de blame de GitHub usa este archivo sola).
+
+# style: format the code with ruff format
+45fa9f8d13987c8167ff133a881296eb7037cb50

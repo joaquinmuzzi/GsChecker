@@ -45,21 +45,23 @@ def _get_gem_lookups() -> tuple[dict, frozenset[str], frozenset[str]]:
     global _gem_by_enchant, _wotlk_epic_gems, _meta_gem_ids
     if _gem_by_enchant is None:
         try:
-            import profile_scraper as ps  # noqa: PLC0415
-            _gem_by_enchant  = ps._load_gem_by_enchant()
+            import profile_scraper as ps
+
+            _gem_by_enchant = ps._load_gem_by_enchant()
             _wotlk_epic_gems = ps._WOTLK_EPIC_GEMS
-            _meta_gem_ids    = ps.META_GEM_IDS
+            _meta_gem_ids = ps.META_GEM_IDS
         except Exception as exc:
             log.warning("Could not import profile_scraper gem data: %s", exc)
-            _gem_by_enchant  = {}
+            _gem_by_enchant = {}
             _wotlk_epic_gems = frozenset()
-            _meta_gem_ids    = frozenset()
+            _meta_gem_ids = frozenset()
     return _gem_by_enchant, _wotlk_epic_gems, _meta_gem_ids  # type: ignore[return-value]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _resolve_gem_item_id(enchant_id: str) -> str | None:
     """Map an armory enchant ID back to the gem item ID, or None if unknown."""
@@ -90,6 +92,7 @@ def _gem_name_from_enchant(enchant_id: str) -> str:
 # Phase 1 – item comparison
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _audit_items(
     char: CharacterData,
     guide: BisGuide,
@@ -113,9 +116,7 @@ def _audit_items(
             if bis is None:
                 continue
             equipped_name = guide.item_names.get(equipped.item_id, equipped.item_id)
-            same_item = next(
-                (opt for opt in bis_slot.options if opt.item_name == equipped_name), None
-            )
+            same_item = next((opt for opt in bis_slot.options if opt.item_name == equipped_name), None)
             if same_item is not None:
                 # Mismo ítem que usan los top, en otra versión (normal vs heroico).
                 msg = (
@@ -146,6 +147,7 @@ def _audit_items(
 # Phase 2 – enchant validation
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _audit_enchants(
     char: CharacterData,
     guide: BisGuide,
@@ -172,10 +174,7 @@ def _audit_enchants(
                     current_enchant_id=None,
                     expected_enchant_name=bis_slot.enchant_display_name,
                     severity=AuditSeverity.CRITICAL,
-                    message=(
-                        f"{slot_name}: falta encantamiento → "
-                        f"aplicar '{bis_slot.enchant_display_name}'"
-                    ),
+                    message=(f"{slot_name}: falta encantamiento → aplicar '{bis_slot.enchant_display_name}'"),
                 )
             )
             penalty += 6
@@ -201,12 +200,13 @@ def _audit_enchants(
 # Phase 3 – gem quality + required gem audit
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _collect_character_gems(
     char: CharacterData,
 ) -> tuple[
-    dict[str, list[str]],   # slot → [gem_item_ids]
-    Counter[str],           # gem_item_id → total count across all gear
-    str | None,             # detected meta gem item_id
+    dict[str, list[str]],  # slot → [gem_item_ids]
+    Counter[str],  # gem_item_id → total count across all gear
+    str | None,  # detected meta gem item_id
 ]:
     """
     Iterate every item's ``gem_enchant_ids`` and resolve them to item IDs.
@@ -216,7 +216,7 @@ def _collect_character_gems(
       gem_counter    – total count of each non-meta gem item_id
       meta_gem_id    – item_id of the first meta gem found, or None
     """
-    _, _, meta_ids = _get_gem_lookups()
+    _, _, _meta_ids = _get_gem_lookups()
     gems_by_slot: dict[str, list[str]] = {}
     gem_counter: Counter[str] = Counter()
     found_meta: str | None = None
@@ -230,10 +230,10 @@ def _collect_character_gems(
                 if found_meta is None:
                     found_meta = item_id
                 continue  # don't add meta to non-meta counter
-            item_id = _resolve_gem_item_id(eid)
-            if item_id:
-                slot_gems.append(item_id)
-                gem_counter[item_id] += 1
+            gem_item_id = _resolve_gem_item_id(eid)
+            if gem_item_id:
+                slot_gems.append(gem_item_id)
+                gem_counter[gem_item_id] += 1
         gems_by_slot[item.slot] = slot_gems
 
     return gems_by_slot, gem_counter, found_meta
@@ -252,40 +252,46 @@ def _audit_gems(
     # ── 3a. Meta gem ────────────────────────────────────────────────────────
     if guide.meta_gem_id:
         if meta_gem_found is None:
-            issues.append(GemAuditIssue(
-                slot="Meta Socket",
-                gem_id="",
-                gem_name="(ninguna)",
-                issue="No hay meta gema equipada",
-                suggestion=f"Equipa {guide.meta_gem_name or 'la meta gema'} (item {guide.meta_gem_id})",
-                severity=AuditSeverity.CRITICAL,
-            ))
+            issues.append(
+                GemAuditIssue(
+                    slot="Meta Socket",
+                    gem_id="",
+                    gem_name="(ninguna)",
+                    issue="No hay meta gema equipada",
+                    suggestion=f"Equipa {guide.meta_gem_name or 'la meta gema'} (item {guide.meta_gem_id})",
+                    severity=AuditSeverity.CRITICAL,
+                )
+            )
             penalty += 10
         elif meta_gem_found != guide.meta_gem_id:
-            issues.append(GemAuditIssue(
-                slot="Meta Socket",
-                gem_id=meta_gem_found,
-                gem_name=f"item:{meta_gem_found}",
-                issue=f"Meta gema incorrecta (encontrada: {meta_gem_found})",
-                suggestion=f"Reemplaza por {guide.meta_gem_name or 'el item'} ({guide.meta_gem_id})",
-                severity=AuditSeverity.WARNING,
-            ))
+            issues.append(
+                GemAuditIssue(
+                    slot="Meta Socket",
+                    gem_id=meta_gem_found,
+                    gem_name=f"item:{meta_gem_found}",
+                    issue=f"Meta gema incorrecta (encontrada: {meta_gem_found})",
+                    suggestion=f"Reemplaza por {guide.meta_gem_name or 'el item'} ({guide.meta_gem_id})",
+                    severity=AuditSeverity.WARNING,
+                )
+            )
             penalty += 5
 
     # ── 3b. Nightmare Tear (meta activation) ────────────────────────────────
     NIGHTMARE_TEAR_ID = "49110"
     if guide.nightmare_tear_required and gem_counter.get(NIGHTMARE_TEAR_ID, 0) == 0:
-        issues.append(GemAuditIssue(
-            slot="Socket (blue/prismático)",
-            gem_id=NIGHTMARE_TEAR_ID,
-            gem_name="Nightmare Tear",
-            issue="Falta Nightmare Tear para activar la meta gema",
-            suggestion=(
-                "Coloca 1× Nightmare Tear (49110) en un socket azul o prismático "
-                "para activar la meta gema, como la mayoría de los top."
-            ),
-            severity=AuditSeverity.CRITICAL,
-        ))
+        issues.append(
+            GemAuditIssue(
+                slot="Socket (blue/prismático)",
+                gem_id=NIGHTMARE_TEAR_ID,
+                gem_name="Nightmare Tear",
+                issue="Falta Nightmare Tear para activar la meta gema",
+                suggestion=(
+                    "Coloca 1× Nightmare Tear (49110) en un socket azul o prismático "
+                    "para activar la meta gema, como la mayoría de los top."
+                ),
+                severity=AuditSeverity.CRITICAL,
+            )
+        )
         penalty += 8
 
     # ── 3c. Required gem minimums ────────────────────────────────────────────
@@ -296,17 +302,16 @@ def _audit_gems(
         have = gem_counter.get(req.gem_item_id, 0)
         if have < req.required_count:
             missing = req.required_count - have
-            issues.append(GemAuditIssue(
-                slot="Multiple slots",
-                gem_id=req.gem_item_id,
-                gem_name=req.gem_name,
-                issue=(
-                    f"Faltan {missing}× {req.gem_name} "
-                    f"(tienes {have}, mínimo {req.required_count})"
-                ),
-                suggestion=req.description,
-                severity=AuditSeverity.CRITICAL if have == 0 else AuditSeverity.WARNING,
-            ))
+            issues.append(
+                GemAuditIssue(
+                    slot="Multiple slots",
+                    gem_id=req.gem_item_id,
+                    gem_name=req.gem_name,
+                    issue=(f"Faltan {missing}× {req.gem_name} (tienes {have}, mínimo {req.required_count})"),
+                    suggestion=req.description,
+                    severity=AuditSeverity.CRITICAL if have == 0 else AuditSeverity.WARNING,
+                )
+            )
             penalty += 5 * missing
 
     # ── 3d. Non-epic gems per slot ───────────────────────────────────────────
@@ -314,14 +319,16 @@ def _audit_gems(
         for gid in gem_ids:
             if gid not in epic_gems:
                 display = f"item:{gid}"  # best-effort; no name lookup needed for penalty
-                issues.append(GemAuditIssue(
-                    slot=slot_name,
-                    gem_id=gid,
-                    gem_name=display,
-                    issue=f"Gema de calidad no-épica detectada ({display})",
-                    suggestion="Reemplaza por una Cardinal Ruby, King's Amber o equivalente épico",
-                    severity=AuditSeverity.WARNING,
-                ))
+                issues.append(
+                    GemAuditIssue(
+                        slot=slot_name,
+                        gem_id=gid,
+                        gem_name=display,
+                        issue=f"Gema de calidad no-épica detectada ({display})",
+                        suggestion="Reemplaza por una Cardinal Ruby, King's Amber o equivalente épico",
+                        severity=AuditSeverity.WARNING,
+                    )
+                )
                 penalty += 3
 
     return issues, penalty
@@ -330,6 +337,7 @@ def _audit_gems(
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 4 – stat caps
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _audit_stat_caps(
     char: CharacterData,
@@ -340,26 +348,27 @@ def _audit_stat_caps(
 
     for cap in guide.stat_caps:
         current = float(getattr(char.stats, cap.stat_key, 0.0) or 0.0)
-        delta   = cap.cap_value - current
-        is_cap  = current >= cap.cap_value
+        delta = cap.cap_value - current
+        is_cap = current >= cap.cap_value
 
         if not is_cap and cap.must_reach:
             penalty += 7
-        elif is_cap and not cap.must_reach:
+        elif is_cap and not cap.must_reach and current > cap.cap_value * 1.20:
             # over-capped by more than 20% → wasteful
-            if current > cap.cap_value * 1.20:
-                penalty += 2
+            penalty += 2
 
-        results.append(StatCapAuditResult(
-            stat_key=cap.stat_key,
-            display_name=cap.display_name,
-            current_value=current,
-            cap_value=cap.cap_value,
-            cap_label=cap.cap_label,
-            is_capped=is_cap,
-            delta=delta,
-            must_reach=cap.must_reach,
-        ))
+        results.append(
+            StatCapAuditResult(
+                stat_key=cap.stat_key,
+                display_name=cap.display_name,
+                current_value=current,
+                cap_value=cap.cap_value,
+                cap_label=cap.cap_label,
+                is_capped=is_cap,
+                delta=delta,
+                must_reach=cap.must_reach,
+            )
+        )
 
     return results, penalty
 
@@ -367,6 +376,7 @@ def _audit_stat_caps(
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def audit_character(
     char_data: CharacterData,
@@ -393,10 +403,10 @@ async def audit_character(
         environment variable when *None*.
     """
     # Run all four audit phases
-    item_issues,    pen_items    = _audit_items(char_data, bis_guide)
+    item_issues, pen_items = _audit_items(char_data, bis_guide)
     enchant_issues, pen_enchants = _audit_enchants(char_data, bis_guide)
-    gem_issues,     pen_gems     = _audit_gems(char_data, bis_guide)
-    stat_results,   pen_stats    = _audit_stat_caps(char_data, bis_guide)
+    gem_issues, pen_gems = _audit_gems(char_data, bis_guide)
+    stat_results, pen_stats = _audit_stat_caps(char_data, bis_guide)
 
     total_penalty = pen_items + pen_enchants + pen_gems + pen_stats
     overall_score = max(0, 100 - total_penalty)
@@ -414,10 +424,9 @@ async def audit_character(
 
     if generate_summary:
         try:
-            from .coach import generate_coach_summary  # noqa: PLC0415
-            report.coach_summary = await generate_coach_summary(
-                report, bis_guide, api_key=groq_api_key
-            )
+            from .coach import generate_coach_summary
+
+            report.coach_summary = await generate_coach_summary(report, bis_guide, api_key=groq_api_key)
         except Exception as exc:
             log.warning("Groq summary generation failed: %s", exc)
             report.coach_summary = None

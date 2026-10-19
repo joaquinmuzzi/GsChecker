@@ -5,7 +5,39 @@ on:
     branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
+# En un PR, un push nuevo cancela la corrida vieja. En master no: Railway espera
+# el CI de cada commit antes de deployar (checkSuites en .railway/railway.py).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff check
+        run: ruff check --output-format=github .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+      - name: Mypy
+        run: mypy
+
   pytest:
     runs-on: ubuntu-latest
     steps:

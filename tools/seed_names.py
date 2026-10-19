@@ -17,9 +17,7 @@ Uso:
 """
 
 import argparse
-import json
 import random
-import re
 import sys
 import time
 from pathlib import Path
@@ -28,8 +26,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bs4 import BeautifulSoup
-from src.schemas.constants import SESSION, HTTP_TIMEOUT
+
 from src.functions.names import is_valid_character_name
+from src.schemas.constants import HTTP_TIMEOUT, SESSION
 from tools.preload_character_gs import _normalize_name
 
 TRACKED_FILE = Path(__file__).resolve().parent.parent / "data" / "tracked_characters.txt"
@@ -78,7 +77,7 @@ def _scrape_guild_leaderboard(server: str) -> list[str]:
     try:
         resp = SESSION.get(url, headers=_HEADERS, timeout=HTTP_TIMEOUT)
         if resp.status_code == 429:
-            print(f"[GUILDS] Rate limited (429). Waiting 10s...")
+            print("[GUILDS] Rate limited (429). Waiting 10s...")
             time.sleep(10)
             resp = SESSION.get(url, headers=_HEADERS, timeout=HTTP_TIMEOUT)
         resp.raise_for_status()
@@ -136,7 +135,7 @@ def collect_from_guilds(server: str, delay: float) -> set[str]:
         print("[GUILDS] No guilds found. Check connectivity / rate limits.")
         return set()
 
-    all_names = set()
+    all_names: set[str] = set()
     start = time.time()
 
     for idx, guild in enumerate(guild_names, 1):
@@ -169,7 +168,6 @@ def collect_from_guilds(server: str, delay: float) -> set[str]:
 
 def collect_from_uwu(server: str, limit: int, best_only: bool) -> set[str]:
     """Collect names from UwU Logs (slower, ~540 queries)."""
-    from src.schemas.constants import UWU_MODES_ALL, UWU_PDPS_BOSS_ORDER
     from tools.preload_character_gs import _collect_names_from_uwu
 
     print(f"[UWU] Recolectando desde UwU Logs ({server})...")
@@ -179,9 +177,7 @@ def collect_from_uwu(server: str, limit: int, best_only: bool) -> set[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Recolecta nombres de personajes de Warmane."
-    )
+    parser = argparse.ArgumentParser(description="Recolecta nombres de personajes de Warmane.")
     parser.add_argument(
         "--server",
         default="Lordaeron",

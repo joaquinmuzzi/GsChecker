@@ -5,9 +5,8 @@ from __future__ import annotations
 
 from unittest.mock import PropertyMock, patch
 
-import pytest
-
 import discord
+import pytest
 from discord.ext import commands
 
 from src.controller.commands import register_commands
@@ -33,9 +32,7 @@ def _find_command(bot: commands.Bot, name: str):
 async def test_ping_responds_with_latency(bot, interaction):
     ping_cmd = _find_command(bot, "ping")
 
-    with patch.object(
-        commands.Bot, "latency", new_callable=PropertyMock, return_value=0.042
-    ):
+    with patch.object(commands.Bot, "latency", new_callable=PropertyMock, return_value=0.042):
         await ping_cmd.callback(interaction)
 
     sent = interaction.last_sent()
@@ -51,9 +48,7 @@ async def test_ping_handles_nan_latency_gracefully(bot, interaction):
     """When bot isn't connected discord.py returns NaN — must not crash."""
     ping_cmd = _find_command(bot, "ping")
 
-    with patch.object(
-        commands.Bot, "latency", new_callable=PropertyMock, return_value=float("nan")
-    ):
+    with patch.object(commands.Bot, "latency", new_callable=PropertyMock, return_value=float("nan")):
         await ping_cmd.callback(interaction)
 
     sent = interaction.last_sent()

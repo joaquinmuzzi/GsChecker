@@ -1,0 +1,29 @@
+# BuildKit usa este archivo (y no un .dockerignore en la raíz) cuando se
+# construye con -f docker/Dockerfile.
+
+# Secretos y config local
+.env
+config.json
+
+# Git, CI, Railway y herramientas de desarrollo
+.git
+.github
+.railway
+.git-blame-ignore-revs
+.gitattributes
+.tool-versions
+docker
+docs
+tests
+requirements-dev.txt
+pyproject.toml
+
+# Entornos y cachés
+**/__pycache__
+**/*.py[cod]
+.mypy_cache
+.pytest_cache
+.ruff_cache
+venv
+.venv
+env

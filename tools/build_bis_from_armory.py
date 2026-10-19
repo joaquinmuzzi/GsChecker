@@ -18,6 +18,7 @@ de cada personaje: si se corta, al volver a correrlo retoma donde quedó.
 static/bis/<realm>.json, por slot, los ítems/encantamientos más usados y los
 nombres de los ítems (tooltips de Wowhead WotLK: Warmane usa los IDs originales).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,21 +38,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import gearscore  # noqa: E402
-from profile_scraper import (  # noqa: E402
+import gearscore
+from profile_scraper import (
     _extract_slot_name,
     _parse_character_stats_html,
     parse_slot,
 )
-from src.audit.auditor import _is_meta_enchant_id, _resolve_gem_item_id  # noqa: E402
-from src.audit.bis_guides import (  # noqa: E402
+from src.audit.auditor import _is_meta_enchant_id, _resolve_gem_item_id
+from src.audit.bis_guides import (
     HEALER_SPECS,
     app_state_key,
     detect_role,
     is_caster,
 )
-from src.db.postgres import get_app_state, init_database, set_app_state  # noqa: E402
-from src.functions.warmane import _parse_specs_from_html  # noqa: E402
+from src.db.postgres import get_app_state, init_database, set_app_state
+from src.functions.warmane import _parse_specs_from_html
 
 logger = logging.getLogger("gschecker.build_bis")
 
@@ -76,9 +77,17 @@ CANDIDATE_BOSSES = ("Lord Marrowgar", "Professor Putricide", "The Lich King")
 # --boost: para las specs con poca muestra (tanques/healers con doble spec suelen
 # estar en la otra al momento de leer el armory) se buscan más candidatos.
 BOOST_BOSSES = (
-    "Lord Marrowgar", "Lady Deathwhisper", "Deathbringer Saurfang", "Festergut",
-    "Rotface", "Professor Putricide", "Blood Prince Council", "Blood-Queen Lana'thel",
-    "Valithria Dreamwalker", "Sindragosa", "The Lich King",
+    "Lord Marrowgar",
+    "Lady Deathwhisper",
+    "Deathbringer Saurfang",
+    "Festergut",
+    "Rotface",
+    "Professor Putricide",
+    "Blood Prince Council",
+    "Blood-Queen Lana'thel",
+    "Valithria Dreamwalker",
+    "Sindragosa",
+    "The Lich King",
 )
 BOOST_BELOW = 8
 BOOST_MAX_FETCH = 80
@@ -108,9 +117,15 @@ def uwu_candidates(realm: str, class_i: int, spec_i: int, boost: bool = False) -
     modes = ("25H", "25N") if boost else ("25H",)
     for boss, mode in ((b, m) for b in bosses for m in modes):
         payload = {
-            "server": realm, "boss": boss, "mode": mode, "class_i": class_i,
-            "spec_i": spec_i, "sort_by": "head-useful-dps", "limit": "100",
-            "best_only": True, "externals": True,
+            "server": realm,
+            "boss": boss,
+            "mode": mode,
+            "class_i": class_i,
+            "spec_i": spec_i,
+            "sort_by": "head-useful-dps",
+            "limit": "100",
+            "best_only": True,
+            "externals": True,
         }
         try:
             rows = SESSION.post("https://uwu-logs.xyz/top", json=payload, timeout=30).json()
@@ -213,7 +228,13 @@ def collect(realm: str, only_class: str | None = None, boost: bool = False) -> N
                     char = None
                 if char and char["active_spec"] == spec_name:
                     entry["characters"].append(char)
-                    logger.info("  [%d] %s gs=%s dodge=%s", len(entry["characters"]), name, char["gs"], char["dodge_pct"])
+                    logger.info(
+                        "  [%d] %s gs=%s dodge=%s",
+                        len(entry["characters"]),
+                        name,
+                        char["gs"],
+                        char["dodge_pct"],
+                    )
                 _save(path, raw)
                 time.sleep(ARMORY_DELAY_S)
 
@@ -231,8 +252,10 @@ def item_tooltip(item_id: str) -> dict:
         entry = {"name": item_id, "text": ""}
         try:
             data = SESSION.get(f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}", timeout=15).json()
-            entry = {"name": data.get("name") or item_id,
-                     "text": re.sub(r"<[^>]+>", " ", data.get("tooltip", ""))}
+            entry = {
+                "name": data.get("name") or item_id,
+                "text": re.sub(r"<[^>]+>", " ", data.get("tooltip", "")),
+            }
         except Exception:
             pass
         _tooltips[item_id] = entry
@@ -261,9 +284,7 @@ def wears_other_spec_gear(class_name: str, spec: str, char: dict) -> bool:
             continue
         text = item_tooltip(g["item"])["text"]
         melee, spell = bool(_MELEE.search(text)), bool(_SPELL.search(text))
-        if int_spec and melee and not spell:
-            wrong += 1
-        elif not int_spec and spell and not melee:
+        if (int_spec and melee and not spell) or (not int_spec and spell and not melee):
             wrong += 1
     return wrong >= MISMATCH_LIMIT
 
@@ -278,11 +299,17 @@ def enchant_label(item_id: str, ench_id: str) -> str:
     if ench_id not in _ench_labels:
         label = ""
         try:
+
             def lines(url):
                 html = SESSION.get(url, timeout=15).json().get("tooltip", "")
                 return [t.strip() for t in re.sub(r"<[^>]+>", "|", html).split("|") if t.strip()]
+
             base = set(lines(f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}"))
-            extra = [t for t in lines(f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}?ench={ench_id}") if t not in base]
+            extra = [
+                t
+                for t in lines(f"https://nether.wowhead.com/wotlk/tooltip/item/{item_id}?ench={ench_id}")
+                if t not in base
+            ]
             label = extra[0] if extra else ""
         except Exception:
             pass
@@ -306,20 +333,26 @@ def stat_caps(class_name: str, spec: str, role: str, top: list[dict]) -> list[di
     elif class_name == "Hunter":
         wanted = [("hit_rating", "hit_rating", "Hit Rating")]
     else:
-        wanted = [("hit_rating", "hit_rating", "Hit Rating"),
-                  ("expertise_rating", "expertise_rating", "Expertise Rating")]
+        wanted = [
+            ("hit_rating", "hit_rating", "Hit Rating"),
+            ("expertise_rating", "expertise_rating", "Expertise Rating"),
+        ]
     caps = []
     for source_key, stat_key, display in wanted:
-        values = [c[source_key] for c in top if isinstance(c.get(source_key), (int, float)) and c[source_key] > 0]
+        values = [
+            c[source_key] for c in top if isinstance(c.get(source_key), (int, float)) and c[source_key] > 0
+        ]
         if len(values) < 5:
             continue
         value = round(_percentile(values, 0.25))
-        caps.append({
-            "stat_key": stat_key,
-            "display_name": display,
-            "cap_value": value,
-            "cap_label": f"lo que tienen 3 de cada 4 top (mediana {round(_percentile(values, 0.5))})",
-        })
+        caps.append(
+            {
+                "stat_key": stat_key,
+                "display_name": display,
+                "cap_value": value,
+                "cap_label": f"lo que tienen 3 de cada 4 top (mediana {round(_percentile(values, 0.5))})",
+            }
+        )
     return caps
 
 
@@ -399,7 +432,9 @@ def aggregate() -> None:
             by_role: dict[str, list] = {}
             for char in entry["characters"]:
                 if wears_other_spec_gear(class_name, spec, char):
-                    logger.info("%s %s: %s tiene puesto equipo de otra spec, se descarta", realm, key, char["name"])
+                    logger.info(
+                        "%s %s: %s tiene puesto equipo de otra spec, se descarta", realm, key, char["name"]
+                    )
                     continue
                 by_role.setdefault(detect_role(class_name, spec, char), []).append(char)
             for role, chars in by_role.items():
@@ -414,13 +449,16 @@ def aggregate() -> None:
         seen = sorted({i for g in guides.values() for i in g.pop("equipped_items")})
         item_names = {i: item_name(i) for i in seen}
         _save(TOOLTIP_CACHE, _tooltips)
-        _save(OUT_DIR / f"{realm.lower()}.json", {
-            "realm": realm,
-            "generated": datetime.now().strftime("%Y-%m-%d"),
-            "source": "armory.warmane.com + rankings ICC 25H de uwu-logs.xyz",
-            "guides": guides,
-            "item_names": item_names,
-        })
+        _save(
+            OUT_DIR / f"{realm.lower()}.json",
+            {
+                "realm": realm,
+                "generated": datetime.now().strftime("%Y-%m-%d"),
+                "source": "armory.warmane.com + rankings ICC 25H de uwu-logs.xyz",
+                "guides": guides,
+                "item_names": item_names,
+            },
+        )
 
 
 # Una corrida mala (uwu-logs caído, armory rate-limitado) trae muchas menos
@@ -439,7 +477,9 @@ def publish(realm: str, data: dict | None = None) -> bool:
     if new_count == 0 or new_count < current_count * MIN_GUIDES_RATIO:
         logger.warning(
             "%s: %d guías nuevas vs %d publicadas, no se publica (¿corrida incompleta?)",
-            realm, new_count, current_count,
+            realm,
+            new_count,
+            current_count,
         )
         return False
     if not set_app_state(app_state_key(realm), data):
@@ -473,8 +513,11 @@ def main() -> int:
     c = sub.add_parser("collect")
     c.add_argument("--realm", choices=REALMS, required=True)
     c.add_argument("--class", dest="only_class")
-    c.add_argument("--boost", action="store_true",
-                   help=f"sólo specs con menos de {BOOST_BELOW} jugadores, con más candidatos")
+    c.add_argument(
+        "--boost",
+        action="store_true",
+        help=f"sólo specs con menos de {BOOST_BELOW} jugadores, con más candidatos",
+    )
     sub.add_parser("aggregate")
     sub.add_parser("publish")
     sub.add_parser("monthly")

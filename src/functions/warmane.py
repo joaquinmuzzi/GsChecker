@@ -2,33 +2,33 @@ import logging
 import random
 import re
 import time
+from typing import Any
 from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
-import gearscore
 import profile_scraper
+from src.functions.cache import _cache_get, _cache_get_stale, _cache_set
 from src.functions.rate_limit import is_cf_1015
 from src.schemas.constants import (
-    SESSION,
-    HTTP_TIMEOUT,
-    SUMMARY_CACHE,
-    SUMMARY_TTL,
     ACHIEVEMENTS_CACHE,
     ACHIEVEMENTS_TTL,
+    ARMORY_BACKOFF_MAX,
+    ARMORY_BACKOFF_MIN,
+    ARMORY_CIRCUIT,
+    ARMORY_LIMITER,
+    ARMORY_MAX_ATTEMPTS,
     GEAR_CACHE,
     GEAR_TTL,
-    STATS_CACHE,
-    STATS_TTL,
     GUILD_RANK_CACHE,
     GUILD_RANK_TTL,
-    ARMORY_LIMITER,
-    ARMORY_CIRCUIT,
-    ARMORY_BACKOFF_MIN,
-    ARMORY_BACKOFF_MAX,
-    ARMORY_MAX_ATTEMPTS,
+    HTTP_TIMEOUT,
+    SESSION,
+    STATS_CACHE,
+    STATS_TTL,
+    SUMMARY_CACHE,
+    SUMMARY_TTL,
 )
-from src.functions.cache import _cache_get, _cache_get_stale, _cache_set
 
 WOW_CLASSES = (
     "Death Knight",
@@ -59,11 +59,7 @@ def _sleep_backoff(resp) -> None:
                 retry_after = float(raw)
             except (TypeError, ValueError):
                 retry_after = None
-    delay = (
-        retry_after
-        if retry_after is not None
-        else random.uniform(ARMORY_BACKOFF_MIN, ARMORY_BACKOFF_MAX)
-    )
+    delay = retry_after if retry_after is not None else random.uniform(ARMORY_BACKOFF_MIN, ARMORY_BACKOFF_MAX)
     time.sleep(delay)
 
 
@@ -107,9 +103,7 @@ def _armory_request(
                 if method == "GET":
                     resp = SESSION.get(url, headers=headers, timeout=HTTP_TIMEOUT)
                 else:
-                    resp = SESSION.post(
-                        url, headers=headers, data=data, timeout=HTTP_TIMEOUT
-                    )
+                    resp = SESSION.post(url, headers=headers, data=data, timeout=HTTP_TIMEOUT)
             except Exception as exc:
                 last_error = str(exc)
                 continue
@@ -136,9 +130,7 @@ def _armory_request(
 
             if _is_rate_limited(resp.status_code):
                 rate_limited_resp = resp
-                ARMORY_CIRCUIT.record_failure(
-                    reason=f"status={resp.status_code} on {path}"
-                )
+                ARMORY_CIRCUIT.record_failure(reason=f"status={resp.status_code} on {path}")
                 if ARMORY_CIRCUIT.is_open():
                     return None
 
@@ -199,9 +191,7 @@ def _fetch_api_summary(nombre: str, server: str) -> dict | None:
     if cached is not None:
         return cached if cached else None
 
-    resp = _warmane_get_with_scheme_fallback(
-        f"/api/character/{nombre}/{server}/summary", _API_HEADERS
-    )
+    resp = _warmane_get_with_scheme_fallback(f"/api/character/{nombre}/{server}/summary", _API_HEADERS)
     if resp is None:
         return None
     try:
@@ -233,9 +223,7 @@ def _fetch_profile_page_html(nombre: str, server: str) -> str:
     cached = _cache_get(SUMMARY_CACHE, cache_key, SUMMARY_TTL)
     if cached is not None:
         return cached
-    resp = _warmane_get_with_scheme_fallback(
-        f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS
-    )
+    resp = _warmane_get_with_scheme_fallback(f"/character/{nombre}/{server}/profile", _PROFILE_HEADERS)
     html = resp.text if resp is not None else ""
     # Do not cache empty/failed payloads; they are often transient issues.
     if html:
@@ -260,9 +248,7 @@ def _summary_from_profile_html(nombre: str, server: str):
     if character_sheet:
         guild_name = "Sin guild"
 
-        guild_link = character_sheet.select_one(
-            ".information .information-left .name .guild-name a"
-        )
+        guild_link = character_sheet.select_one(".information .information-left .name .guild-name a")
         if guild_link:
             guild_text = guild_link.get_text(" ", strip=True)
             if guild_text:
@@ -277,9 +263,7 @@ def _summary_from_profile_html(nombre: str, server: str):
             if raw_name:
                 parsed_name = " ".join(raw_name.split())
 
-        level_node = character_sheet.select_one(
-            ".information .information-left .level-race-class"
-        )
+        level_node = character_sheet.select_one(".information .information-left .level-race-class")
         if level_node:
             level_text = " ".join(level_node.get_text(" ", strip=True).split())
             level_pattern = re.compile(
@@ -288,10 +272,7 @@ def _summary_from_profile_html(nombre: str, server: str):
             )
             level_match = level_pattern.search(level_text)
             if level_match:
-                level_data = {
-                    key: " ".join(value.split())
-                    for key, value in level_match.groupdict().items()
-                }
+                level_data = {key: " ".join(value.split()) for key, value in level_match.groupdict().items()}
                 if (
                     level_data.get("server", "").lower() == target_server_lower
                     and (parsed_name or "").strip().lower() == lower_name
@@ -341,13 +322,8 @@ def _summary_from_profile_html(nombre: str, server: str):
 
     match = strict_pattern.search(page_text)
     if match:
-        data = {
-            k: (" ".join(v.split()) if isinstance(v, str) else v)
-            for k, v in match.groupdict().items()
-        }
-        parsed_guild = (
-            data.get("guild_bracket") or data.get("guild_plain") or ""
-        ).strip()
+        data = {k: (" ".join(v.split()) if isinstance(v, str) else v) for k, v in match.groupdict().items()}
+        parsed_guild = (data.get("guild_bracket") or data.get("guild_plain") or "").strip()
         return {
             "name": target_name,
             "level": int(data.get("level") or 0),
@@ -367,10 +343,7 @@ def _summary_from_profile_html(nombre: str, server: str):
     )
 
     for match in legacy_pattern.finditer(page_text):
-        data = {
-            k: (" ".join(v.split()) if isinstance(v, str) else v)
-            for k, v in match.groupdict().items()
-        }
+        data = {k: (" ".join(v.split()) if isinstance(v, str) else v) for k, v in match.groupdict().items()}
         if data.get("server", "").lower() != target_server_lower:
             continue
         if data.get("name", "").lower() != nombre.lower():
@@ -385,8 +358,6 @@ def _summary_from_profile_html(nombre: str, server: str):
             "gearScore": "N/A",
         }
 
-    page_title = soup.title.get_text(" ", strip=True) if soup.title else ""
-    not_found_hint = "Character does not exist" in page_text
     return None
 
 
@@ -422,9 +393,7 @@ def _fetch_summary(nombre: str, server: str):
     if summary is None:
         profile_summary = _summary_from_profile_html(nombre, server)
         if profile_summary is not None:
-            logger.warning(
-                "Falling back to profile HTML summary for '%s'/%s", nombre, server
-            )
+            logger.warning("Falling back to profile HTML summary for '%s'/%s", nombre, server)
             summary = profile_summary
 
     if summary is not None:
@@ -433,42 +402,48 @@ def _fetch_summary(nombre: str, server: str):
 
     stale = _cache_get_stale(SUMMARY_CACHE, cache_key)
     if isinstance(stale, dict) and stale.get("name"):
-        logger.warning(
-            "Using stale summary for '%s'/%s (armory unreachable)", nombre, server
-        )
+        logger.warning("Using stale summary for '%s'/%s (armory unreachable)", nombre, server)
         return stale
 
     if ARMORY_CIRCUIT.is_open():
         wait_s = int(ARMORY_CIRCUIT.seconds_until_close()) + 1
-        return {
-            "__error__": (
-                f"⚠️ El Armory de Warmane nos rate-limitó. "
-                f"Reintentá en ~{wait_s}s."
-            )
-        }
+        return {"__error__": (f"⚠️ El Armory de Warmane nos rate-limitó. Reintentá en ~{wait_s}s.")}
 
     if ARMORY_CIRCUIT.recent_failure_count() > 0:
         return {
-            "__error__": (
-                "⚠️ El Armory de Warmane está respondiendo con errores. "
-                "Reintentá en unos segundos."
-            )
+            "__error__": ("⚠️ El Armory de Warmane está respondiendo con errores. Reintentá en unos segundos.")
         }
 
     return {"__error__": f"⚠️ No se encontró el personaje '{nombre}' en {server}."}
 
 
 WOW_CLASSIC_SPEC_NAMES = {
-    "Balance", "Feral Combat", "Restoration",
-    "Arcane", "Fire", "Frost",
-    "Holy", "Protection", "Retribution",
-    "Beast Mastery", "Marksmanship", "Survival",
-    "Assassination", "Combat", "Subtlety",
-    "Arms", "Fury",
-    "Discipline", "Shadow",
-    "Elemental", "Enhancement",
-    "Affliction", "Demonology", "Destruction",
-    "Blood", "Unholy",
+    "Balance",
+    "Feral Combat",
+    "Restoration",
+    "Arcane",
+    "Fire",
+    "Frost",
+    "Holy",
+    "Protection",
+    "Retribution",
+    "Beast Mastery",
+    "Marksmanship",
+    "Survival",
+    "Assassination",
+    "Combat",
+    "Subtlety",
+    "Arms",
+    "Fury",
+    "Discipline",
+    "Shadow",
+    "Elemental",
+    "Enhancement",
+    "Affliction",
+    "Demonology",
+    "Destruction",
+    "Blood",
+    "Unholy",
 }
 
 # Abbreviated/alternate names the Warmane armory sometimes returns
@@ -498,7 +473,7 @@ def _parse_specs_from_html(html: str) -> list[dict]:
         return []
     soup = BeautifulSoup(html, "html.parser")
     stubs = soup.select("div.specialization div.stub")
-    specs = []
+    specs: list[dict[str, Any]] = []
     for stub in stubs:
         text_node = stub.select_one("div.text")
         if not text_node:
@@ -515,7 +490,7 @@ def _parse_specs_from_html(html: str) -> list[dict]:
             value_span.extract()
         spec_name = _normalize_spec_name(" ".join(text_copy.get_text(" ", strip=True).split()))
         if spec_name and spec_name in WOW_CLASSIC_SPEC_NAMES:
-            stub_classes = stub.get("class") or []
+            stub_classes: str | list[str] = stub.get("class") or []
             is_active = "active" in stub_classes or "selected" in stub_classes
             specs.append(
                 {
@@ -543,11 +518,7 @@ def _parse_specs_from_html(html: str) -> list[dict]:
         active = (
             s["_active_flag"]
             if has_explicit_active
-            else (
-                i == points_active_index
-                if use_points_heuristic
-                else (i == 0)
-            )
+            else (i == points_active_index if use_points_heuristic else (i == 0))
         )
         result.append({"name": s["name"], "active": active})
     return result
@@ -581,10 +552,7 @@ def _specs_from_api_payload(payload: dict) -> list[dict]:
                 active_idx = idx
                 break
 
-    return [
-        {"name": entry["name"], "active": idx == active_idx}
-        for idx, entry in enumerate(parsed)
-    ]
+    return [{"name": entry["name"], "active": idx == active_idx} for idx, entry in enumerate(parsed)]
 
 
 def _fetch_specs(nombre: str, server: str) -> list[dict]:
@@ -666,9 +634,7 @@ def _fetch_professions(nombre: str, server: str) -> list[str]:
 
     result = []
     for stub in prof_section.find_all(class_="stub"):
-        parts = [
-            p.strip() for p in stub.get_text("\n", strip=True).split("\n") if p.strip()
-        ]
+        parts = [p.strip() for p in stub.get_text("\n", strip=True).split("\n") if p.strip()]
         if len(parts) < 2:
             continue
         name = parts[0].capitalize()
@@ -825,7 +791,7 @@ def _fetch_achievements(nombre: str, server: str):
         all_achievements = soup.find_all("div", class_="achievement")
         completed_achievements = []
         for ach in all_achievements:
-            classes = ach.get("class") or []
+            classes: str | list[str] = ach.get("class") or []
             if isinstance(classes, str):
                 class_list = classes.split()
             elif isinstance(classes, list):
@@ -961,10 +927,7 @@ def _fetch_achievements(nombre: str, server: str):
             "storming_25h_achieved",
         )
     )
-    rs_categories_tried = set(raid_categories) & {14922, 14923}
-    rs_got_empty = not any(
-        ach_id in completed_ids for ach_id in target_achievements
-    )
+    rs_got_empty = not any(ach_id in completed_ids for ach_id in target_achievements)
     # Prefer stale cache when ICC succeeded but RS failed (partial transient failure),
     # or when every target flag is false due to complete upstream failure.
     prefer_stale = (storming_any and rs_got_empty) or (not halion_any and not storming_any)
@@ -1039,7 +1002,7 @@ def _fetch_toc_achievements(nombre: str, server: str):
             key = target_titles.get(title)
             if not key:
                 continue
-            classes = ach_div.get("class") or []
+            classes: str | list[str] = ach_div.get("class") or []
             if isinstance(classes, str):
                 class_list = classes.split()
             elif isinstance(classes, list):
@@ -1054,9 +1017,25 @@ def _fetch_toc_achievements(nombre: str, server: str):
 
 
 _SLOT_FALLBACK_ORDER = [
-    "Head", "Neck", "Shoulder", "Back", "Chest", "Shirt", "Tabard", "Wrist",
-    "Hands", "Waist", "Legs", "Feet", "Finger 1", "Finger 2", "Trinket 1",
-    "Trinket 2", "Main Hand", "Off Hand", "Ranged",
+    "Head",
+    "Neck",
+    "Shoulder",
+    "Back",
+    "Chest",
+    "Shirt",
+    "Tabard",
+    "Wrist",
+    "Hands",
+    "Waist",
+    "Legs",
+    "Feet",
+    "Finger 1",
+    "Finger 2",
+    "Trinket 1",
+    "Trinket 2",
+    "Main Hand",
+    "Off Hand",
+    "Ranged",
 ]
 
 
@@ -1080,9 +1059,7 @@ def _gear_stubs_from_api(nombre: str, server: str) -> list[dict]:
         item_id = str(item.get("item") or "").strip()
         if not item_id.isdigit():
             continue
-        slot_name = (
-            _SLOT_FALLBACK_ORDER[idx] if idx < len(_SLOT_FALLBACK_ORDER) else f"Slot {idx + 1}"
-        )
+        slot_name = _SLOT_FALLBACK_ORDER[idx] if idx < len(_SLOT_FALLBACK_ORDER) else f"Slot {idx + 1}"
         stubs.append(
             {
                 "item": item_id,

@@ -1,0 +1,56 @@
+# Configuración de las herramientas de desarrollo: Ruff, Mypy y pytest.
+# No hay tabla [project] a propósito: el bot no es un paquete instalable y
+# Railway (Nixpacks) instala las dependencias desde requirements.txt.
+# Las herramientas se instalan con: pip install -r requirements-dev.txt
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+# Selección explícita, para que una versión nueva de Ruff no cambie las reglas
+select = [
+    "E4", "E7", "E9", # pycodestyle: errores
+    "F",              # pyflakes
+    "I",              # orden de imports (isort)
+    "B",              # bugbear
+    "UP",             # pyupgrade
+    "SIM",            # simplify
+    "PT",             # estilo de pytest
+    "RUF",            # reglas propias de Ruff
+]
+# zip() recorre listas alineadas por construcción: strict= solo agregaría ruido
+ignore = ["B905"]
+# Los textos del bot están en español y llevan rayas, signos y emojis a propósito
+allowed-confusables = ["–", "−", "×", "ℹ"]
+
+[tool.ruff.lint.per-file-ignores]
+# Los scripts agregan la raíz del repo al sys.path antes de importar el proyecto,
+# para poder correrlos también como `python tools/<script>.py`
+"tools/*.py" = ["E402"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.11"
+files = ["main.py", "gearscore.py", "profile_scraper.py", "src", "tools", "tests"]
+# tools/ y tests/ se importan como paquetes desde la raíz (`tools.preload_...`)
+explicit_package_bases = true
+# Sin `strict` todavía: se chequea el cuerpo de todas las funciones, aunque no
+# tengan anotaciones, y se avisa lo que sobra. Las anotaciones se suman de a poco.
+check_untyped_defs = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning:discord.*"]

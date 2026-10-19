@@ -13,7 +13,6 @@ from src.controller.commands import register_commands
 from src.db.postgres import init_database
 from src.schemas.constants import PREFIX
 
-
 LOCK_PATH = "/tmp/gschecker.lock"
 
 
@@ -22,13 +21,9 @@ def configure_logging() -> logging.Logger:
     logger = logging.getLogger("gschecker")
     logger.setLevel(logging.INFO)
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-    info_handler = RotatingFileHandler(
-        "logs/bot.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8"
-    )
+    info_handler = RotatingFileHandler("logs/bot.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8")
     info_handler.setLevel(logging.INFO)
     info_handler.setFormatter(formatter)
 
@@ -54,7 +49,7 @@ def configure_logging() -> logging.Logger:
 def acquire_lock(lock_path: str, log: logging.Logger) -> None:
     if os.path.exists(lock_path):
         try:
-            with open(lock_path, "r", encoding="utf-8") as f:
+            with open(lock_path, encoding="utf-8") as f:
                 pid_str = f.read().strip()
             if pid_str:
                 pid = int(pid_str)

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from src.functions.warmane import _fetch_achievements
-from src.functions.cache import _cache_set
-from src.schemas.constants import ACHIEVEMENTS_CACHE, ACHIEVEMENTS_TTL
+from src.schemas.constants import ACHIEVEMENTS_CACHE
 
 
 @pytest.fixture(autouse=True)
@@ -55,10 +53,9 @@ class TestSequentialFetching:
     @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
     @patch("src.functions.warmane.ARMORY_LIMITER")
     @patch("src.functions.warmane.time.sleep")
-    def test_rescue_also_fetches_sequentially(
-        self, mock_sleep, mock_limiter, mock_post
-    ):
+    def test_rescue_also_fetches_sequentially(self, mock_sleep, mock_limiter, mock_post):
         """When rescue fires, it also fetches RS categories one-by-one."""
+
         def side_effect(path, headers, data):
             cat = data.get("category")
             if cat in (14922, 14923):
@@ -78,9 +75,7 @@ class TestStaleCacheFallback:
     @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
     @patch("src.functions.warmane.ARMORY_LIMITER")
     @patch("src.functions.warmane.time.sleep")
-    def test_stale_cache_used_when_rs_empty_icc_ok(
-        self, mock_sleep, mock_limiter, mock_post, mock_get_stale
-    ):
+    def test_stale_cache_used_when_rs_empty_icc_ok(self, mock_sleep, mock_limiter, mock_post, mock_get_stale):
         def side_effect(path, headers, data):
             cat = data.get("category")
             if cat == 15041:
@@ -118,9 +113,7 @@ class TestStaleCacheFallback:
     @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
     @patch("src.functions.warmane.ARMORY_LIMITER")
     @patch("src.functions.warmane.time.sleep")
-    def test_stale_cache_not_used_when_both_empty(
-        self, mock_sleep, mock_limiter, mock_post, mock_get_stale
-    ):
+    def test_stale_cache_not_used_when_both_empty(self, mock_sleep, mock_limiter, mock_post, mock_get_stale):
         mock_post.return_value = _make_empty_response()
         mock_limiter.acquire.return_value = None
         mock_get_stale.return_value = None
