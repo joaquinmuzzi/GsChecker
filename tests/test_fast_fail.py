@@ -7,28 +7,25 @@ from __future__ import annotations
 
 import pytest
 
-from tests.test_personaje import (  # noqa: F401  (fixtures)
-    _find_command,
-    bot,
-    patched_fetchers,
-)
+from tests.helpers import _find_command
 
 HEAVY = ("gear", "achievements", "statistics", "specs", "professions")
 
 
 @pytest.mark.asyncio
-async def test_invalid_name_is_rejected_without_armory(bot, interaction, patched_fetchers):  # noqa: F811
+async def test_invalid_name_is_rejected_without_armory(bot, interaction, patched_fetchers):
     await _find_command(bot, "p").callback(interaction, nombre="C_123")
 
     last = interaction.last_sent()
-    assert last is not None and "no es un nombre de personaje válido" in (last.content or "")
+    assert last is not None
+    assert "no es un nombre de personaje válido" in (last.content or "")
     patched_fetchers["summary"].assert_not_called()
     for name in HEAVY:
         patched_fetchers[name].assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_missing_character_skips_heavy_fetches(bot, interaction, patched_fetchers):  # noqa: F811
+async def test_missing_character_skips_heavy_fetches(bot, interaction, patched_fetchers):
     patched_fetchers["summary"].return_value = {
         "__error__": "⚠️ No se encontró el personaje 'Zzqxwvut' en Lordaeron."
     }
@@ -40,7 +37,7 @@ async def test_missing_character_skips_heavy_fetches(bot, interaction, patched_f
 
 
 @pytest.mark.asyncio
-async def test_low_level_character_skips_heavy_fetches(bot, interaction, patched_fetchers):  # noqa: F811
+async def test_low_level_character_skips_heavy_fetches(bot, interaction, patched_fetchers):
     patched_fetchers["summary"].return_value = {
         "name": "Srpingu",
         "level": 1,
@@ -58,8 +55,9 @@ async def test_low_level_character_skips_heavy_fetches(bot, interaction, patched
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("command", ["dps", "ptoc", "ia"])
-async def test_other_commands_reject_invalid_names(bot, interaction, command):  # noqa: F811
+async def test_other_commands_reject_invalid_names(bot, interaction, command):
     await _find_command(bot, command).callback(interaction, nombre="C_123")
 
     last = interaction.last_sent()
-    assert last is not None and "no es un nombre de personaje válido" in (last.content or "")
+    assert last is not None
+    assert "no es un nombre de personaje válido" in (last.content or "")

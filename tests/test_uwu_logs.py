@@ -11,7 +11,7 @@ import pytest
 
 import src.functions.uwu as uwu
 from src.functions.embeds import _build_uwu_logs_embed, _build_uwu_logs_view
-from tests.test_personaje import _find_command, bot  # noqa: F401
+from tests.helpers import _find_command
 from tests.test_uwu_dps import FakeResp, FakeSession, _isolated_caches  # noqa: F401
 
 REPORTS = {
@@ -85,7 +85,7 @@ def test_embed_and_view():
 
 
 @pytest.mark.asyncio
-async def test_command_without_logs(bot, interaction, monkeypatch):  # noqa: F811
+async def test_command_without_logs(bot, interaction, monkeypatch):
     monkeypatch.setattr(
         "src.controller.commands.logs._fetch_uwu_recent_logs",
         lambda nombre, server: {"total": 0, "reports": []},
@@ -96,7 +96,7 @@ async def test_command_without_logs(bot, interaction, monkeypatch):  # noqa: F81
 
 
 @pytest.mark.asyncio
-async def test_command_when_uwu_is_down(bot, interaction, monkeypatch):  # noqa: F811
+async def test_command_when_uwu_is_down(bot, interaction, monkeypatch):
     monkeypatch.setattr("src.controller.commands.logs._fetch_uwu_recent_logs", lambda nombre, server: None)
     await _find_command(bot, "logs").callback(interaction, nombre="Flappyaladin")
 

@@ -26,10 +26,9 @@ import asyncio
 import logging
 import os
 
-from src.audit.models import CharacterData, CharacterStats, EquippedItem
-from src.audit.bis_guides import get_bis_guide
 from src.audit.auditor import audit_character
-from src.audit.models import AuditReport
+from src.audit.bis_guides import get_bis_guide
+from src.audit.models import AuditReport, CharacterData, CharacterStats, EquippedItem
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ _ITEM_NAME_CACHE: dict[str, str] = {}
 def _lookup_item_names(item_ids: list[str]) -> dict[str, str]:
     """Nombres de ítems vía tooltips de Wowhead WotLK (Warmane usa los IDs
     originales). Cacheado y tolerante a fallos: si no responde, queda el ID."""
-    import requests  # noqa: PLC0415
+    import requests
 
     for item_id in item_ids:
         if item_id in _ITEM_NAME_CACHE:
@@ -138,7 +137,7 @@ async def run_full_audit(
     # 1. Get gear data
     if gear_data is None:
         try:
-            from profile_scraper import get_gear_data  # noqa: PLC0415
+            from profile_scraper import get_gear_data
 
             # Offload blocking I/O to the default thread-pool executor
             loop = asyncio.get_event_loop()

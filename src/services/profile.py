@@ -127,10 +127,7 @@ def _is_valid_personaje_payload(payload: dict) -> bool:
         return False
 
     gear_item_count = payload.get("gear_item_count")
-    if gear_item_count is not None and gear_item_count < 15:
-        return False
-
-    return True
+    return gear_item_count is None or gear_item_count >= 15
 
 
 def _compute_personaje_base(
@@ -159,10 +156,7 @@ def _compute_personaje_base(
         # NOT filter out blank slots (e.g. empty Tabard) or every item after
         # them scores against the wrong slot category.
         gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
-        if gear_ids:
-            gs = sum(gearscore.main(gear_ids))
-        else:
-            gs = summary.get("gearScore", "N/A")
+        gs = sum(gearscore.main(gear_ids)) if gear_ids else summary.get("gearScore", "N/A")
     except Exception:
         logger.exception(
             "gearscore calc failed for '%s'/%s — falling back to armory gearScore",
@@ -252,10 +246,13 @@ def _compute_personaje_base(
         gs_by_spec,
         active_specs,
     )
-    if spec_gs_entries and not any(entry.get("main") for entry in spec_gs_entries):
-        if gs not in {None, "N/A", "?"}:
-            spec_gs_entries[0]["main"] = True
-            spec_gs_entries[0]["gearscore"] = gs
+    if (
+        spec_gs_entries
+        and not any(entry.get("main") for entry in spec_gs_entries)
+        and gs not in {None, "N/A", "?"}
+    ):
+        spec_gs_entries[0]["main"] = True
+        spec_gs_entries[0]["gearscore"] = gs
 
     # Avoid synthetic ICC counts when statistics are temporarily unavailable.
     # Storming achievements are handled in the special UwU section only.

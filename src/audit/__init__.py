@@ -10,6 +10,9 @@ Public API
     from src.audit.coach import generate_coach_summary
 """
 
+from .auditor import audit_character
+from .bis_guides import available_guides, get_bis_guide
+from .coach import generate_coach_summary
 from .models import (
     AuditReport,
     AuditSeverity,
@@ -21,16 +24,8 @@ from .models import (
     ItemAuditIssue,
     StatCapAuditResult,
 )
-from .bis_guides import available_guides, get_bis_guide
-from .auditor import audit_character
-from .coach import generate_coach_summary
 
 __all__ = [
-    "audit_character",
-    "generate_coach_summary",
-    "get_bis_guide",
-    "available_guides",
-    # models
     "AuditReport",
     "AuditSeverity",
     "BisGuide",
@@ -40,4 +35,8 @@ __all__ = [
     "GemAuditIssue",
     "ItemAuditIssue",
     "StatCapAuditResult",
+    "audit_character",
+    "available_guides",
+    "generate_coach_summary",
+    "get_bis_guide",
 ]

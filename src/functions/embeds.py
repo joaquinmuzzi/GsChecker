@@ -56,7 +56,7 @@ def _render_table(rows, headers, header_labels=None, widths=None) -> str:
     total_width = sum(widths[h] for h in headers) + len(headers) * 3
     sep_line = "-" * total_width
     body_lines = [" | ".join(_pad(row[h], widths[h]) for h in headers) for row in rows]
-    return "\n".join([header_line, sep_line] + body_lines)
+    return "\n".join([header_line, sep_line, *body_lines])
 
 
 def _format_uwu_dps_table(rows) -> str:
@@ -71,7 +71,7 @@ def _format_uwu_dps_table(rows) -> str:
             body_lines.append(sep_line)
             continue
         body_lines.append(" | ".join(_pad(row[h], widths[h]) for h in headers))
-    return "\n".join([header_line, sep_line] + body_lines)
+    return "\n".join([header_line, sep_line, *body_lines])
 
 
 def _format_uwu_overview_table(rows) -> str:
@@ -94,7 +94,7 @@ def _format_uwu_overview_table(rows) -> str:
     total_width = sum(widths[h] for h in headers) + len(headers) * 3
     sep_line = "-" * total_width
     body_lines = [" | ".join(_pad(row[key_map[h]], widths[h]) for h in headers) for row in rows]
-    return "\n".join([header_line, sep_line] + body_lines)
+    return "\n".join([header_line, sep_line, *body_lines])
 
 
 def _extract_icc_boss_kills(stats_rows):
@@ -173,7 +173,7 @@ def _format_boss_rows(bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, load
     if isinstance(uwu_icc_kills, dict):
         uwu_dependent_bosses.update(uwu_icc_kills.keys())
 
-    for name in bosses_10.keys():
+    for name in bosses_10:
         c10 = bosses_10[name]
         c25 = bosses_25.get(name, {"nm": 0, "hc": 0})
         row = {"Boss": name}

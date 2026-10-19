@@ -3,44 +3,44 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
+from src.db.postgres import get_external_cache, set_external_cache
+from src.functions.cache import _cache_get, _cache_set
 from src.schemas.constants import (
-    SESSION,
     HTTP_TIMEOUT,
+    SESSION,
     UWU_BASE,
     UWU_BOSS_MODE,
     UWU_BOSS_SHORT,
-    UWU_CLASS_INDEX,
-    UWU_MODES_ALL,
-    UWU_SPEC_KEYWORDS,
-    UWU_SPEC_KEYWORDS_BY_CLASS,
     UWU_CHARACTER_CACHE,
     UWU_CHARACTER_TTL,
-    UWU_TOP_CACHE,
-    UWU_TOP_TTL,
-    UWU_PDPS_SUMMARY_CACHE,
-    UWU_PDPS_SUMMARY_TTL,
+    UWU_CLASS_INDEX,
     UWU_ICC_KILLS_CACHE,
     UWU_ICC_KILLS_TTL,
-    UWU_PLAYER_ROWS_CACHE,
-    UWU_PLAYER_ROWS_TTL,
-    UWU_TOP_MAX_ATTEMPTS,
-    UWU_TOP_PLAYER_LIMIT,
-    UWU_SPEC_PLAYERS_CACHE,
-    UWU_SPEC_PLAYERS_TTL,
-    UWU_NON_DPS_SPECS,
-    UWU_SPEC_NAMES,
-    UWU_TOP_POINTS_CACHE,
-    UWU_TOP_POINTS_TTL,
     UWU_LOGS_CACHE,
     UWU_LOGS_ICC_FIGHTS,
     UWU_LOGS_LIMIT,
     UWU_LOGS_OTHER_FIGHTS,
     UWU_LOGS_TTL,
+    UWU_MODES_ALL,
+    UWU_NON_DPS_SPECS,
+    UWU_PDPS_SUMMARY_CACHE,
+    UWU_PDPS_SUMMARY_TTL,
+    UWU_PLAYER_ROWS_CACHE,
+    UWU_PLAYER_ROWS_TTL,
+    UWU_SPEC_KEYWORDS,
+    UWU_SPEC_KEYWORDS_BY_CLASS,
+    UWU_SPEC_NAMES,
+    UWU_SPEC_PLAYERS_CACHE,
+    UWU_SPEC_PLAYERS_TTL,
+    UWU_TOP_CACHE,
+    UWU_TOP_MAX_ATTEMPTS,
+    UWU_TOP_PLAYER_LIMIT,
     UWU_TOP_PLAYER_TIMEOUT,
+    UWU_TOP_POINTS_CACHE,
+    UWU_TOP_POINTS_TTL,
+    UWU_TOP_TTL,
     UWU_TOP_WORKERS,
 )
-from src.db.postgres import get_external_cache, set_external_cache
-from src.functions.cache import _cache_get, _cache_set
 
 logger = logging.getLogger("gschecker.uwu")
 

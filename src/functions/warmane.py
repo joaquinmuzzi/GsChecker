@@ -6,29 +6,28 @@ from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
-import gearscore
 import profile_scraper
+from src.functions.cache import _cache_get, _cache_get_stale, _cache_set
 from src.functions.rate_limit import is_cf_1015
 from src.schemas.constants import (
-    SESSION,
-    HTTP_TIMEOUT,
-    SUMMARY_CACHE,
-    SUMMARY_TTL,
     ACHIEVEMENTS_CACHE,
     ACHIEVEMENTS_TTL,
+    ARMORY_BACKOFF_MAX,
+    ARMORY_BACKOFF_MIN,
+    ARMORY_CIRCUIT,
+    ARMORY_LIMITER,
+    ARMORY_MAX_ATTEMPTS,
     GEAR_CACHE,
     GEAR_TTL,
-    STATS_CACHE,
-    STATS_TTL,
     GUILD_RANK_CACHE,
     GUILD_RANK_TTL,
-    ARMORY_LIMITER,
-    ARMORY_CIRCUIT,
-    ARMORY_BACKOFF_MIN,
-    ARMORY_BACKOFF_MAX,
-    ARMORY_MAX_ATTEMPTS,
+    HTTP_TIMEOUT,
+    SESSION,
+    STATS_CACHE,
+    STATS_TTL,
+    SUMMARY_CACHE,
+    SUMMARY_TTL,
 )
-from src.functions.cache import _cache_get, _cache_get_stale, _cache_set
 
 WOW_CLASSES = (
     "Death Knight",
@@ -358,8 +357,6 @@ def _summary_from_profile_html(nombre: str, server: str):
             "gearScore": "N/A",
         }
 
-    page_title = soup.title.get_text(" ", strip=True) if soup.title else ""
-    not_found_hint = "Character does not exist" in page_text
     return None
 
 
@@ -929,7 +926,6 @@ def _fetch_achievements(nombre: str, server: str):
             "storming_25h_achieved",
         )
     )
-    rs_categories_tried = set(raid_categories) & {14922, 14923}
     rs_got_empty = not any(ach_id in completed_ids for ach_id in target_achievements)
     # Prefer stale cache when ICC succeeded but RS failed (partial transient failure),
     # or when every target flag is false due to complete upstream failure.

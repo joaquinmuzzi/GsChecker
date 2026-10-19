@@ -11,141 +11,11 @@ Cubre los 3 escenarios que corresponden a los bugs que ya vimos:
 
 from __future__ import annotations
 
-from contextlib import ExitStack
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import discord
-from discord.ext import commands as discord_commands
-
-from src.controller.commands import register_commands
-
-
-@pytest.fixture
-def bot() -> discord_commands.Bot:
-    intents = discord.Intents.default()
-    intents.message_content = True
-    b = discord_commands.Bot(command_prefix="!", intents=intents)
-    register_commands(b)
-    return b
-
-
-def _find_command(bot: discord_commands.Bot, name: str):
-    for cmd in bot.tree.walk_commands():
-        if cmd.name == name:
-            return cmd
-    raise LookupError(f"slash command '{name}' not found")
-
-
-def _happy_summary() -> dict:
-    return {
-        "name": "Samsara",
-        "level": 80,
-        "race": "Draenei",
-        "class": "Death Knight",
-        "guild": "Newbie Ink",
-        "gearScore": "N/A",
-    }
-
-
-def _happy_gear_data() -> list[dict]:
-    slots = [
-        "Head",
-        "Neck",
-        "Shoulder",
-        "Back",
-        "Chest",
-        "Wrist",
-        "Hands",
-        "Waist",
-        "Legs",
-        "Feet",
-        "Finger 1",
-        "Finger 2",
-        "Trinket 1",
-        "Trinket 2",
-        "Ranged",
-        "Main Hand",
-        "Off Hand",
-        "Sigil",
-        "Tabard",
-    ]
-    return [
-        {
-            "item": str(49986 + i),
-            "slot": slot,
-            "gems": ["0", "0", "0"],
-            "ench": "0",
-        }
-        for i, slot in enumerate(slots)
-    ]
-
-
-def _happy_achievements() -> dict:
-    return {
-        "completed_ids": {"4531", "4604"},
-        "icc_10n_bosses": 4,
-        "icc_25n_bosses": 4,
-        "icc_10h_bosses": 0,
-        "icc_25h_bosses": 0,
-        "halion_10n_achieved": False,
-        "halion_10h_achieved": False,
-        "halion_25n_achieved": False,
-        "halion_25h_achieved": False,
-        "storming_10n_achieved": True,
-        "storming_10h_achieved": False,
-        "storming_25n_achieved": True,
-        "storming_25h_achieved": False,
-    }
-
-
-# Cada comando importa los fetchers por nombre, así que se patchean en cada
-# módulo que los usa (el mismo mock en todos, como cuando había un solo
-# commands.py).
-_COMMANDS = "src.controller.commands"
-FETCHER_TARGETS = {
-    "summary": ("_fetch_summary", ("personaje_live", "dps", "ia")),
-    "specs": ("_fetch_specs", ("personaje_live", "ia")),
-    "professions": ("_fetch_professions", ("personaje_live",)),
-    "gear": ("_fetch_gear_data", ("personaje_live", "ia")),
-    "achievements": ("_fetch_achievements", ("personaje_live",)),
-    "statistics": ("_fetch_statistics", ("personaje_live",)),
-    "uwu_icc": ("_uwu_icc_bugfix_kills", ("personaje_live",)),
-    "uwu_perf": ("_fetch_uwu_performance", ("personaje", "personaje_live")),
-}
-
-
-@pytest.fixture
-def patched_fetchers():
-    """Patchea todas las funciones armory + uwu que /p invoca por executor.
-
-    Los tests solo tienen que sobrescribir el retorno de la función que
-    les interesa (ej: patched_fetchers['summary'].return_value = ...) y
-    ejecutar el comando.
-    """
-    mocks = {key: MagicMock(name=attr) for key, (attr, _) in FETCHER_TARGETS.items()}
-    # El guild rank lo pide la lógica del perfil compartida con el cron.
-    mocks["guild_rank"] = MagicMock(name="_fetch_guild_rank")
-    with ExitStack() as stack:
-        for key, (attr, modules) in FETCHER_TARGETS.items():
-            for module in modules:
-                stack.enter_context(patch(f"{_COMMANDS}.{module}.{attr}", mocks[key]))
-        stack.enter_context(patch("src.services.profile._fetch_guild_rank", mocks["guild_rank"]))
-
-        mocks["summary"].return_value = _happy_summary()
-        mocks["specs"].return_value = [
-            {"name": "Blood", "active": True},
-            {"name": "Frost", "active": False},
-        ]
-        mocks["professions"].return_value = ["Engineering 450", "Enchanting 450"]
-        mocks["gear"].return_value = _happy_gear_data()
-        mocks["achievements"].return_value = _happy_achievements()
-        mocks["statistics"].return_value = []
-        mocks["guild_rank"].return_value = "Gran Canciller"
-        mocks["uwu_icc"].return_value = {}
-        mocks["uwu_perf"].return_value = {}
-        yield mocks
+from tests.helpers import _find_command, _happy_achievements, _happy_summary
 
 
 @pytest.mark.asyncio
@@ -273,9 +143,10 @@ class TestHalionIgnoresBrokenStatistics:
         await p_cmd.callback(interaction, nombre="Srpingu")
 
         edit = interaction.last_edit()
-        assert edit is not None and edit.embed is not None
+        assert edit is not None
+        assert edit.embed is not None
         rs_value = _ruby_sanctum_field_value(edit.embed)
-        halion_row = next(l for l in rs_value.splitlines() if l.startswith("Halion"))
+        halion_row = next(line for line in rs_value.splitlines() if line.startswith("Halion"))
         assert "❌" not in halion_row, rs_value
         assert halion_row.count("✅") == 4, rs_value
 
@@ -392,7 +263,8 @@ async def test_hung_uwu_lookup_still_ends_in_final_state(bot, interaction, patch
     final = interaction.last_edit().embed
     for boss in ("Marrowgar", "Deathwhisper"):
         line = _icc_line(final, boss)
-        assert "⌛" not in line and "⏳" not in line, line
+        assert "⌛" not in line, line
+        assert "⏳" not in line, line
 
 
 @pytest.mark.asyncio
@@ -422,7 +294,8 @@ async def test_final_embed_is_resent_when_discord_keeps_the_loading_one(bot, int
     assert edits[-1].embed is edits[-2].embed, "the final embed should be re-sent"
     for boss in ("Marrowgar", "Deathwhisper"):
         line = _icc_line(edits[-1].embed, boss)
-        assert "⌛" not in line and "⏳" not in line, line
+        assert "⌛" not in line, line
+        assert "⏳" not in line, line
 
 
 @pytest.mark.asyncio

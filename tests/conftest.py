@@ -12,12 +12,18 @@ from __future__ import annotations
 import copy
 import os
 import sys
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import discord
 import pytest
+from discord.ext import commands as discord_commands
+
+from src.controller.commands import register_commands
+from tests.helpers import _happy_achievements, _happy_gear_data, _happy_summary
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -178,3 +184,60 @@ def interaction() -> FakeInteraction:
 @pytest.fixture(autouse=True)
 def _no_final_edit_check_wait(monkeypatch):
     monkeypatch.setattr("src.controller.commands.personaje_live.PERSONAJE_FINAL_CHECK_SECONDS", 0)
+
+
+@pytest.fixture
+def bot() -> discord_commands.Bot:
+    intents = discord.Intents.default()
+    intents.message_content = True
+    b = discord_commands.Bot(command_prefix="!", intents=intents)
+    register_commands(b)
+    return b
+
+
+# Cada comando importa los fetchers por nombre, así que se patchean en cada
+# módulo que los usa (el mismo mock en todos, como cuando había un solo
+# commands.py).
+_COMMANDS = "src.controller.commands"
+FETCHER_TARGETS = {
+    "summary": ("_fetch_summary", ("personaje_live", "dps", "ia")),
+    "specs": ("_fetch_specs", ("personaje_live", "ia")),
+    "professions": ("_fetch_professions", ("personaje_live",)),
+    "gear": ("_fetch_gear_data", ("personaje_live", "ia")),
+    "achievements": ("_fetch_achievements", ("personaje_live",)),
+    "statistics": ("_fetch_statistics", ("personaje_live",)),
+    "uwu_icc": ("_uwu_icc_bugfix_kills", ("personaje_live",)),
+    "uwu_perf": ("_fetch_uwu_performance", ("personaje", "personaje_live")),
+}
+
+
+@pytest.fixture
+def patched_fetchers():
+    """Patchea todas las funciones armory + uwu que /p invoca por executor.
+
+    Los tests solo tienen que sobrescribir el retorno de la función que
+    les interesa (ej: patched_fetchers['summary'].return_value = ...) y
+    ejecutar el comando.
+    """
+    mocks = {key: MagicMock(name=attr) for key, (attr, _) in FETCHER_TARGETS.items()}
+    # El guild rank lo pide la lógica del perfil compartida con el cron.
+    mocks["guild_rank"] = MagicMock(name="_fetch_guild_rank")
+    with ExitStack() as stack:
+        for key, (attr, modules) in FETCHER_TARGETS.items():
+            for module in modules:
+                stack.enter_context(patch(f"{_COMMANDS}.{module}.{attr}", mocks[key]))
+        stack.enter_context(patch("src.services.profile._fetch_guild_rank", mocks["guild_rank"]))
+
+        mocks["summary"].return_value = _happy_summary()
+        mocks["specs"].return_value = [
+            {"name": "Blood", "active": True},
+            {"name": "Frost", "active": False},
+        ]
+        mocks["professions"].return_value = ["Engineering 450", "Enchanting 450"]
+        mocks["gear"].return_value = _happy_gear_data()
+        mocks["achievements"].return_value = _happy_achievements()
+        mocks["statistics"].return_value = []
+        mocks["guild_rank"].return_value = "Gran Canciller"
+        mocks["uwu_icc"].return_value = {}
+        mocks["uwu_perf"].return_value = {}
+        yield mocks

@@ -191,7 +191,7 @@ def register(bot):
             )
             try:
                 uwu_overview = await asyncio.wait_for(overview_future, timeout=12.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 uwu_overview = None
 
             if uwu_overview and uwu_overview.get("rows"):
@@ -225,7 +225,7 @@ def register(bot):
                     uwu_dps_future,
                     timeout=DPS_COMMAND_TIMEOUT_SECONDS,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await _safe_edit_original_response(
                     interaction,
                     content=(

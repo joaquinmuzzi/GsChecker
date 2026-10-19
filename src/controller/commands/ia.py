@@ -6,7 +6,6 @@ import os
 import discord
 
 from profile_scraper import get_character_stats
-
 from src.audit.bis_guides import (
     GUIDE_REALMS,
     available_guides,

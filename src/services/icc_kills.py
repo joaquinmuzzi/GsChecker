@@ -202,13 +202,10 @@ def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
     if not isinstance(achi_payload, dict):
         return uwu_icc_kills
 
-    completed_ids = achi_payload.get("completed_ids", set())
-    if isinstance(completed_ids, list):
-        completed_ids = set(str(x) for x in completed_ids)
-    elif isinstance(completed_ids, set):
-        completed_ids = set(str(x) for x in completed_ids)
-    else:
-        completed_ids = set()
+    raw_completed_ids = achi_payload.get("completed_ids", set())
+    completed_ids = (
+        {str(x) for x in raw_completed_ids} if isinstance(raw_completed_ids, (list, set)) else set()
+    )
 
     mode_to_achievement = {
         "10H": bool(achi_payload.get("storming_10h_achieved") or "4628" in completed_ids),

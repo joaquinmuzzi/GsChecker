@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from src.functions.warmane import _fetch_achievements
-from src.functions.cache import _cache_set
-from src.schemas.constants import ACHIEVEMENTS_CACHE, ACHIEVEMENTS_TTL
+from src.schemas.constants import ACHIEVEMENTS_CACHE
 
 
 @pytest.fixture(autouse=True)

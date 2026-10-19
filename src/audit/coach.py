@@ -41,7 +41,7 @@ Responde SIEMPRE en español. No uses bullet points, sólo prosa.\
 """
 
 
-def _build_audit_prompt(report: "AuditReport", guide: "BisGuide") -> str:
+def _build_audit_prompt(report: AuditReport, guide: BisGuide) -> str:
     """Serialise the audit results into a compact prompt for the LLM."""
 
     lines: list[str] = [
@@ -84,8 +84,8 @@ def _build_audit_prompt(report: "AuditReport", guide: "BisGuide") -> str:
 
 
 async def generate_coach_summary(
-    report: "AuditReport",
-    guide: "BisGuide",
+    report: AuditReport,
+    guide: BisGuide,
     *,
     api_key: str | None = None,
     model: str | None = None,
@@ -121,7 +121,7 @@ async def generate_coach_summary(
         If the ``groq`` package is not installed.
     """
     try:
-        from groq import AsyncGroq  # noqa: PLC0415
+        from groq import AsyncGroq
     except ImportError as exc:
         raise ImportError(
             "The 'groq' package is required for coach summaries. Install it with: pip install groq"
@@ -161,7 +161,7 @@ async def generate_coach_summary(
     return content.strip()
 
 
-def build_fallback_summary(report: "AuditReport") -> str:
+def build_fallback_summary(report: AuditReport) -> str:
     """
     Plain-text fallback used when the Groq API is unavailable.
 

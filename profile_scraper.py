@@ -5,6 +5,7 @@ import random
 import re
 import time
 from functools import lru_cache
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -238,7 +239,7 @@ def _load_socket_cache() -> dict:
     if _SOCKET_CACHE is not None:
         return _SOCKET_CACHE
     try:
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(CACHE_PATH, encoding="utf-8") as f:
             _SOCKET_CACHE = json.load(f)
     except FileNotFoundError:
         _SOCKET_CACHE = {}
@@ -253,7 +254,7 @@ def _load_gem_data() -> dict:
     if _GEM_DATA is not None:
         return _GEM_DATA
     try:
-        with open(GEM_DATA_PATH, "r", encoding="utf-8") as f:
+        with open(GEM_DATA_PATH, encoding="utf-8") as f:
             _GEM_DATA = json.load(f)
     except FileNotFoundError:
         _GEM_DATA = {}
@@ -369,7 +370,7 @@ def _load_slot_cache() -> dict:
     if _SLOT_CACHE is not None:
         return _SLOT_CACHE
     try:
-        with open(SLOT_CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(SLOT_CACHE_PATH, encoding="utf-8") as f:
             _SLOT_CACHE = json.load(f)
     except FileNotFoundError:
         _SLOT_CACHE = {}

@@ -44,11 +44,11 @@ class TestTokenBucket:
         assert 0.15 <= elapsed <= 0.4
 
     def test_invalid_rate_and_capacity_rejected(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="rate must be > 0"):
             TokenBucket(rate=0, capacity=1)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="rate must be > 0"):
             TokenBucket(rate=-1, capacity=1)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="capacity must be >= 1"):
             TokenBucket(rate=1, capacity=0)
 
     def test_thread_safety_no_over_issue(self):

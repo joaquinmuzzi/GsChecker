@@ -23,14 +23,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import gearscore
-from src.schemas.constants import (
-    SESSION,
-    HTTP_TIMEOUT,
-    ARMORY_LIMITER,
-    ARMORY_CIRCUIT,
-)
 from src.db.postgres import init_database, set_app_state
 from src.functions.names import is_valid_character_name
+from src.schemas.constants import (
+    ARMORY_CIRCUIT,
+    ARMORY_LIMITER,
+    HTTP_TIMEOUT,
+    SESSION,
+)
 from tools.preload_character_gs import _normalize_name
 
 HIGH_GS_STATE_KEY = "tracked_high_gs"

@@ -126,7 +126,7 @@ async def _send_stale_profile(
     )
     await _safe_edit_original_response(
         interaction,
-        content=f"⚠️ El armory de Warmane está rate-limitado. Intenta de nuevo en ~60s.",
+        content="⚠️ El armory de Warmane está rate-limitado. Intenta de nuevo en ~60s.",
         embed=None,
     )
 

@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ─────────────────────────── enums ───────────────────────────────────────────
 
 
-class AuditSeverity(str, Enum):
+# StrEnum cambiaría str(AuditSeverity.CRITICAL) de "AuditSeverity.CRITICAL" a "critical".
+class AuditSeverity(str, Enum):  # noqa: UP042
     CRITICAL = "critical"  # wrong item / slot completely missing enchant
     WARNING = "warning"  # non-epic gem, suboptimal enchant, near-cap miss
     INFO = "info"  # alternative available but current is acceptable

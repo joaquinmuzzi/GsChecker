@@ -90,7 +90,8 @@ def test_nightmare_tear_is_recognised(realm_files):
     issues, _ = _audit_gems(_char([head]), guide)
     messages = " ".join(i.issue for i in issues)
     assert "Nightmare Tear" not in messages
-    assert "Meta gema" not in messages and "No hay meta" not in messages
+    assert "Meta gema" not in messages
+    assert "No hay meta" not in messages
 
 
 def test_lower_version_of_any_option_is_reported_as_upgrade(realm_files):

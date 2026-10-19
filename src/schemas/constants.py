@@ -1,5 +1,6 @@
-import requests
 from concurrent.futures import ThreadPoolExecutor
+
+import requests
 from discord.ext import commands
 
 from src.functions.rate_limit import CircuitBreaker, TokenBucket

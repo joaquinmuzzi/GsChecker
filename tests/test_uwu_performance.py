@@ -100,7 +100,8 @@ def test_embed_shows_field_only_with_points():
     without = _build_personaje_embed(*args, uwu_performance={})
 
     ranking = [f for f in with_perf.fields if "(top " in f.value]
-    assert len(ranking) == 1 and ranking[0].name == "Leaderboard"
+    assert len(ranking) == 1
+    assert ranking[0].name == "Leaderboard"
     assert not [f for f in without.fields if "(top " in f.value]
 
 

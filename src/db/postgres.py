@@ -6,8 +6,6 @@ import os
 import threading
 from contextlib import contextmanager
 
-import psycopg
-
 from src.functions.names import is_valid_character_name
 
 logger = logging.getLogger("gschecker.postgres")
@@ -154,30 +152,29 @@ def list_tracked_characters(server: str | None = None, limit: int | None = None)
         return []
 
     try:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                if server:
-                    cur.execute(
-                        """
+        with _get_connection() as conn, conn.cursor() as cur:
+            if server:
+                cur.execute(
+                    """
                         SELECT character_name, server
                         FROM tracked_characters
                         WHERE LOWER(server) = LOWER(%s)
                         ORDER BY last_seen_at DESC, lookup_count DESC
                         LIMIT %s
                         """,
-                        (server, limit if limit and limit > 0 else 100000),
-                    )
-                else:
-                    cur.execute(
-                        """
+                    (server, limit if limit and limit > 0 else 100000),
+                )
+            else:
+                cur.execute(
+                    """
                         SELECT character_name, server
                         FROM tracked_characters
                         ORDER BY last_seen_at DESC, lookup_count DESC
                         LIMIT %s
                         """,
-                        (limit if limit and limit > 0 else 100000,),
-                    )
-                return [(row[0], row[1]) for row in cur.fetchall()]
+                    (limit if limit and limit > 0 else 100000,),
+                )
+            return [(row[0], row[1]) for row in cur.fetchall()]
     except Exception as exc:
         logger.warning("Error listando tracked_characters: %s", exc)
         return []
@@ -190,11 +187,10 @@ def get_app_state(key: str):
         return None
 
     try:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT value_json FROM app_state WHERE key = %s", (key,))
-                row = cur.fetchone()
-                return json.loads(row[0]) if row else None
+        with _get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT value_json FROM app_state WHERE key = %s", (key,))
+            row = cur.fetchone()
+            return json.loads(row[0]) if row else None
     except Exception as exc:
         logger.warning("Error leyendo app_state '%s': %s", key, exc)
         return None
@@ -232,10 +228,9 @@ def get_external_cache(source: str, cache_key: str, ttl_seconds: int):
         return None
 
     try:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with _get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     SELECT payload_json
                     FROM external_api_cache
                     WHERE source = %s
@@ -243,12 +238,12 @@ def get_external_cache(source: str, cache_key: str, ttl_seconds: int):
                       AND fetched_at >= NOW() - (%s * INTERVAL '1 second')
                     LIMIT 1
                     """,
-                    (source, cache_key, ttl_seconds),
-                )
-                row = cur.fetchone()
-                if not row:
-                    return None
-                return json.loads(row[0])
+                (source, cache_key, ttl_seconds),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return json.loads(row[0])
     except Exception as exc:
         logger.warning("Error leyendo caché Postgres (%s): %s", source, exc)
         return None
@@ -259,10 +254,9 @@ def get_external_cache_stale(source: str, cache_key: str):
         return None
 
     try:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with _get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     SELECT payload_json, fetched_at
                     FROM external_api_cache
                     WHERE source = %s
@@ -270,12 +264,12 @@ def get_external_cache_stale(source: str, cache_key: str):
                     ORDER BY fetched_at DESC
                     LIMIT 1
                     """,
-                    (source, cache_key),
-                )
-                row = cur.fetchone()
-                if not row:
-                    return None
-                return json.loads(row[0])
+                (source, cache_key),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return json.loads(row[0])
     except Exception as exc:
         logger.warning("Error leyendo caché stale Postgres (%s): %s", source, exc)
         return None
@@ -338,10 +332,9 @@ def find_character_spec_gs_by_metadata(
         return None
 
     try:
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
+        with _get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
                     SELECT payload_json
                     FROM external_api_cache
                     WHERE source = 'character_spec_gs'
@@ -372,12 +365,12 @@ def find_character_spec_gs_by_metadata(
                     ORDER BY fetched_at DESC
                     LIMIT 1
                     """,
-                    (ttl_seconds, clean_character, clean_specs, clean_server),
-                )
-                row = cur.fetchone()
-                if not row:
-                    return None
-                return json.loads(row[0])
+                (ttl_seconds, clean_character, clean_specs, clean_server),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return json.loads(row[0])
     except Exception as exc:
         logger.warning(
             "Error buscando spec GS por metadata (%s/%s): %s",

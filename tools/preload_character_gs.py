@@ -7,10 +7,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import gearscore
-import profile_scraper
 from dotenv import load_dotenv
 
+import gearscore
+import profile_scraper
 from src.db.postgres import init_database, set_external_cache
 from src.functions.uwu import _fetch_uwu_top
 from src.functions.warmane import _fetch_gear_data, _fetch_specs, _fetch_summary

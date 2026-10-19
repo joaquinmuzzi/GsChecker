@@ -14,11 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from tests.test_personaje import (  # noqa: F401  (fixtures)
-    _find_command,
-    bot,
-    patched_fetchers,
-)
+from tests.helpers import _find_command
 
 
 @pytest.fixture
@@ -27,7 +23,7 @@ def tracked():
         yield m
 
 
-async def _run(bot, command, interaction, **kwargs):  # noqa: F811
+async def _run(bot, command, interaction, **kwargs):
     await _find_command(bot, command).callback(interaction, **kwargs)
     # El registro es fire-and-forget: se deja correr la task pendiente.
     await asyncio.sleep(0)
@@ -46,7 +42,7 @@ def _summary(name: str, level: int) -> dict:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "nombre, reino, summary",
+    ("nombre", "reino", "summary"),
     [
         ("Zzqxwvut", "Lordaeron", {"__error__": "⚠️ No se encontró el personaje 'Zzqxwvut' en Lordaeron."}),
         ("Herbbz", "Lordaeron", {"__error__": "⚠️ No se encontró el personaje 'Herbbz' en Lordaeron."}),
@@ -61,7 +57,7 @@ async def test_p_does_not_track_missing_or_low_level(
     tracked,
     nombre,
     reino,
-    summary,  # noqa: F811
+    summary,
 ):
     patched_fetchers["summary"].return_value = summary
     await _run(bot, "p", interaction, nombre=nombre, reino=reino)
@@ -74,7 +70,7 @@ async def test_p_tracks_found_character_with_armory_name(
     bot,
     interaction,
     patched_fetchers,
-    tracked,  # noqa: F811
+    tracked,
 ):
     await _run(bot, "p", interaction, nombre="samsara")
 
@@ -86,7 +82,7 @@ async def test_dps_does_not_track_missing_character(
     bot,
     interaction,
     patched_fetchers,
-    tracked,  # noqa: F811
+    tracked,
 ):
     patched_fetchers["summary"].return_value = {
         "__error__": "⚠️ No se encontró el personaje 'Veleriel' en Lordaeron."
@@ -97,7 +93,7 @@ async def test_dps_does_not_track_missing_character(
 
 
 @pytest.mark.asyncio
-async def test_ptoc_does_not_track(bot, interaction, tracked):  # noqa: F811
+async def test_ptoc_does_not_track(bot, interaction, tracked):
     toc = {"toc_10n": False, "toc_10h": False, "toc_25n": False, "toc_25h": False}
     with patch("src.controller.commands.ptoc._fetch_toc_achievements", return_value=toc):
         await _run(bot, "ptoc", interaction, nombre="Kynrwe")

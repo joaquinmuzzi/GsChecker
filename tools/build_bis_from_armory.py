@@ -38,21 +38,21 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import gearscore  # noqa: E402
-from profile_scraper import (  # noqa: E402
+import gearscore
+from profile_scraper import (
     _extract_slot_name,
     _parse_character_stats_html,
     parse_slot,
 )
-from src.audit.auditor import _is_meta_enchant_id, _resolve_gem_item_id  # noqa: E402
-from src.audit.bis_guides import (  # noqa: E402
+from src.audit.auditor import _is_meta_enchant_id, _resolve_gem_item_id
+from src.audit.bis_guides import (
     HEALER_SPECS,
     app_state_key,
     detect_role,
     is_caster,
 )
-from src.db.postgres import get_app_state, init_database, set_app_state  # noqa: E402
-from src.functions.warmane import _parse_specs_from_html  # noqa: E402
+from src.db.postgres import get_app_state, init_database, set_app_state
+from src.functions.warmane import _parse_specs_from_html
 
 logger = logging.getLogger("gschecker.build_bis")
 
@@ -284,9 +284,7 @@ def wears_other_spec_gear(class_name: str, spec: str, char: dict) -> bool:
             continue
         text = item_tooltip(g["item"])["text"]
         melee, spell = bool(_MELEE.search(text)), bool(_SPELL.search(text))
-        if int_spec and melee and not spell:
-            wrong += 1
-        elif not int_spec and spell and not melee:
+        if (int_spec and melee and not spell) or (not int_spec and spell and not melee):
             wrong += 1
     return wrong >= MISMATCH_LIMIT
 

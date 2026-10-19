@@ -5,9 +5,8 @@ from __future__ import annotations
 
 from unittest.mock import PropertyMock, patch
 
-import pytest
-
 import discord
+import pytest
 from discord.ext import commands
 
 from src.controller.commands import register_commands

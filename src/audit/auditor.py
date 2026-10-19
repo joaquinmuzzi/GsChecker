@@ -45,7 +45,7 @@ def _get_gem_lookups() -> tuple[dict, frozenset[str], frozenset[str]]:
     global _gem_by_enchant, _wotlk_epic_gems, _meta_gem_ids
     if _gem_by_enchant is None:
         try:
-            import profile_scraper as ps  # noqa: PLC0415
+            import profile_scraper as ps
 
             _gem_by_enchant = ps._load_gem_by_enchant()
             _wotlk_epic_gems = ps._WOTLK_EPIC_GEMS
@@ -216,7 +216,7 @@ def _collect_character_gems(
       gem_counter    – total count of each non-meta gem item_id
       meta_gem_id    – item_id of the first meta gem found, or None
     """
-    _, _, meta_ids = _get_gem_lookups()
+    _, _, _meta_ids = _get_gem_lookups()
     gems_by_slot: dict[str, list[str]] = {}
     gem_counter: Counter[str] = Counter()
     found_meta: str | None = None
@@ -353,10 +353,9 @@ def _audit_stat_caps(
 
         if not is_cap and cap.must_reach:
             penalty += 7
-        elif is_cap and not cap.must_reach:
+        elif is_cap and not cap.must_reach and current > cap.cap_value * 1.20:
             # over-capped by more than 20% → wasteful
-            if current > cap.cap_value * 1.20:
-                penalty += 2
+            penalty += 2
 
         results.append(
             StatCapAuditResult(
@@ -425,7 +424,7 @@ async def audit_character(
 
     if generate_summary:
         try:
-            from .coach import generate_coach_summary  # noqa: PLC0415
+            from .coach import generate_coach_summary
 
             report.coach_summary = await generate_coach_summary(report, bis_guide, api_key=groq_api_key)
         except Exception as exc:

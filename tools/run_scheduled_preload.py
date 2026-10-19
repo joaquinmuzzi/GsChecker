@@ -41,7 +41,6 @@ from tools.preload_character_gs import (
     _store_character_gs,
 )
 
-
 logger = logging.getLogger("gschecker.preload_cron")
 
 
@@ -215,8 +214,9 @@ def main() -> int:
     if today.day == 1 or force_filter:
         logger.info("Ejecutando filter_high_gs (día=%d, force=%s)...", today.day, force_filter)
         try:
-            from tools.filter_high_gs import main as filter_main
             import sys
+
+            from tools.filter_high_gs import main as filter_main
 
             old_argv = sys.argv
             sys.argv = ["filter_high_gs", "--delay", "2"]

@@ -9,12 +9,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from tests.test_personaje import (
+from tests.helpers import (
     _find_command,
     _happy_achievements,
     _happy_gear_data,
     _happy_summary,
-    bot,  # noqa: F401  (fixture)
 )
 
 STATS_ROWS = [
@@ -60,7 +59,7 @@ def _cron_payload() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_live_and_cron_cache_the_same_payload(bot, interaction):  # noqa: F811
+async def test_live_and_cron_cache_the_same_payload(bot, interaction):
     with ExitStack() as stack:
         _patch_fetchers(stack, "src.controller.commands.personaje")
         _patch_fetchers(stack, "src.controller.commands.personaje_live")

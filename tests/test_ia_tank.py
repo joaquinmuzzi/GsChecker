@@ -11,11 +11,7 @@ import pytest
 
 from profile_scraper import _parse_character_stats_html
 from src.audit.bis_guides import detect_role, is_caster
-from tests.test_personaje import (  # noqa: F401  (fixtures)
-    _find_command,
-    bot,
-    patched_fetchers,
-)
+from tests.helpers import _find_command
 
 SRPINGU_STATS_HTML = """
 <div class="character-stats">Character Stats Melee Damage: 2176 - 2605 Power: 4096
@@ -33,7 +29,7 @@ def test_parses_dodge_parry_and_stamina():
 
 
 @pytest.mark.parametrize(
-    "char_class,spec,stats,expected",
+    ("char_class", "spec", "stats", "expected"),
     [
         ("Death Knight", "Blood", {"dodge_pct": 24.84}, "Tank"),  # Srpingu
         ("Death Knight", "Blood", {"dodge_pct": 8.25}, "DPS"),  # Blood DPS
@@ -67,7 +63,7 @@ def _srpingu_fetchers(patched_fetchers):
 
 
 @pytest.mark.asyncio
-async def test_ia_audits_blood_tank_with_tank_guide(bot, interaction, patched_fetchers):  # noqa: F811
+async def test_ia_audits_blood_tank_with_tank_guide(bot, interaction, patched_fetchers):
     _srpingu_fetchers(patched_fetchers)
     audit = AsyncMock(return_value=None)
     with (
@@ -86,7 +82,7 @@ async def test_ia_audits_blood_tank_with_tank_guide(bot, interaction, patched_fe
 
 
 @pytest.mark.asyncio
-async def test_ia_realm_without_guides_skips_armory(bot, interaction, patched_fetchers):  # noqa: F811
+async def test_ia_realm_without_guides_skips_armory(bot, interaction, patched_fetchers):
     await _find_command(bot, "ia").callback(interaction, nombre="Srpingu", reino="Onyxia")
 
     assert "Todavía no hay guías BiS para Onyxia" in (interaction.last_edit().content or "")
