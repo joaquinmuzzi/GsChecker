@@ -67,11 +67,7 @@ def _build_dps_embed(
     timed_out: bool,
     uwu_overview,
 ) -> discord.Embed:
-    has_any_logs = any(
-        row.get("Raids") not in {"0", "--"}
-        for row in grouped_rows
-        if not row.get("_sep")
-    )
+    has_any_logs = any(row.get("Raids") not in {"0", "--"} for row in grouped_rows if not row.get("_sep"))
 
     uwu_table = _format_uwu_dps_table(grouped_rows)
     table_block = f"```\n{uwu_table}\n```"
@@ -81,8 +77,7 @@ def _build_dps_embed(
     warning_note = ""
     if not has_any_logs:
         warning_note = (
-            "\n⚠️ No se encontraron logs para este personaje"
-            f"{' con esa spec' if spec else ''} en UwU Logs."
+            f"\n⚠️ No se encontraron logs para este personaje{' con esa spec' if spec else ''} en UwU Logs."
         )
 
     failed_parts = []
@@ -93,25 +88,18 @@ def _build_dps_embed(
                 failed_parts.append(f"{mode}:{value}")
     failed_note = ""
     if failed_parts:
-        failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(
-            failed_parts
-        )
+        failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(failed_parts)
 
     timeout_note = ""
     if timed_out:
-        timeout_note = (
-            "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
-        )
+        timeout_note = "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
 
     # Bloque de overview (rank/points/dps por boss), encima de la tabla DPS
     overview_prefix = ""
     if isinstance(uwu_overview, dict) and uwu_overview.get("rows"):
         overview_table = _format_uwu_overview_table(uwu_overview["rows"])
         overall_pts = uwu_overview.get("overall_points", "?")
-        overview_prefix = (
-            f"**Overall: {overall_pts} pts**\n"
-            f"```\n{overview_table}\n```\n"
-        )
+        overview_prefix = f"**Overall: {overall_pts} pts**\n```\n{overview_table}\n```\n"
 
     embed = discord.Embed(
         title=f"{nombre_char} - Uwulogs DPS{spec_display}",
@@ -150,9 +138,7 @@ def register(bot):
         nombre="Nombre del personaje en Lordaeron.",
         spec="Filtro opcional por spec (ej: fury, udk, frost).",
     )
-    async def dps(
-        interaction: discord.Interaction, nombre: str, spec: str | None = None
-    ):
+    async def dps(interaction: discord.Interaction, nombre: str, spec: str | None = None):
         try:
             nombre = _normalize_character_name(nombre)
             _log_command_usage(interaction, "dps", nombre, "Lordaeron", spec=spec)
@@ -160,14 +146,10 @@ def register(bot):
             await _safe_defer(interaction)
 
             dps_cache_key = _build_dps_cache_key(nombre, spec)
-            cached_payload = await async_get_external_cache(
-                "command_dps", dps_cache_key, COMMAND_DPS_TTL
-            )
+            cached_payload = await async_get_external_cache("command_dps", dps_cache_key, COMMAND_DPS_TTL)
             if isinstance(cached_payload, dict):
                 embed_cached = _build_dps_embed_from_cache(cached_payload)
-                await _safe_edit_original_response(
-                    interaction, content=None, embed=embed_cached
-                )
+                await _safe_edit_original_response(interaction, content=None, embed=embed_cached)
                 return
 
             await _safe_edit_original_response(
@@ -178,9 +160,7 @@ def register(bot):
 
             loop = asyncio.get_running_loop()
 
-            summary = await loop.run_in_executor(
-                EXECUTOR, _fetch_summary, nombre, "Lordaeron"
-            )
+            summary = await loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, "Lordaeron")
             if isinstance(summary, dict) and summary.get("__error__"):
                 await _safe_edit_original_response(
                     interaction,
@@ -227,9 +207,7 @@ def register(bot):
                     ),
                     color=0x2B2D31,
                 )
-                await _safe_edit_original_response(
-                    interaction, content=None, embed=overview_embed
-                )
+                await _safe_edit_original_response(interaction, content=None, embed=overview_embed)
 
             # --- Fase 2: tabla DPS detallada ---
             uwu_dps_future = loop.run_in_executor(

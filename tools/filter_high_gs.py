@@ -88,8 +88,7 @@ def _fetch_summary_gs(nombre: str, server: str) -> int | None:
         # NOT filter out blank slots or every item after them scores against
         # the wrong slot category.
         gear_ids = [
-            str(item.get("item", "")) if str(item.get("item", "")).isdigit() else ""
-            for item in equipment
+            str(item.get("item", "")) if str(item.get("item", "")).isdigit() else "" for item in equipment
         ]
         if not any(gear_ids):
             return None
@@ -112,9 +111,7 @@ def _write_high_gs(file_path: Path, entries: list[tuple[str, str]]) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Filtra personajes por GS > min_gs desde el armory."
-    )
+    parser = argparse.ArgumentParser(description="Filtra personajes por GS > min_gs desde el armory.")
     parser.add_argument(
         "--min-gs",
         type=int,
@@ -157,7 +154,7 @@ def main():
 
     pairs = _load_names(input_path)
     if args.max and args.max > 0:
-        pairs = pairs[:args.max]
+        pairs = pairs[: args.max]
 
     print(f"[INFO] Procesando {len(pairs)} personajes (min_gs={args.min_gs}, delay={args.delay}s)")
 
@@ -185,7 +182,9 @@ def main():
             high_gs.append((nombre, realm))
             ok += 1
             if ok % 50 == 0 or ok <= 10:
-                print(f"  [{idx}/{len(pairs)}] ({pct:.0f}%) {nombre}/{realm} GS={gs} ✓ | high_gs={ok} | eta={eta}s")
+                print(
+                    f"  [{idx}/{len(pairs)}] ({pct:.0f}%) {nombre}/{realm} GS={gs} ✓ | high_gs={ok} | eta={eta}s"
+                )
         else:
             skipped += 1
             if skipped % 200 == 0:
@@ -196,7 +195,9 @@ def main():
             time.sleep(jittered)
 
     duration = int(time.time() - start)
-    print(f"\n[RESUMEN] Procesados: {len(pairs)} | GS>={args.min_gs}: {ok} | Skip: {skipped} | Duración: {duration}s")
+    print(
+        f"\n[RESUMEN] Procesados: {len(pairs)} | GS>={args.min_gs}: {ok} | Skip: {skipped} | Duración: {duration}s"
+    )
 
     if args.dry_run:
         print(f"\n--- DRY RUN: {len(high_gs)} personajes con GS>={args.min_gs} ---")

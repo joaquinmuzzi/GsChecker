@@ -51,9 +51,25 @@ def _happy_summary() -> dict:
 
 def _happy_gear_data() -> list[dict]:
     slots = [
-        "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist",
-        "Legs", "Feet", "Finger 1", "Finger 2", "Trinket 1", "Trinket 2",
-        "Ranged", "Main Hand", "Off Hand", "Sigil", "Tabard",
+        "Head",
+        "Neck",
+        "Shoulder",
+        "Back",
+        "Chest",
+        "Wrist",
+        "Hands",
+        "Waist",
+        "Legs",
+        "Feet",
+        "Finger 1",
+        "Finger 2",
+        "Trinket 1",
+        "Trinket 2",
+        "Ranged",
+        "Main Hand",
+        "Off Hand",
+        "Sigil",
+        "Tabard",
     ]
     return [
         {
@@ -133,9 +149,7 @@ def patched_fetchers():
 
 
 @pytest.mark.asyncio
-async def test_personaje_happy_path_ships_embed_with_character_data(
-    bot, interaction, patched_fetchers
-):
+async def test_personaje_happy_path_ships_embed_with_character_data(bot, interaction, patched_fetchers):
     p_cmd = _find_command(bot, "p")
     await p_cmd.callback(interaction, nombre="Samsara")
 
@@ -144,12 +158,8 @@ async def test_personaje_happy_path_ships_embed_with_character_data(
     assert edit.embed is not None, "final edit should carry the character embed"
     assert edit.content is None
 
-    author_name = (
-        edit.embed.author.name if edit.embed.author is not None else ""
-    ) or ""
-    text = (
-        f"{author_name} {edit.embed.title or ''} {edit.embed.description or ''}"
-    )
+    author_name = (edit.embed.author.name if edit.embed.author is not None else "") or ""
+    text = f"{author_name} {edit.embed.title or ''} {edit.embed.description or ''}"
     for field in getattr(edit.embed, "fields", []):
         text += f" {field.name} {field.value}"
 
@@ -158,9 +168,7 @@ async def test_personaje_happy_path_ships_embed_with_character_data(
 
 
 @pytest.mark.asyncio
-async def test_personaje_rate_limited_shows_rate_limit_message(
-    bot, interaction, patched_fetchers
-):
+async def test_personaje_rate_limited_shows_rate_limit_message(bot, interaction, patched_fetchers):
     """Regression: reported bug where existing characters showed 'no existe'
     because the circuit breaker was open. Now they should see a rate-limit
     message with a wait hint."""
@@ -176,15 +184,11 @@ async def test_personaje_rate_limited_shows_rate_limit_message(
     assert edit.embed is None, "rate-limit message must be plain content, not an embed"
     assert edit.content is not None
     assert "rate-limit" in edit.content.lower()
-    assert "no se encontr" not in edit.content.lower(), (
-        "must not falsely claim the character doesn't exist"
-    )
+    assert "no se encontr" not in edit.content.lower(), "must not falsely claim the character doesn't exist"
 
 
 @pytest.mark.asyncio
-async def test_personaje_not_found_shows_not_found_message(
-    bot, interaction, patched_fetchers
-):
+async def test_personaje_not_found_shows_not_found_message(bot, interaction, patched_fetchers):
     patched_fetchers["summary"].return_value = {
         "__error__": "⚠️ No se encontró el personaje 'Xxxxx' en Lordaeron."
     }
@@ -211,9 +215,7 @@ async def test_personaje_rejects_invalid_realm(bot, interaction, patched_fetcher
 
 
 @pytest.mark.asyncio
-async def test_personaje_non_80_short_circuits(
-    bot, interaction, patched_fetchers
-):
+async def test_personaje_non_80_short_circuits(bot, interaction, patched_fetchers):
     """A level 79 character shouldn't reach the achievements/gear pipeline —
     /p only supports 80s."""
     patched_fetchers["summary"].return_value = {
@@ -283,16 +285,32 @@ async def test_cached_profile_without_ranking_gets_it(bot, interaction, patched_
     # Novatizimu (2026-09-28): perfil cacheado por el cron antes del deploy del
     # ranking de uwu-logs; /p lo servía sin el campo hasta que venciera (25 h).
     old_payload = {
-        "nombre_char": "Novatizimu", "server": "Lordaeron", "gs": 6398, "nivel": 80,
-        "raza": "Human", "clase": "Warlock", "spec_display": "Affliction",
-        "guild_display": "<The Order of the Ring>", "guild_rank": "Officer",
-        "halion_10n_achieved": True, "halion_10h_achieved": True,
-        "halion_25n_achieved": True, "halion_25h_achieved": True,
-        "icc_10": {}, "icc_25": {}, "missing_enchants": [], "missing_gems": [],
-        "uwu_icc_kills": {}, "spec_gs_entries": [], "active_spec_name": "Affliction",
+        "nombre_char": "Novatizimu",
+        "server": "Lordaeron",
+        "gs": 6398,
+        "nivel": 80,
+        "raza": "Human",
+        "clase": "Warlock",
+        "spec_display": "Affliction",
+        "guild_display": "<The Order of the Ring>",
+        "guild_rank": "Officer",
+        "halion_10n_achieved": True,
+        "halion_10h_achieved": True,
+        "halion_25n_achieved": True,
+        "halion_25h_achieved": True,
+        "icc_10": {},
+        "icc_25": {},
+        "missing_enchants": [],
+        "missing_gems": [],
+        "uwu_icc_kills": {},
+        "spec_gs_entries": [],
+        "active_spec_name": "Affliction",
     }
     patched_fetchers["uwu_perf"].return_value = {
-        "spec": "Demonology", "points": 44.65, "rank": 895, "total": 1869,
+        "spec": "Demonology",
+        "points": 44.65,
+        "rank": 895,
+        "total": 1869,
     }
     with patch(
         "src.controller.commands.personaje.async_get_external_cache",
@@ -312,17 +330,33 @@ async def test_cached_profile_with_empty_ranking_is_refetched(bot, interaction, 
     # Epillef (2026-09-28): el cron guardó uwu_performance={} porque uwu-logs no
     # respondió; /p lo servía sin Leaderboard hasta que venciera la caché.
     payload = {
-        "nombre_char": "Epillef", "server": "Lordaeron", "gs": 6072, "nivel": 80,
-        "raza": "Night Elf", "clase": "Druid", "spec_display": "Balance",
-        "guild_display": "<Brotherhood Of Silence>", "guild_rank": "Member",
-        "halion_10n_achieved": False, "halion_10h_achieved": False,
-        "halion_25n_achieved": False, "halion_25h_achieved": False,
-        "icc_10": {}, "icc_25": {}, "missing_enchants": [], "missing_gems": [],
-        "uwu_icc_kills": {}, "spec_gs_entries": [], "active_spec_name": "Balance",
+        "nombre_char": "Epillef",
+        "server": "Lordaeron",
+        "gs": 6072,
+        "nivel": 80,
+        "raza": "Night Elf",
+        "clase": "Druid",
+        "spec_display": "Balance",
+        "guild_display": "<Brotherhood Of Silence>",
+        "guild_rank": "Member",
+        "halion_10n_achieved": False,
+        "halion_10h_achieved": False,
+        "halion_25n_achieved": False,
+        "halion_25h_achieved": False,
+        "icc_10": {},
+        "icc_25": {},
+        "missing_enchants": [],
+        "missing_gems": [],
+        "uwu_icc_kills": {},
+        "spec_gs_entries": [],
+        "active_spec_name": "Balance",
         "uwu_performance": {},
     }
     patched_fetchers["uwu_perf"].return_value = {
-        "spec": "Balance", "points": 29.69, "rank": 2034, "total": 3143,
+        "spec": "Balance",
+        "points": 29.69,
+        "rank": 2034,
+        "total": 3143,
     }
     with patch(
         "src.controller.commands.personaje.async_get_external_cache",
@@ -342,9 +376,7 @@ def _icc_line(embed, boss):
 
 
 @pytest.mark.asyncio
-async def test_hung_uwu_lookup_still_ends_in_final_state(
-    bot, interaction, patched_fetchers, monkeypatch
-):
+async def test_hung_uwu_lookup_still_ends_in_final_state(bot, interaction, patched_fetchers, monkeypatch):
     # /p Suramar (2026-09-28): Marrowgar/Deathwhisper quedaron en ⌛ para siempre.
     # Aunque uwu-logs no termine, el embed tiene que llegar a un estado final.
     import threading
@@ -364,13 +396,12 @@ async def test_hung_uwu_lookup_still_ends_in_final_state(
 
 
 @pytest.mark.asyncio
-async def test_storming_the_citadel_marks_kills_without_waiting_uwu(
-    bot, interaction, patched_fetchers
-):
+async def test_storming_the_citadel_marks_kills_without_waiting_uwu(bot, interaction, patched_fetchers):
     # Storming the Citadel 25N (4604) completo: Marrowgar/Deathwhisper 25N ✅ ya
     # en el primer embed, antes de que responda uwu-logs.
     patched_fetchers["achievements"].return_value = {
-        **_happy_achievements(), "storming_25n_achieved": True,
+        **_happy_achievements(),
+        "storming_25n_achieved": True,
     }
     await _find_command(bot, "p").callback(interaction, nombre="Suramar")
 
@@ -381,9 +412,7 @@ async def test_storming_the_citadel_marks_kills_without_waiting_uwu(
 
 
 @pytest.mark.asyncio
-async def test_final_embed_is_resent_when_discord_keeps_the_loading_one(
-    bot, interaction, patched_fetchers
-):
+async def test_final_embed_is_resent_when_discord_keeps_the_loading_one(bot, interaction, patched_fetchers):
     # /p Kuvez (2026-10-07): Discord aceptó la edición final sin error, pero el
     # mensaje quedó con el embed de carga (⌛ en Marrowgar/Deathwhisper).
     interaction.keeps_previous_edit = True
@@ -397,9 +426,7 @@ async def test_final_embed_is_resent_when_discord_keeps_the_loading_one(
 
 
 @pytest.mark.asyncio
-async def test_final_embed_is_sent_once_when_discord_keeps_it(
-    bot, interaction, patched_fetchers
-):
+async def test_final_embed_is_sent_once_when_discord_keeps_it(bot, interaction, patched_fetchers):
     await _find_command(bot, "p").callback(interaction, nombre="Kuvez")
 
     edits = [s for s in interaction.sent if s.kind == "edit"]

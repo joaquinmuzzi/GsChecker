@@ -40,6 +40,4 @@ def _normalize_character_realm(reino: str | None) -> str:
         return normalized
 
     valid_realms = ", ".join(SUPPORTED_CHARACTER_REALMS.values())
-    raise ValueError(
-        f"⚠️ Reino inválido: '{clean_realm}'. Reinos válidos: {valid_realms}."
-    )
+    raise ValueError(f"⚠️ Reino inválido: '{clean_realm}'. Reinos válidos: {valid_realms}.")

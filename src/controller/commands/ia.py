@@ -38,11 +38,11 @@ def _build_ia_embed(report: AuditReport, nombre_char: str) -> discord.Embed:
 
     # Color por score
     if report.overall_score >= 80:
-        color = 0x57F287   # verde
+        color = 0x57F287  # verde
     elif report.overall_score >= 50:
-        color = 0xFEE75C   # amarillo
+        color = 0xFEE75C  # amarillo
     else:
-        color = 0xED4245   # rojo
+        color = 0xED4245  # rojo
 
     embed = discord.Embed(
         title=f"🤖 Análisis IA · {nombre_char} ({report.spec_name})",
@@ -90,9 +90,7 @@ def _build_ia_embed(report: AuditReport, nombre_char: str) -> discord.Embed:
             inline=False,
         )
 
-    embed.set_footer(
-        text="Fuente: Armory Warmane · IA: Groq llama-3.3-70b · /p para resumen completo"
-    )
+    embed.set_footer(text="Fuente: Armory Warmane · IA: Groq llama-3.3-70b · /p para resumen completo")
     return embed
 
 
@@ -137,18 +135,12 @@ def register(bot):
             loop = asyncio.get_running_loop()
 
             # Fetch summary (class + spec) y gear en paralelo
-            summary_task = loop.run_in_executor(
-                EXECUTOR, _fetch_summary, nombre, realm
-            )
-            gear_task = loop.run_in_executor(
-                EXECUTOR, _fetch_gear_data, nombre, realm
-            )
+            summary_task = loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
+            gear_task = loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre, realm)
             summary, gear_data = await asyncio.gather(summary_task, gear_task)
 
             if isinstance(summary, dict) and summary.get("__error__"):
-                await _safe_edit_original_response(
-                    interaction, content=summary["__error__"], embed=None
-                )
+                await _safe_edit_original_response(interaction, content=summary["__error__"], embed=None)
                 return
 
             if not isinstance(summary, dict):
@@ -173,12 +165,8 @@ def register(bot):
             _track_character(nombre_char, realm)
 
             # Determinar spec activa y stats del personaje en paralelo
-            specs_task2 = loop.run_in_executor(
-                EXECUTOR, _fetch_specs, nombre_char, realm
-            )
-            stats_task2 = loop.run_in_executor(
-                EXECUTOR, get_character_stats, nombre_char, realm
-            )
+            specs_task2 = loop.run_in_executor(EXECUTOR, _fetch_specs, nombre_char, realm)
+            stats_task2 = loop.run_in_executor(EXECUTOR, get_character_stats, nombre_char, realm)
             specs_raw, raw_stats = await asyncio.gather(specs_task2, stats_task2)
 
             active_spec = ""
@@ -226,9 +214,7 @@ def register(bot):
 
             embed = _build_ia_embed(report, nombre_char)
 
-            await _safe_edit_original_response(
-                interaction, content=None, embed=embed
-            )
+            await _safe_edit_original_response(interaction, content=None, embed=embed)
 
         except Exception as exc:
             await _reply_command_error(interaction, exc, "❌ Error en /ia")

@@ -2,6 +2,7 @@
 de tanque (antes se lo evaluaba con la de Blood DPS, que le recomendaba cambiar
 todo su set y le daba 0/100), y los reinos sin guía se avisan sin tocar el
 armory."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -34,12 +35,12 @@ def test_parses_dodge_parry_and_stamina():
 @pytest.mark.parametrize(
     "char_class,spec,stats,expected",
     [
-        ("Death Knight", "Blood", {"dodge_pct": 24.84}, "Tank"),   # Srpingu
-        ("Death Knight", "Blood", {"dodge_pct": 8.25}, "DPS"),     # Blood DPS
-        ("Death Knight", "Frost", {"dodge_pct": 25.0}, "Tank"),    # Frost tank
-        ("Death Knight", "Unholy", {}, "DPS"),                     # sin dato
-        ("Druid", "Feral Combat", {"stamina": 4200}, "Tank"),      # oso
-        ("Druid", "Feral Combat", {"stamina": 2300}, "DPS"),       # gato
+        ("Death Knight", "Blood", {"dodge_pct": 24.84}, "Tank"),  # Srpingu
+        ("Death Knight", "Blood", {"dodge_pct": 8.25}, "DPS"),  # Blood DPS
+        ("Death Knight", "Frost", {"dodge_pct": 25.0}, "Tank"),  # Frost tank
+        ("Death Knight", "Unholy", {}, "DPS"),  # sin dato
+        ("Druid", "Feral Combat", {"stamina": 4200}, "Tank"),  # oso
+        ("Druid", "Feral Combat", {"stamina": 2300}, "DPS"),  # gato
         ("Paladin", "Protection", {}, "Tank"),
         ("Warrior", "Fury", {"dodge_pct": 30.0}, ""),
     ],
@@ -55,8 +56,12 @@ def test_frost_is_caster_only_for_mages():
 
 def _srpingu_fetchers(patched_fetchers):
     patched_fetchers["summary"].return_value = {
-        "name": "Srpingu", "level": 80, "race": "Night Elf", "class": "Death Knight",
-        "guild": "Sin guild", "gearScore": "N/A",
+        "name": "Srpingu",
+        "level": 80,
+        "race": "Night Elf",
+        "class": "Death Knight",
+        "guild": "Sin guild",
+        "gearScore": "N/A",
     }
     patched_fetchers["specs"].return_value = [{"name": "Blood", "active": True}]
 
@@ -65,9 +70,13 @@ def _srpingu_fetchers(patched_fetchers):
 async def test_ia_audits_blood_tank_with_tank_guide(bot, interaction, patched_fetchers):  # noqa: F811
     _srpingu_fetchers(patched_fetchers)
     audit = AsyncMock(return_value=None)
-    with patch("src.controller.commands.ia.get_character_stats",
-               return_value={"hit_rating": 244.9, "dodge_pct": 24.84}), \
-         patch("src.controller.commands.ia.run_full_audit", audit):
+    with (
+        patch(
+            "src.controller.commands.ia.get_character_stats",
+            return_value={"hit_rating": 244.9, "dodge_pct": 24.84},
+        ),
+        patch("src.controller.commands.ia.run_full_audit", audit),
+    ):
         await _find_command(bot, "ia").callback(interaction, nombre="Srpingu")
 
     audit.assert_awaited_once()

@@ -92,9 +92,7 @@ class TestCircuitBreaker:
         assert cb.is_open() is False
 
     def test_threshold_opens_only_after_N_failures(self):
-        cb = CircuitBreaker(
-            failure_threshold=3, open_duration_s=0.5, failure_window_s=10
-        )
+        cb = CircuitBreaker(failure_threshold=3, open_duration_s=0.5, failure_window_s=10)
         cb.record_failure(reason="429")
         cb.record_failure(reason="429")
         assert cb.is_open() is False
@@ -104,9 +102,7 @@ class TestCircuitBreaker:
         assert cb.is_open() is True
 
     def test_failures_outside_window_dont_count(self):
-        cb = CircuitBreaker(
-            failure_threshold=3, open_duration_s=0.5, failure_window_s=0.1
-        )
+        cb = CircuitBreaker(failure_threshold=3, open_duration_s=0.5, failure_window_s=0.1)
         cb.record_failure(reason="429")
         cb.record_failure(reason="429")
         time.sleep(0.15)

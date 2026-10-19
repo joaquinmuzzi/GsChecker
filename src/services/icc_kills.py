@@ -119,9 +119,7 @@ def _fetch_item_source_hint(item_id: str) -> dict:
                 "deathwhisper": "lady deathwhisper" in lowered,
             }
     except Exception:
-        logger.exception(
-            "wowhead item-source hint failed for item_id=%s", clean_item_id
-        )
+        logger.exception("wowhead item-source hint failed for item_id=%s", clean_item_id)
         payload = {"marrowgar": False, "deathwhisper": False}
 
     set_external_cache(
@@ -192,9 +190,7 @@ def _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data):
             boss_modes = {}
             uwu_icc_kills[boss_name] = boss_modes
         for mode in ICC_SPECIAL_MODES:
-            if boss_modes.get(mode) != "✅" and found_modes.get(boss_name, {}).get(
-                mode
-            ):
+            if boss_modes.get(mode) != "✅" and found_modes.get(boss_name, {}).get(mode):
                 boss_modes[mode] = "✅"
 
     return uwu_icc_kills
@@ -215,15 +211,9 @@ def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
         completed_ids = set()
 
     mode_to_achievement = {
-        "10H": bool(
-            achi_payload.get("storming_10h_achieved") or "4628" in completed_ids
-        ),
-        "25N": bool(
-            achi_payload.get("storming_25n_achieved") or "4604" in completed_ids
-        ),
-        "25H": bool(
-            achi_payload.get("storming_25h_achieved") or "4632" in completed_ids
-        ),
+        "10H": bool(achi_payload.get("storming_10h_achieved") or "4628" in completed_ids),
+        "25N": bool(achi_payload.get("storming_25n_achieved") or "4604" in completed_ids),
+        "25H": bool(achi_payload.get("storming_25h_achieved") or "4632" in completed_ids),
     }
 
     for boss_name in ICC_SPECIAL_BOSSES:
@@ -238,9 +228,7 @@ def _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload: dict):
     return uwu_icc_kills
 
 
-def _resolve_uwu_icc_kills(
-    nombre_char, realm, raw_uwu_kills, persistent_confirmed, achi_payload, gear_data
-):
+def _resolve_uwu_icc_kills(nombre_char, realm, raw_uwu_kills, persistent_confirmed, achi_payload, gear_data):
     """Kills especiales de ICC combinando fuentes, en este orden:
     1) UwU Logs, 2) Storming the Citadel, 3) ítems equipados del boss.
     Persiste las kills nuevas confirmadas (Postgres, sincrónico)."""
@@ -249,8 +237,6 @@ def _resolve_uwu_icc_kills(
     uwu_icc_kills = _apply_storming_fallback_to_uwu(uwu_icc_kills, achi_payload)
     uwu_icc_kills = _apply_item_drop_fallback_to_uwu(uwu_icc_kills, gear_data)
 
-    persistent_confirmed = _persist_new_confirmed_icc_kills(
-        nombre_char, realm, uwu_icc_kills
-    )
+    persistent_confirmed = _persist_new_confirmed_icc_kills(nombre_char, realm, uwu_icc_kills)
     uwu_icc_kills = _overlay_persistent_confirmed_kills(uwu_icc_kills, persistent_confirmed)
     return _finalize_special_uwu_kills(uwu_icc_kills)

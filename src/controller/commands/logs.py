@@ -45,13 +45,9 @@ def register(bot):
             )
 
             loop = asyncio.get_running_loop()
-            data = await loop.run_in_executor(
-                EXECUTOR, _fetch_uwu_recent_logs, nombre, realm
-            )
+            data = await loop.run_in_executor(EXECUTOR, _fetch_uwu_recent_logs, nombre, realm)
             if data is None:
-                await _safe_edit_original_response(
-                    interaction, content=UWU_DOWN_MESSAGE, embed=None
-                )
+                await _safe_edit_original_response(interaction, content=UWU_DOWN_MESSAGE, embed=None)
                 return
             if not data.get("reports"):
                 await _safe_edit_original_response(

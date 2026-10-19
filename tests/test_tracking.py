@@ -6,6 +6,7 @@ todos los días 16 que no podía precargar (2026-10-10): typos (Veleriel por
 Veletriel), reinos equivocados (Herbbz es de Icecrown), personajes que no son 80
 (Zolan, nivel 56; Srpingu de Icecrown, nivel 1) y nombres de prueba (Zzqxwvut).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,9 +23,7 @@ from tests.test_personaje import (  # noqa: F401  (fixtures)
 
 @pytest.fixture
 def tracked():
-    with patch(
-        "src.services.tracking.async_track_character_lookup", new_callable=AsyncMock
-    ) as m:
+    with patch("src.services.tracking.async_track_character_lookup", new_callable=AsyncMock) as m:
         yield m
 
 
@@ -36,8 +35,12 @@ async def _run(bot, command, interaction, **kwargs):  # noqa: F811
 
 def _summary(name: str, level: int) -> dict:
     return {
-        "name": name, "level": level, "race": "Night Elf", "class": "Rogue",
-        "guild": "The Order of the Ring", "gearScore": "N/A",
+        "name": name,
+        "level": level,
+        "race": "Night Elf",
+        "class": "Rogue",
+        "guild": "The Order of the Ring",
+        "gearScore": "N/A",
     }
 
 
@@ -52,7 +55,13 @@ def _summary(name: str, level: int) -> dict:
     ],
 )
 async def test_p_does_not_track_missing_or_low_level(
-    bot, interaction, patched_fetchers, tracked, nombre, reino, summary  # noqa: F811
+    bot,
+    interaction,
+    patched_fetchers,
+    tracked,
+    nombre,
+    reino,
+    summary,  # noqa: F811
 ):
     patched_fetchers["summary"].return_value = summary
     await _run(bot, "p", interaction, nombre=nombre, reino=reino)
@@ -62,7 +71,10 @@ async def test_p_does_not_track_missing_or_low_level(
 
 @pytest.mark.asyncio
 async def test_p_tracks_found_character_with_armory_name(
-    bot, interaction, patched_fetchers, tracked  # noqa: F811
+    bot,
+    interaction,
+    patched_fetchers,
+    tracked,  # noqa: F811
 ):
     await _run(bot, "p", interaction, nombre="samsara")
 
@@ -71,7 +83,10 @@ async def test_p_tracks_found_character_with_armory_name(
 
 @pytest.mark.asyncio
 async def test_dps_does_not_track_missing_character(
-    bot, interaction, patched_fetchers, tracked  # noqa: F811
+    bot,
+    interaction,
+    patched_fetchers,
+    tracked,  # noqa: F811
 ):
     patched_fetchers["summary"].return_value = {
         "__error__": "⚠️ No se encontró el personaje 'Veleriel' en Lordaeron."

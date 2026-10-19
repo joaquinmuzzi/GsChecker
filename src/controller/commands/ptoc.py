@@ -29,9 +29,7 @@ def register(bot):
             await _safe_defer(interaction)
 
             loop = asyncio.get_running_loop()
-            toc_payload = await loop.run_in_executor(
-                EXECUTOR, _fetch_toc_achievements, nombre, "Lordaeron"
-            )
+            toc_payload = await loop.run_in_executor(EXECUTOR, _fetch_toc_achievements, nombre, "Lordaeron")
 
             def toc_status(done: bool) -> str:
                 return "✅" if done else "❌"

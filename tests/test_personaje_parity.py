@@ -1,6 +1,7 @@
 """/p y el cron tienen que producir exactamente el mismo payload cacheado para
 los mismos datos del armory. Antes eran dos copias de la lógica y los arreglos
 había que hacerlos dos veces (el de Halion se aplicó en ambas por separado)."""
+
 from __future__ import annotations
 
 from contextlib import ExitStack

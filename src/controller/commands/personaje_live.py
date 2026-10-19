@@ -96,9 +96,7 @@ async def _ensure_final_edit_landed(
         if _message_has_embed(message, embed):
             return
         stored = message.embeds[0] if message.embeds else None
-        stored_text = (
-            " ".join(str(f.value) for f in stored.fields) if stored else message.content
-        )
+        stored_text = " ".join(str(f.value) for f in stored.fields) if stored else message.content
         logger.warning(
             "final edit not kept by Discord edited_at=%s loading=%s content=%r "
             "patch_response_final=%s patch_edited_at=%s — re-sending",
@@ -108,9 +106,7 @@ async def _ensure_final_edit_landed(
             _message_has_embed(patched, embed),
             getattr(patched, "edited_at", None),
         )
-        await _safe_edit_original_response(
-            interaction, content=None, embed=embed, view=view
-        )
+        await _safe_edit_original_response(interaction, content=None, embed=embed, view=view)
     except discord.NotFound:
         return
     except Exception as exc:
@@ -140,9 +136,7 @@ async def _send_live_profile(
     summary = await loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
 
     if isinstance(summary, dict) and summary.get("__error__"):
-        await _safe_edit_original_response(
-            interaction, content=summary["__error__"], embed=None
-        )
+        await _safe_edit_original_response(interaction, content=summary["__error__"], embed=None)
         return
 
     if not isinstance(summary, dict):
@@ -213,9 +207,7 @@ async def _send_live_profile(
     await _safe_edit_original_response(
         interaction,
         content=None,
-        embed=_build_personaje_embed_from_cache(
-            initial_payload, loading_symbol=LOADING_FRAMES[0]
-        ),
+        embed=_build_personaje_embed_from_cache(initial_payload, loading_symbol=LOADING_FRAMES[0]),
         view=personaje_view,
     )
 
@@ -249,27 +241,23 @@ async def _send_live_profile(
             timeout=10.0,
         )
     except Exception:
-        logger.exception(
-            "uwu performance fetch failed for '%s'/%s", nombre_char, realm
-        )
+        logger.exception("uwu performance fetch failed for '%s'/%s", nombre_char, realm)
         uwu_performance = None
 
     payload = _serialize_personaje_payload(
         **base, uwu_icc_kills=uwu_icc_kills, uwu_performance=uwu_performance
     )
-    embed_final = await _cache_final_profile(
-        payload, personaje_cache_key, nombre_char, realm, command_name
-    )
+    embed_final = await _cache_final_profile(payload, personaje_cache_key, nombre_char, realm, command_name)
     patched = await _safe_edit_original_response(
         interaction, content=None, embed=embed_final, view=personaje_view
     )
     logger.info(
         "personaje done character='%s' realm='%s' elapsed=%.1fs",
-        nombre_char, realm, loop.time() - started_at,
+        nombre_char,
+        realm,
+        loop.time() - started_at,
     )
-    await _ensure_final_edit_landed(
-        interaction, embed_final, personaje_view, patched
-    )
+    await _ensure_final_edit_landed(interaction, embed_final, personaje_view, patched)
 
 
 async def _wait_for_uwu_kills(
@@ -304,15 +292,15 @@ async def _wait_for_uwu_kills(
         # corriendo de fondo y deja la caché lista para el próximo /p).
         logger.warning(
             "uwu icc kills timeout (%ss) for '%s'/%s",
-            PERSONAJE_UWU_WAIT_SECONDS, nombre_char, realm,
+            PERSONAJE_UWU_WAIT_SECONDS,
+            nombre_char,
+            realm,
         )
         return {}
     try:
         return uwu_icc_task.result()
     except Exception:
-        logger.exception(
-            "uwu icc kills fetch failed for '%s'/%s", nombre_char, realm
-        )
+        logger.exception("uwu icc kills fetch failed for '%s'/%s", nombre_char, realm)
         return {}
 
 
@@ -348,9 +336,7 @@ async def _cache_final_profile(
         )
         if not payload["data_complete"]:
             # Mejor mostrar el último perfil bueno que ❌ falsos por un 429.
-            stale_payload = await async_get_external_cache_stale(
-                "command_personaje", personaje_cache_key
-            )
+            stale_payload = await async_get_external_cache_stale("command_personaje", personaje_cache_key)
             if isinstance(stale_payload, dict):
                 logger.warning(
                     "Armory respondió incompleto — serving stale DB cache for '%s'/%s",

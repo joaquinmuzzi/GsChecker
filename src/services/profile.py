@@ -185,13 +185,11 @@ def _compute_personaje_base(
         suboptimal_gems = []
     else:
         try:
-            missing_enchants, missing_gems = (
-                profile_scraper.get_missing_enchants_gems_from_gear_data(gear_data)
+            missing_enchants, missing_gems = profile_scraper.get_missing_enchants_gems_from_gear_data(
+                gear_data
             )
         except Exception:
-            logger.exception(
-                "missing enchants/gems calc failed for '%s'/%s", nombre_char, realm
-            )
+            logger.exception("missing enchants/gems calc failed for '%s'/%s", nombre_char, realm)
             missing_enchants, missing_gems = [], []
 
         try:
@@ -199,9 +197,7 @@ def _compute_personaje_base(
                 gear_data, clase, active_specs[0] if active_specs else ""
             )
         except Exception:
-            logger.exception(
-                "suboptimal gems calc failed for '%s'/%s", nombre_char, realm
-            )
+            logger.exception("suboptimal gems calc failed for '%s'/%s", nombre_char, realm)
             suboptimal_gems = []
 
     guild_obj = summary.get("guild")
@@ -245,11 +241,7 @@ def _compute_personaje_base(
         active_name = str(active_specs[0] or "").strip()
         if active_name and gs_by_spec.get(active_name) in {None, "N/A", "?"}:
             fallback_gs = next(
-                (
-                    value
-                    for value in gs_by_spec.values()
-                    if value not in {None, "N/A", "?"}
-                ),
+                (value for value in gs_by_spec.values() if value not in {None, "N/A", "?"}),
                 None,
             )
             if fallback_gs is not None:
@@ -277,8 +269,7 @@ def _compute_personaje_base(
         "raza": summary.get("race", "N/A"),
         "clase": clase,
         "spec_display": " - ".join(
-            f"**{spec}**" if spec in active_specs else spec
-            for spec in active_specs + inactive_specs
+            f"**{spec}**" if spec in active_specs else spec for spec in active_specs + inactive_specs
         ),
         "guild_display": f"<{guild}>" if guild and guild != "Sin guild" else "Sin guild",
         "guild_rank": guild_rank,

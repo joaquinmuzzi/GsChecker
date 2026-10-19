@@ -18,10 +18,7 @@ from src.schemas.constants import UWU_MODES_ALL, UWU_PDPS_BOSS_ORDER
 
 
 def _build_character_spec_gs_key(nombre: str, server: str, spec_name: str) -> str:
-    return (
-        f"character:spec-gs:{server.strip().lower()}:"
-        f"{nombre.strip().lower()}:{spec_name.strip().lower()}"
-    )
+    return f"character:spec-gs:{server.strip().lower()}:{nombre.strip().lower()}:{spec_name.strip().lower()}"
 
 
 def _normalize_name(name: str) -> str:
@@ -47,10 +44,7 @@ def _collect_names_from_uwu(server: str, limit: int, best_only: bool) -> list[st
     total_queries = len(UWU_PDPS_BOSS_ORDER) * len(UWU_MODES_ALL) * 10 * 3
     query_idx = 0
     seed_start = time.time()
-    print(
-        "[INFO] Seed UwU iniciado "
-        f"(consultas={total_queries}, best_only={best_only}, limit={limit})"
-    )
+    print(f"[INFO] Seed UwU iniciado (consultas={total_queries}, best_only={best_only}, limit={limit})")
 
     for boss in UWU_PDPS_BOSS_ORDER:
         boss_start = time.time()
@@ -81,26 +75,18 @@ def _collect_names_from_uwu(server: str, limit: int, best_only: bool) -> list[st
                         qps = query_idx / elapsed
                         remaining = max(total_queries - query_idx, 0)
                         eta_sec = int(remaining / qps) if qps > 0 else 0
-                        pct = (
-                            (query_idx / total_queries) * 100 if total_queries else 100
-                        )
+                        pct = (query_idx / total_queries) * 100 if total_queries else 100
                         print(
                             "[UWU] "
                             f"{query_idx}/{total_queries} ({pct:.1f}%) | "
                             f"nombres={len(names)} | eta={eta_sec}s"
                         )
 
-            print(f"[UWU] Boss {boss} mode {mode} listo | " f"nombres={len(names)}")
+            print(f"[UWU] Boss {boss} mode {mode} listo | nombres={len(names)}")
 
-        print(
-            f"[UWU] Boss {boss} finalizado en "
-            f"{int(time.time() - boss_start)}s | nombres={len(names)}"
-        )
+        print(f"[UWU] Boss {boss} finalizado en {int(time.time() - boss_start)}s | nombres={len(names)}")
 
-    print(
-        f"[INFO] Seed UwU finalizado en {int(time.time() - seed_start)}s "
-        f"| nombres_unicos={len(names)}"
-    )
+    print(f"[INFO] Seed UwU finalizado en {int(time.time() - seed_start)}s | nombres_unicos={len(names)}")
     return sorted(names)
 
 
@@ -112,9 +98,7 @@ def _calculate_character_gs(nombre: str, server: str) -> dict | None:
     nombre_char = str(summary.get("name") or nombre)
     talents = _fetch_specs(nombre_char, server)
     active_specs = [
-        str(t.get("name") or "").strip()
-        for t in talents
-        if isinstance(t, dict) and t.get("active")
+        str(t.get("name") or "").strip() for t in talents if isinstance(t, dict) and t.get("active")
     ]
     active_specs = [spec for spec in active_specs if spec and spec != "N/A"]
 
@@ -125,11 +109,7 @@ def _calculate_character_gs(nombre: str, server: str) -> dict | None:
         # NOT filter out blank slots (e.g. empty Tabard) or every item after
         # them scores against the wrong slot category.
         gear_ids = profile_scraper.get_gear_ids_from_gear_data(gear_data)
-        gs = (
-            sum(gearscore.main(gear_ids))
-            if gear_ids
-            else summary.get("gearScore", "N/A")
-        )
+        gs = sum(gearscore.main(gear_ids)) if gear_ids else summary.get("gearScore", "N/A")
     except Exception:
         gs = summary.get("gearScore", "N/A")
 
@@ -240,9 +220,7 @@ def main():
         names = names[: args.max_characters]
 
     if not names:
-        print(
-            "[ERROR] No hay personajes para procesar. Usa --name, --names-file o --seed-uwu."
-        )
+        print("[ERROR] No hay personajes para procesar. Usa --name, --names-file o --seed-uwu.")
         return
 
     print(f"[INFO] Procesando {len(names)} personajes en {args.server}...")

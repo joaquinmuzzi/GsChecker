@@ -2,6 +2,7 @@
 responder sin disparar las consultas pesadas del armory (logros, estadísticas,
 gear...). Antes cada uno tardaba 30-50 s y gastaba ~15 requests del rate limit
 compartido, lo que llegó a abrir el circuit breaker para todos los usuarios."""
+
 from __future__ import annotations
 
 import pytest
@@ -41,8 +42,12 @@ async def test_missing_character_skips_heavy_fetches(bot, interaction, patched_f
 @pytest.mark.asyncio
 async def test_low_level_character_skips_heavy_fetches(bot, interaction, patched_fetchers):  # noqa: F811
     patched_fetchers["summary"].return_value = {
-        "name": "Srpingu", "level": 1, "race": "Night Elf", "class": "Warrior",
-        "guild": "Sin guild", "gearScore": "N/A",
+        "name": "Srpingu",
+        "level": 1,
+        "race": "Night Elf",
+        "class": "Warrior",
+        "guild": "Sin guild",
+        "gearScore": "N/A",
     }
     await _find_command(bot, "p").callback(interaction, nombre="Srpingu", reino="Icecrown")
 

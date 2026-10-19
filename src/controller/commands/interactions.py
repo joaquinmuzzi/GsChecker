@@ -81,8 +81,8 @@ async def _safe_edit_original_response(
             return await interaction.edit_original_response(**kwargs)
         except discord.NotFound:
             logger.warning(
-                "edit_original_response NotFound (mensaje o interacción inexistente) "
-                "command=%s", getattr(getattr(interaction, "command", None), "name", "?"),
+                "edit_original_response NotFound (mensaje o interacción inexistente) command=%s",
+                getattr(getattr(interaction, "command", None), "name", "?"),
             )
             return
         except discord.HTTPException as exc:
@@ -105,9 +105,7 @@ def _embed_fields_signature(embed) -> list[tuple[str, str]]:
 
 def _message_has_embed(message, embed: discord.Embed) -> bool:
     embeds = getattr(message, "embeds", None) or []
-    return bool(embeds) and _embed_fields_signature(embeds[0]) == _embed_fields_signature(
-        embed
-    )
+    return bool(embeds) and _embed_fields_signature(embeds[0]) == _embed_fields_signature(embed)
 
 
 async def _safe_send_error(interaction: discord.Interaction, message: str) -> None:
@@ -134,9 +132,7 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
             logger.exception("_safe_send_error: retry send failed")
 
 
-async def _reply_command_error(
-    interaction: discord.Interaction, exc: Exception, fallback: str
-) -> None:
+async def _reply_command_error(interaction: discord.Interaction, exc: Exception, fallback: str) -> None:
     """La respuesta de todos los comandos cuando algo falla: Discord ya no tiene
     el mensaje o el token venció (nada que responder), error de red de Discord,
     `ValueError` con un mensaje para el usuario (nombre o reino inválido) o

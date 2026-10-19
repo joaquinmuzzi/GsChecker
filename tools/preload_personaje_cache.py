@@ -18,6 +18,7 @@ Configurable por env vars:
     PERSONAJE_CACHE_DELAY_SECONDS   Pausa entre personajes (default: 2.0)
     PERSONAJE_CACHE_MAX_CHARACTERS  Corte duro (default: 0 = sin límite)
 """
+
 from __future__ import annotations
 
 import logging
@@ -97,9 +98,7 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
 
     persistent_confirmed = _load_confirmed_icc_kills(nombre_char, server)
     try:
-        raw_uwu_kills = _uwu_icc_bugfix_kills(
-            nombre_char, server, summary.get("class")
-        )
+        raw_uwu_kills = _uwu_icc_bugfix_kills(nombre_char, server, summary.get("class"))
     except Exception:
         logger.exception("uwu icc kills fetch failed for '%s'/%s", nombre_char, server)
         raw_uwu_kills = {}
@@ -108,9 +107,7 @@ def build_personaje_cache_entry(nombre: str, server: str) -> dict | None:
         nombre_char, server, raw_uwu_kills, persistent_confirmed, achi_payload, gear_data
     )
     try:
-        uwu_performance = _fetch_uwu_performance(
-            nombre_char, server, summary.get("class")
-        )
+        uwu_performance = _fetch_uwu_performance(nombre_char, server, summary.get("class"))
     except Exception:
         logger.exception("uwu performance fetch failed for '%s'/%s", nombre_char, server)
         uwu_performance = None
@@ -191,9 +188,7 @@ def main() -> int:
         if idx != len(pairs):
             time.sleep(delay)
 
-    logger.info(
-        "Finalizado: ok=%s skip=%s duración=%ds", ok, skipped, int(time.time() - run_start)
-    )
+    logger.info("Finalizado: ok=%s skip=%s duración=%ds", ok, skipped, int(time.time() - run_start))
     return 0
 
 

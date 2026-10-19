@@ -62,14 +62,8 @@ def _spec_lookup_candidates(spec_name: str) -> list[str]:
 def _split_active_inactive_specs(talents, clase):
     if isinstance(talents, list) and len(talents) > 0:
         sorted_talents = sorted(talents, key=lambda t: not t.get("active", False))
-        active_specs = [
-            t.get("name", "N/A") for t in sorted_talents if t.get("active", False)
-        ]
-        inactive_specs = [
-            t.get("name", "N/A")
-            for t in sorted_talents
-            if not t.get("active", False)
-        ]
+        active_specs = [t.get("name", "N/A") for t in sorted_talents if t.get("active", False)]
+        inactive_specs = [t.get("name", "N/A") for t in sorted_talents if not t.get("active", False)]
         # Warmane sometimes returns talents without an explicit active marker.
         # If no active spec is flagged, promote the first valid talent as active.
         if not active_specs:
@@ -78,11 +72,7 @@ def _split_active_inactive_specs(talents, clase):
                 if not candidate or candidate == "N/A":
                     continue
                 active_specs = [candidate]
-                inactive_specs = [
-                    name
-                    for name in inactive_specs
-                    if str(name or "").strip() != candidate
-                ]
+                inactive_specs = [name for name in inactive_specs if str(name or "").strip() != candidate]
                 break
         return active_specs, inactive_specs
     return [], _fallback_spec_names_for_class(clase)
@@ -172,9 +162,7 @@ def _build_spec_gs_entries(
                 "gearscore": gs_by_spec.get(clean_name, "?"),
             }
         )
-    return sorted(
-        entries, key=lambda entry: (not entry.get("main", False), entry.get("name", ""))
-    )
+    return sorted(entries, key=lambda entry: (not entry.get("main", False), entry.get("name", "")))
 
 
 def _format_spec_gs_value(spec_gs_entries: list[dict]) -> str:

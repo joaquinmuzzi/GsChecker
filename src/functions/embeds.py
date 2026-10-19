@@ -78,7 +78,10 @@ def _format_uwu_overview_table(rows) -> str:
     """Formateo de tabla de resumen de personaje UwU (boss/dps/kills/date)."""
     headers = ["Boss (25H)", "Best DPS", "Kills", "Date"]
     key_map = {
-        "Boss (25H)": "boss", "Best DPS": "best_dps", "Kills": "kills", "Date": "date",
+        "Boss (25H)": "boss",
+        "Best DPS": "best_dps",
+        "Kills": "kills",
+        "Date": "date",
     }
     widths = {
         h: max(
@@ -90,10 +93,7 @@ def _format_uwu_overview_table(rows) -> str:
     header_line = " | ".join(_pad(h, widths[h]) for h in headers)
     total_width = sum(widths[h] for h in headers) + len(headers) * 3
     sep_line = "-" * total_width
-    body_lines = [
-        " | ".join(_pad(row[key_map[h]], widths[h]) for h in headers)
-        for row in rows
-    ]
+    body_lines = [" | ".join(_pad(row[key_map[h]], widths[h]) for h in headers) for row in rows]
     return "\n".join([header_line, sep_line] + body_lines)
 
 
@@ -139,16 +139,8 @@ def _extract_icc_boss_kills(stats_rows):
             continue
 
         # Warmane wording varies by endpoint/locale. Accept broader mode markers.
-        is_10 = (
-            "10 player" in low_desc
-            or "(10" in low_desc
-            or "10-player" in low_desc
-        )
-        is_25 = (
-            "25 player" in low_desc
-            or "(25" in low_desc
-            or "25-player" in low_desc
-        )
+        is_10 = "10 player" in low_desc or "(10" in low_desc or "10-player" in low_desc
+        is_25 = "25 player" in low_desc or "(25" in low_desc or "25-player" in low_desc
         is_hc = "heroic" in low_desc
         if not (is_10 or is_25):
             continue
@@ -175,9 +167,7 @@ def _extract_icc_boss_kills(stats_rows):
     return icc_10, icc_25
 
 
-def _format_boss_rows(
-    bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, loading_symbol="?"
-):
+def _format_boss_rows(bosses_10: dict, bosses_25: dict, uwu_icc_kills=None, loading_symbol="?"):
     rows = []
     uwu_dependent_bosses = {"Marrowgar", "Deathwhisper"}
     if isinstance(uwu_icc_kills, dict):
@@ -332,9 +322,7 @@ def _format_professions_short(professions: list[str]) -> str:
     return " - ".join(parts)
 
 
-def _spec_icon_url(
-    active_spec_name: str | None, class_name: str | None = None
-) -> str | None:
+def _spec_icon_url(active_spec_name: str | None, class_name: str | None = None) -> str | None:
     clean_name = str(active_spec_name or "").strip().lower()
     if not clean_name:
         return None
@@ -346,7 +334,7 @@ def _spec_icon_url(
 
 
 def _format_uwu_performance(perf: dict | None) -> str:
-    """"Fire · #37 (top 1,2 %)": puesto de la spec en el reino. Los puntos de
+    """ "Fire · #37 (top 1,2 %)": puesto de la spec en el reino. Los puntos de
     uwu-logs no se muestran porque no se entienden. Vacío si no hay puesto."""
     if not isinstance(perf, dict) or not perf.get("rank"):
         return ""
@@ -402,9 +390,7 @@ def _build_personaje_embed(
         guild_value = f"{guild_display}\n{clean_rank}"
     embed.add_field(name="Guild", value=guild_value, inline=True)
 
-    icc_table, icc_widths = _format_boss_rows(
-        icc_10, icc_25, uwu_icc_kills, loading_symbol
-    )
+    icc_table, icc_widths = _format_boss_rows(icc_10, icc_25, uwu_icc_kills, loading_symbol)
     rs_rows = [
         {
             "Boss": "Halion",
@@ -477,8 +463,7 @@ def _build_personaje_embed(
 def _build_uwu_logs_embed(nombre: str, server: str, data: dict) -> discord.Embed:
     """/logs: un renglón por reporte, del más nuevo al más viejo."""
     lines = [
-        f"`{r['date']}` · {r['label']} · por {r['author']} · "
-        f"[ver](https://uwu-logs.xyz/reports/{r['id']}/)"
+        f"`{r['date']}` · {r['label']} · por {r['author']} · [ver](https://uwu-logs.xyz/reports/{r['id']}/)"
         for r in data.get("reports", [])
     ]
     embed = discord.Embed(
@@ -503,9 +488,7 @@ def _build_uwu_logs_view(nombre: str, server: str) -> discord.ui.View:
     return view
 
 
-def _build_personaje_view(
-    nombre_char: str, server: str = "Lordaeron"
-) -> discord.ui.View:
+def _build_personaje_view(nombre_char: str, server: str = "Lordaeron") -> discord.ui.View:
     view = discord.ui.View()
     view.add_item(
         discord.ui.Button(

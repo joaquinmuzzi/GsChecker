@@ -4,6 +4,7 @@ Datos reales (2026-09-28): POST /logs_list {"server", "player"} devuelve los
 ids de los 479 reportes de Flappyaladin, sin orden y sin bosses; con "fight"
 filtra los que tienen esa pelea.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -61,10 +62,17 @@ def test_recent_logs_none_when_uwu_is_down(monkeypatch):
 
 
 def test_embed_and_view():
-    data = {"total": 479, "reports": [{
-        "id": "26-09-27--19-01--Myamoto--Lordaeron", "date": "27-09-26",
-        "author": "Myamoto", "label": "ICC 12/12",
-    }]}
+    data = {
+        "total": 479,
+        "reports": [
+            {
+                "id": "26-09-27--19-01--Myamoto--Lordaeron",
+                "date": "27-09-26",
+                "author": "Myamoto",
+                "label": "ICC 12/12",
+            }
+        ],
+    }
     embed = _build_uwu_logs_embed("Flappyaladin", "Lordaeron", data)
     view = _build_uwu_logs_view("Flappyaladin", "Lordaeron")
 
@@ -73,9 +81,7 @@ def test_embed_and_view():
         "[ver](https://uwu-logs.xyz/reports/26-09-27--19-01--Myamoto--Lordaeron/)"
     )
     assert embed.footer.text == "Lordaeron · 479 reportes en total"
-    assert view.children[0].url == (
-        "https://uwu-logs.xyz/logs_list?server=Lordaeron&player=Flappyaladin"
-    )
+    assert view.children[0].url == ("https://uwu-logs.xyz/logs_list?server=Lordaeron&player=Flappyaladin")
 
 
 @pytest.mark.asyncio
@@ -91,9 +97,7 @@ async def test_command_without_logs(bot, interaction, monkeypatch):  # noqa: F81
 
 @pytest.mark.asyncio
 async def test_command_when_uwu_is_down(bot, interaction, monkeypatch):  # noqa: F811
-    monkeypatch.setattr(
-        "src.controller.commands.logs._fetch_uwu_recent_logs", lambda nombre, server: None
-    )
+    monkeypatch.setattr("src.controller.commands.logs._fetch_uwu_recent_logs", lambda nombre, server: None)
     await _find_command(bot, "logs").callback(interaction, nombre="Flappyaladin")
 
     assert "no responde" in interaction.last_edit().content

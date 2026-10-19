@@ -90,17 +90,13 @@ async def _send_cached_profile(
                 timeout=10.0,
             )
         except Exception:
-            logger.warning(
-                "uwu performance fetch failed for cached '%s'/%s", nombre, realm
-            )
+            logger.warning("uwu performance fetch failed for cached '%s'/%s", nombre, realm)
     embed_cached = _build_personaje_embed_from_cache(cached_payload)
     view_cached = _build_personaje_view(
         cached_payload["nombre_char"],
         cached_payload.get("server", DEFAULT_CHARACTER_REALM),
     )
-    await _safe_edit_original_response(
-        interaction, content=None, embed=embed_cached, view=view_cached
-    )
+    await _safe_edit_original_response(interaction, content=None, embed=embed_cached, view=view_cached)
 
 
 async def _send_stale_profile(
@@ -108,9 +104,7 @@ async def _send_stale_profile(
 ) -> None:
     """El armory está rate-limitado (circuit breaker abierto): se muestra la
     última copia guardada aunque esté vencida, o un aviso si no hay ninguna."""
-    stale_payload = await async_get_external_cache_stale(
-        "command_personaje", personaje_cache_key
-    )
+    stale_payload = await async_get_external_cache_stale("command_personaje", personaje_cache_key)
     if isinstance(stale_payload, dict):
         logger.warning(
             "Armory circuit open — serving stale DB cache for '%s'/%s",
@@ -123,9 +117,7 @@ async def _send_stale_profile(
             stale_payload["nombre_char"],
             stale_payload.get("server", DEFAULT_CHARACTER_REALM),
         )
-        await _safe_edit_original_response(
-            interaction, content=None, embed=embed_stale, view=view_stale
-        )
+        await _safe_edit_original_response(interaction, content=None, embed=embed_stale, view=view_stale)
         return
     logger.warning(
         "Armory circuit open and no stale cache for '%s'/%s — showing error",

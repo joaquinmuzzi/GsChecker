@@ -12,6 +12,7 @@ Configurable por env vars:
     PRELOAD_MAX_CHARACTERS  Corte duro para tandas grandes (default: 0 = sin límite)
     PRELOAD_ROTATION_SIZE   Personajes no-filtrados por run (default: 500)
 """
+
 from __future__ import annotations
 
 import logging
@@ -208,6 +209,7 @@ def main() -> int:
     init_database()
 
     from datetime import datetime
+
     today = datetime.now()
     force_filter = os.getenv("FORCE_FILTER", "").strip() in ("1", "true", "yes")
     if today.day == 1 or force_filter:
@@ -215,6 +217,7 @@ def main() -> int:
         try:
             from tools.filter_high_gs import main as filter_main
             import sys
+
             old_argv = sys.argv
             sys.argv = ["filter_high_gs", "--delay", "2"]
             try:
@@ -266,9 +269,7 @@ def main() -> int:
     for idx, (nombre, realm) in enumerate(all_pairs, start=1):
         while ARMORY_CIRCUIT.is_open():
             wait_s = int(ARMORY_CIRCUIT.seconds_until_close()) + 1
-            logger.warning(
-                "Circuit abierto, esperando %ss antes de continuar...", wait_s
-            )
+            logger.warning("Circuit abierto, esperando %ss antes de continuar...", wait_s)
             time.sleep(min(wait_s, 30))
 
         elapsed = max(time.time() - run_start, 0.001)

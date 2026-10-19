@@ -1,5 +1,6 @@
 """Cuando el armory responde a medias (429 en logros o estadísticas), el perfil
 no debe persistirse: los ❌ que mostraría son "no pudimos leerlo", no "no lo hizo"."""
+
 from unittest.mock import patch
 
 from src.services.profile import (
@@ -13,9 +14,28 @@ from src.schemas.constants import ACHIEVEMENTS_CACHE
 
 def _payload(data_complete):
     return _serialize_personaje_payload(
-        "Srpingu", "Lordaeron", 6291, 80, "Night Elf", "Death Knight",
-        "Blood", "<Guild>", None, True, True, True, True, {}, {}, [], [], {},
-        [], "Blood", gear_item_count=18, data_complete=data_complete,
+        "Srpingu",
+        "Lordaeron",
+        6291,
+        80,
+        "Night Elf",
+        "Death Knight",
+        "Blood",
+        "<Guild>",
+        None,
+        True,
+        True,
+        True,
+        True,
+        {},
+        {},
+        [],
+        [],
+        {},
+        [],
+        "Blood",
+        gear_item_count=18,
+        data_complete=data_complete,
     )
 
 

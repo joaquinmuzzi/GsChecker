@@ -179,9 +179,7 @@ def collect_from_uwu(server: str, limit: int, best_only: bool) -> set[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Recolecta nombres de personajes de Warmane."
-    )
+    parser = argparse.ArgumentParser(description="Recolecta nombres de personajes de Warmane.")
     parser.add_argument(
         "--server",
         default="Lordaeron",

@@ -146,14 +146,10 @@ def track_character_lookup(character_name: str, server: str) -> None:
                 )
             conn.commit()
     except Exception as exc:
-        logger.warning(
-            "Error registrando lookup para '%s'/%s: %s", clean_name, clean_server, exc
-        )
+        logger.warning("Error registrando lookup para '%s'/%s: %s", clean_name, clean_server, exc)
 
 
-def list_tracked_characters(
-    server: str | None = None, limit: int | None = None
-) -> list[tuple[str, str]]:
+def list_tracked_characters(server: str | None = None, limit: int | None = None) -> list[tuple[str, str]]:
     if not db_enabled():
         return []
 
@@ -337,11 +333,7 @@ def find_character_spec_gs_by_metadata(
 
     clean_character = str(character_name or "").strip().lower()
     clean_server = str(server or "").strip().lower()
-    clean_specs = [
-        str(spec or "").strip().lower()
-        for spec in spec_candidates
-        if str(spec or "").strip()
-    ]
+    clean_specs = [str(spec or "").strip().lower() for spec in spec_candidates if str(spec or "").strip()]
     if not clean_character or not clean_specs:
         return None
 
@@ -400,6 +392,7 @@ def find_character_spec_gs_by_metadata(
 # Async wrappers — run blocking psycopg calls on a thread pool so the asyncio
 # event loop (and Discord heartbeats) are never blocked.
 # ---------------------------------------------------------------------------
+
 
 async def async_get_external_cache(source: str, cache_key: str, ttl_seconds: int):
     return await asyncio.to_thread(get_external_cache, source, cache_key, ttl_seconds)

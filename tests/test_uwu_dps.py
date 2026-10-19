@@ -7,6 +7,7 @@ Casos reales de Lordaeron (sept. 2026) que mostraron los bugs:
 - /top ordena por DPS útil y con limit=1000 los tanks/healers quedaban afuera:
   Flappyaladin (Prot Pala) tiene 11 raids de LK 25N y el bot veía 2.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,7 @@ class FakeResp:
     def iter_content(self, chunk_size=65536):
         body = json.dumps(self._payload).encode()
         for i in range(0, len(body), chunk_size):
-            yield body[i:i + chunk_size]
+            yield body[i : i + chunk_size]
 
 
 def _row(name, useful_amount, duration=100.0):

@@ -14,10 +14,7 @@ def _build_dps_cache_key(nombre: str, spec: str | None) -> str:
 
 
 def _build_character_spec_gs_key(nombre: str, server: str, spec_name: str) -> str:
-    return (
-        f"character:spec-gs:{server.strip().lower()}:"
-        f"{nombre.strip().lower()}:{spec_name.strip().lower()}"
-    )
+    return f"character:spec-gs:{server.strip().lower()}:{nombre.strip().lower()}:{spec_name.strip().lower()}"
 
 
 def _build_character_spec_gs_legacy_key(nombre: str, spec_name: str) -> str:
@@ -25,7 +22,4 @@ def _build_character_spec_gs_legacy_key(nombre: str, spec_name: str) -> str:
 
 
 def _build_confirmed_icc_kills_key(nombre: str, server: str) -> str:
-    return (
-        f"character:icc-confirmed-kills:{server.strip().lower()}:"
-        f"{nombre.strip().lower()}"
-    )
+    return f"character:icc-confirmed-kills:{server.strip().lower()}:{nombre.strip().lower()}"

@@ -52,9 +52,7 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
         return cached
 
     persistent_cache_key = f"uwu:character:{server}:{nombre.lower()}:{spec_i}"
-    cached = get_external_cache(
-        "uwu_character", persistent_cache_key, UWU_CHARACTER_TTL
-    )
+    cached = get_external_cache("uwu_character", persistent_cache_key, UWU_CHARACTER_TTL)
     if cached is not None:
         _cache_set(UWU_CHARACTER_CACHE, cache_key, cached)
         return cached
@@ -66,12 +64,18 @@ def _fetch_uwu_character(nombre: str, server: str, spec_i: int):
     except Exception as e:
         logger.info(
             "uwu_character name=%s spec=%s error=%r elapsed=%.2fs",
-            nombre, spec_i, e, time.monotonic() - started,
+            nombre,
+            spec_i,
+            e,
+            time.monotonic() - started,
         )
         return {"__error__": f"uwu character error: {e}"}
     logger.info(
         "uwu_character name=%s spec=%s status=%s bytes=%s elapsed=%.2fs",
-        nombre, spec_i, resp.status_code, len(resp.content),
+        nombre,
+        spec_i,
+        resp.status_code,
+        len(resp.content),
         time.monotonic() - started,
     )
 
@@ -113,9 +117,7 @@ def _fetch_uwu_top(
     if cached is not None:
         return cached
 
-    persistent_cache_key = (
-        f"uwu:v4:top:{server}:{boss}:{mode}:{class_i}:{spec_i}:{int(best_only)}"
-    )
+    persistent_cache_key = f"uwu:v4:top:{server}:{boss}:{mode}:{class_i}:{spec_i}:{int(best_only)}"
     cached = get_external_cache("uwu_top", persistent_cache_key, UWU_TOP_TTL)
     if cached is not None:
         _cache_set(UWU_TOP_CACHE, cache_key, cached)
@@ -141,17 +143,27 @@ def _fetch_uwu_top(
         except Exception as e:
             last_error = f"uwu top error: {e}"
             logger.info(
-                "uwu_top boss=%s mode=%s class=%s spec=%s best_only=%s "
-                "timeout=%.1f error=%r elapsed=%.2fs",
-                boss, mode, class_i, spec_i, best_only, timeout_value, e,
+                "uwu_top boss=%s mode=%s class=%s spec=%s best_only=%s timeout=%.1f error=%r elapsed=%.2fs",
+                boss,
+                mode,
+                class_i,
+                spec_i,
+                best_only,
+                timeout_value,
+                e,
                 time.monotonic() - started,
             )
             continue
         logger.info(
-            "uwu_top boss=%s mode=%s class=%s spec=%s best_only=%s "
-            "status=%s bytes=%s elapsed=%.2fs",
-            boss, mode, class_i, spec_i, best_only, resp.status_code,
-            len(resp.content), time.monotonic() - started,
+            "uwu_top boss=%s mode=%s class=%s spec=%s best_only=%s status=%s bytes=%s elapsed=%.2fs",
+            boss,
+            mode,
+            class_i,
+            spec_i,
+            best_only,
+            resp.status_code,
+            len(resp.content),
+            time.monotonic() - started,
         )
 
         if resp.status_code != 200:
@@ -245,9 +257,7 @@ def _post_json_with_deadline(url: str, payload: dict, total_timeout: float):
     el status no es 200, el tercer valor es el header Retry-After.
     """
     started = time.monotonic()
-    with SESSION.post(
-        url, json=payload, timeout=(5, total_timeout), stream=True
-    ) as resp:
+    with SESSION.post(url, json=payload, timeout=(5, total_timeout), stream=True) as resp:
         if resp.status_code != 200:
             return resp.status_code, 0, resp.headers.get("Retry-After")
         chunks = []
@@ -269,9 +279,7 @@ def _post_top_with_retry(payload: dict, timeout_value: float, path: str = "/top"
     started = time.monotonic()
     for attempt in range(1, UWU_TOP_MAX_ATTEMPTS + 1):
         remaining = timeout_value - (time.monotonic() - started)
-        status, size, data = _post_json_with_deadline(
-            f"{UWU_BASE}{path}", payload, max(remaining, 1.0)
-        )
+        status, size, data = _post_json_with_deadline(f"{UWU_BASE}{path}", payload, max(remaining, 1.0))
         if status != 429 or attempt == UWU_TOP_MAX_ATTEMPTS:
             break
         try:
@@ -280,10 +288,13 @@ def _post_top_with_retry(payload: dict, timeout_value: float, path: str = "/top"
             wait_s = 1.5 * attempt
         remaining = timeout_value - (time.monotonic() - started)
         logger.info(
-            "uwu_top_retry boss=%s mode=%s class=%s spec=%s status=429 "
-            "attempt=%s wait=%.1fs",
-            payload.get("boss"), payload.get("mode"), payload.get("class_i"),
-            payload.get("spec_i"), attempt, wait_s,
+            "uwu_top_retry boss=%s mode=%s class=%s spec=%s status=429 attempt=%s wait=%.1fs",
+            payload.get("boss"),
+            payload.get("mode"),
+            payload.get("class_i"),
+            payload.get("spec_i"),
+            attempt,
+            wait_s,
         )
         if wait_s >= remaining - 1.0:
             break
@@ -291,9 +302,7 @@ def _post_top_with_retry(payload: dict, timeout_value: float, path: str = "/top"
     return status, size, data
 
 
-def _fetch_uwu_spec_players(
-    server: str, boss: str, mode: str, class_i: int, spec_i: int
-):
+def _fetch_uwu_spec_players(server: str, boss: str, mode: str, class_i: int, spec_i: int):
     """
     Nombres (en minúscula) de todos los jugadores de una spec con al menos un
     kill válido del boss en ese modo. Es la misma lista para todos los
@@ -307,12 +316,8 @@ def _fetch_uwu_spec_players(
     if cached is not None:
         return cached
 
-    persistent_cache_key = (
-        f"uwu:spec_players:{server}:{boss}:{mode}:{class_i}:{spec_i}"
-    )
-    cached = get_external_cache(
-        "uwu_spec_players", persistent_cache_key, UWU_SPEC_PLAYERS_TTL
-    )
+    persistent_cache_key = f"uwu:spec_players:{server}:{boss}:{mode}:{class_i}:{spec_i}"
+    cached = get_external_cache("uwu_spec_players", persistent_cache_key, UWU_SPEC_PLAYERS_TTL)
     if cached is not None:
         _cache_set(UWU_SPEC_PLAYERS_CACHE, cache_key, cached)
         return cached
@@ -330,31 +335,46 @@ def _fetch_uwu_spec_players(
     }
     started = time.monotonic()
     try:
-        status, size, top_rows = _post_top_with_retry(
-            payload, UWU_TOP_PLAYER_TIMEOUT
-        )
+        status, size, top_rows = _post_top_with_retry(payload, UWU_TOP_PLAYER_TIMEOUT)
     except Exception as e:
         logger.info(
             "uwu_spec_players boss=%s mode=%s class=%s spec=%s error=%r elapsed=%.2fs",
-            boss, mode, class_i, spec_i, e, time.monotonic() - started,
+            boss,
+            mode,
+            class_i,
+            spec_i,
+            e,
+            time.monotonic() - started,
         )
         return None
     if status != 200 or not isinstance(top_rows, list):
         logger.info(
             "uwu_spec_players boss=%s mode=%s class=%s spec=%s status=%s elapsed=%.2fs",
-            boss, mode, class_i, spec_i, status, time.monotonic() - started,
+            boss,
+            mode,
+            class_i,
+            spec_i,
+            status,
+            time.monotonic() - started,
         )
         return None
 
-    names = sorted({
-        str(row[3]).lower()
-        for row in top_rows
-        if isinstance(row, list) and len(row) > 4 and _uwu_row_dps(row) is not None
-    })
+    names = sorted(
+        {
+            str(row[3]).lower()
+            for row in top_rows
+            if isinstance(row, list) and len(row) > 4 and _uwu_row_dps(row) is not None
+        }
+    )
     logger.info(
-        "uwu_spec_players boss=%s mode=%s class=%s spec=%s status=200 bytes=%s "
-        "players=%s elapsed=%.2fs",
-        boss, mode, class_i, spec_i, size, len(names), time.monotonic() - started,
+        "uwu_spec_players boss=%s mode=%s class=%s spec=%s status=200 bytes=%s players=%s elapsed=%.2fs",
+        boss,
+        mode,
+        class_i,
+        spec_i,
+        size,
+        len(names),
+        time.monotonic() - started,
     )
     _cache_set(UWU_SPEC_PLAYERS_CACHE, cache_key, names)
     set_external_cache(
@@ -391,12 +411,8 @@ def _fetch_uwu_player_rows(
     if cached is not None:
         return cached
 
-    persistent_cache_key = (
-        f"uwu:player_rows:{server}:{boss}:{mode}:{class_i}:{spec_i}:{lower_name}"
-    )
-    cached = get_external_cache(
-        "uwu_player_rows", persistent_cache_key, UWU_PLAYER_ROWS_TTL
-    )
+    persistent_cache_key = f"uwu:player_rows:{server}:{boss}:{mode}:{class_i}:{spec_i}:{lower_name}"
+    cached = get_external_cache("uwu_player_rows", persistent_cache_key, UWU_PLAYER_ROWS_TTL)
     if cached is not None:
         _cache_set(UWU_PLAYER_ROWS_CACHE, cache_key, cached)
         return cached
@@ -412,17 +428,19 @@ def _fetch_uwu_player_rows(
         "best_only": False,
         "externals": True,
     }
-    timeout_value = (
-        timeout_override if timeout_override is not None else UWU_TOP_PLAYER_TIMEOUT
-    )
+    timeout_value = timeout_override if timeout_override is not None else UWU_TOP_PLAYER_TIMEOUT
     started = time.monotonic()
     try:
         status, size, top_rows = _post_top_with_retry(payload, timeout_value)
     except Exception as e:
         logger.info(
-            "uwu_player_rows boss=%s mode=%s class=%s spec=%s timeout=%.1f "
-            "error=%r elapsed=%.2fs",
-            boss, mode, class_i, spec_i, timeout_value, e,
+            "uwu_player_rows boss=%s mode=%s class=%s spec=%s timeout=%.1f error=%r elapsed=%.2fs",
+            boss,
+            mode,
+            class_i,
+            spec_i,
+            timeout_value,
+            e,
             time.monotonic() - started,
         )
         return {"__error__": f"uwu top error: {e}"}
@@ -430,7 +448,12 @@ def _fetch_uwu_player_rows(
     if status != 200:
         logger.info(
             "uwu_player_rows boss=%s mode=%s class=%s spec=%s status=%s elapsed=%.2fs",
-            boss, mode, class_i, spec_i, status, time.monotonic() - started,
+            boss,
+            mode,
+            class_i,
+            spec_i,
+            status,
+            time.monotonic() - started,
         )
         return {"__error__": f"uwu top status: {status}"}
     if not isinstance(top_rows, list):
@@ -440,16 +463,20 @@ def _fetch_uwu_player_rows(
         "rows": [
             row
             for row in top_rows
-            if isinstance(row, list)
-            and len(row) > 4
-            and str(row[3]).lower() == lower_name
+            if isinstance(row, list) and len(row) > 4 and str(row[3]).lower() == lower_name
         ],
         "truncated": len(top_rows) >= UWU_TOP_PLAYER_LIMIT,
     }
     logger.info(
         "uwu_player_rows boss=%s mode=%s class=%s spec=%s status=200 bytes=%s "
         "rows=%s player_rows=%s elapsed=%.2fs",
-        boss, mode, class_i, spec_i, size, len(top_rows), len(result["rows"]),
+        boss,
+        mode,
+        class_i,
+        spec_i,
+        size,
+        len(top_rows),
+        len(result["rows"]),
         time.monotonic() - started,
     )
     _cache_set(UWU_PLAYER_ROWS_CACHE, cache_key, result)
@@ -498,9 +525,7 @@ def _uwu_spec_ids_for_filter(spec_filter: str | None, class_i: int | None):
     return UWU_SPEC_KEYWORDS.get(kw)
 
 
-def _uwu_dps_spec_pairs(
-    profiles, spec_filter: str | None = None, char_class: str | None = None
-):
+def _uwu_dps_spec_pairs(profiles, spec_filter: str | None = None, char_class: str | None = None):
     """
     Pares (spec_i, class_i) a consultar en /top para /dps.
 
@@ -526,9 +551,7 @@ def _uwu_dps_spec_pairs(
     if allowed_spec_ids:
         return [(s, class_i) for s in allowed_spec_ids]
 
-    spec_i, class_i, data = max(
-        valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
-    )
+    spec_i, class_i, data = max(valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2]))
     if _uwu_spec_sort_key(spec_i, data)[0] == 0:
         return [(s, class_i) for s in (1, 2, 3)]
     return [(spec_i, class_i)]
@@ -544,9 +567,7 @@ def _pick_uwu_spec(nombre: str, server: str):
     if not payloads:
         return None, None
 
-    best_spec_i, best_payload = max(
-        payloads, key=lambda item: _uwu_spec_sort_key(item[0], item[1])
-    )
+    best_spec_i, best_payload = max(payloads, key=lambda item: _uwu_spec_sort_key(item[0], item[1]))
     return best_spec_i, best_payload
 
 
@@ -566,10 +587,17 @@ def _extract_character_overview(data: dict, nombre: str) -> dict | None:
         boss_short = UWU_BOSS_SHORT[boss_name]
         bd = bosses.get(boss_name)
         if not isinstance(bd, dict) or not bd:
-            rows.append({
-                "boss": boss_short, "rank": "-", "points": "0.00",
-                "best_dps": "-", "duration": "-", "kills": "-", "date": "-",
-            })
+            rows.append(
+                {
+                    "boss": boss_short,
+                    "rank": "-",
+                    "points": "0.00",
+                    "best_dps": "-",
+                    "duration": "-",
+                    "kills": "-",
+                    "date": "-",
+                }
+            )
             continue
         rank = bd.get("rank_players")
         pts = bd.get("points")
@@ -591,15 +619,17 @@ def _extract_character_overview(data: dict, nombre: str) -> dict | None:
             parts = raid_id.split("-")
             if len(parts) >= 3:
                 date_str = f"{parts[2]}-{parts[1]}-{parts[0]}"
-        rows.append({
-            "boss": boss_short,
-            "rank": str(rank) if rank is not None else "-",
-            "points": pts_str,
-            "best_dps": dps_str,
-            "duration": dur_str,
-            "kills": str(kills) if kills is not None else "-",
-            "date": date_str,
-        })
+        rows.append(
+            {
+                "boss": boss_short,
+                "rank": str(rank) if rank is not None else "-",
+                "points": pts_str,
+                "best_dps": dps_str,
+                "duration": dur_str,
+                "kills": str(kills) if kills is not None else "-",
+                "date": date_str,
+            }
+        )
 
     overall_pts = data.get("overall_points")
     overall_rank = data.get("overall_rank")
@@ -611,9 +641,7 @@ def _extract_character_overview(data: dict, nombre: str) -> dict | None:
     }
 
 
-def _fetch_uwu_overview_for_dps(
-    nombre: str, server: str, spec_filter: str | None = None
-) -> dict | None:
+def _fetch_uwu_overview_for_dps(nombre: str, server: str, spec_filter: str | None = None) -> dict | None:
     """
     Obtiene de forma rápida el resumen de personaje (rank/points/dps por boss)
     desde UwU Logs. Usa la mejor spec disponible salvo que spec_filter lo indique.
@@ -675,9 +703,7 @@ def _uwu_icc_bugfix_kills(
         _cache_set(UWU_ICC_KILLS_CACHE, cache_key, result)
         return result
 
-    character_mode_presence = {
-        short_name: {mode: False for mode in modes} for short_name in target
-    }
+    character_mode_presence = {short_name: {mode: False for mode in modes} for short_name in target}
     for _, _, data in profiles:
         bosses = data.get("bosses")
         if not isinstance(bosses, dict):
@@ -686,10 +712,7 @@ def _uwu_icc_bugfix_kills(
             boss_info = bosses.get(full_boss_name)
             if not isinstance(boss_info, dict) or not boss_info:
                 continue
-            has_report = any(
-                boss_info.get(key)
-                for key in ("report_id", "raid_id", "raids", "dps_max")
-            )
+            has_report = any(boss_info.get(key) for key in ("report_id", "raid_id", "raids", "dps_max"))
             if not has_report:
                 continue
             default_mode = UWU_BOSS_MODE.get(full_boss_name)
@@ -707,9 +730,7 @@ def _uwu_icc_bugfix_kills(
             for spec_i, class_i in probe_pairs:
                 if found:
                     break
-                players = _fetch_uwu_spec_players(
-                    server, full_boss_name, mode, class_i, spec_i
-                )
+                players = _fetch_uwu_spec_players(server, full_boss_name, mode, class_i, spec_i)
                 if players is None:
                     complete = False
                     continue
@@ -748,19 +769,24 @@ def _fetch_uwu_spec_ranking(server: str, class_i: int, spec_i: int):
     except Exception as e:
         logger.info(
             "uwu_top_points class=%s spec=%s error=%r elapsed=%.2fs",
-            class_i, spec_i, e, time.monotonic() - started,
+            class_i,
+            spec_i,
+            e,
+            time.monotonic() - started,
         )
         return None
     logger.info(
         "uwu_top_points class=%s spec=%s status=%s bytes=%s elapsed=%.2fs",
-        class_i, spec_i, status, size, time.monotonic() - started,
+        class_i,
+        spec_i,
+        status,
+        size,
+        time.monotonic() - started,
     )
     if status != 200 or not isinstance(rows, list):
         return None
 
-    names = [
-        str(row[0]).lower() for row in rows if isinstance(row, list) and row
-    ]
+    names = [str(row[0]).lower() for row in rows if isinstance(row, list) and row]
     _cache_set(UWU_TOP_POINTS_CACHE, cache_key, names)
     set_external_cache(
         "uwu_top_points",
@@ -784,14 +810,10 @@ def _fetch_uwu_performance(nombre: str, server: str, char_class: str | None = No
     if profiles is None:
         return None
     valid = [
-        (s, c, d)
-        for s, c, d in profiles
-        if c in UWU_SPEC_NAMES and float(d.get("overall_points") or 0) > 0
+        (s, c, d) for s, c, d in profiles if c in UWU_SPEC_NAMES and float(d.get("overall_points") or 0) > 0
     ]
     if valid:
-        spec_i, class_i, data = max(
-            valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2])
-        )
+        spec_i, class_i, data = max(valid, key=lambda item: _uwu_spec_sort_key(item[0], item[2]))
         ranking = _fetch_uwu_spec_ranking(server, class_i, spec_i)
         rank = data.get("overall_rank")
         return {
@@ -840,18 +862,23 @@ def _fetch_uwu_report_ids(server: str, nombre: str, fight: str | None = None):
         payload["fight"] = fight
     started = time.monotonic()
     try:
-        status, size, ids = _post_top_with_retry(
-            payload, UWU_TOP_PLAYER_TIMEOUT, path="/logs_list"
-        )
+        status, size, ids = _post_top_with_retry(payload, UWU_TOP_PLAYER_TIMEOUT, path="/logs_list")
     except Exception as e:
         logger.info(
             "uwu_logs_list name=%s fight=%s error=%r elapsed=%.2fs",
-            nombre, fight, e, time.monotonic() - started,
+            nombre,
+            fight,
+            e,
+            time.monotonic() - started,
         )
         return None
     logger.info(
         "uwu_logs_list name=%s fight=%s status=%s bytes=%s elapsed=%.2fs",
-        nombre, fight, status, size, time.monotonic() - started,
+        nombre,
+        fight,
+        status,
+        size,
+        time.monotonic() - started,
     )
     if status != 200 or not isinstance(ids, list):
         return None
@@ -859,14 +886,12 @@ def _fetch_uwu_report_ids(server: str, nombre: str, fight: str | None = None):
 
 
 def _uwu_report_label(fights: set[str]) -> str:
-    """"ICC 11/12", "Halion", "ICC 12/12 + Halion" u "otro raid"."""
+    """ "ICC 11/12", "Halion", "ICC 12/12 + Halion" u "otro raid"."""
     parts = []
     icc = sum(1 for fight in UWU_LOGS_ICC_FIGHTS if fight in fights)
     if icc:
         parts.append(f"ICC {icc}/{len(UWU_LOGS_ICC_FIGHTS)}")
-    parts.extend(
-        label for fight, label in UWU_LOGS_OTHER_FIGHTS.items() if fight in fights
-    )
+    parts.extend(label for fight, label in UWU_LOGS_OTHER_FIGHTS.items() if fight in fights)
     return " + ".join(parts) or "otro raid"
 
 
@@ -912,12 +937,14 @@ def _fetch_uwu_recent_logs(nombre: str, server: str):
         date = "-".join(reversed(parts[0].split("-"))) if parts else report_id
         author = parts[2] if len(parts) >= 4 else "?"
         present = {fight for fight, s in fight_sets.items() if report_id in s}
-        result["reports"].append({
-            "id": report_id,
-            "date": date,
-            "author": author,
-            "label": _uwu_report_label(present) if complete else "?",
-        })
+        result["reports"].append(
+            {
+                "id": report_id,
+                "date": date,
+                "author": author,
+                "label": _uwu_report_label(present) if complete else "?",
+            }
+        )
 
     if complete:
         _cache_set(UWU_LOGS_CACHE, cache_key, result)
@@ -931,9 +958,7 @@ def _fetch_uwu_recent_logs(nombre: str, server: str):
     return result
 
 
-UWU_DOWN_MESSAGE = (
-    "⚠️ UwU Logs no responde en este momento. Probá de nuevo en unos minutos."
-)
+UWU_DOWN_MESSAGE = "⚠️ UwU Logs no responde en este momento. Probá de nuevo en unos minutos."
 
 
 def _uwu_dps_row(boss_name: str, mode: str, player_rows, truncated: bool):
@@ -1002,9 +1027,7 @@ def _build_uwu_dps_summary(
         return payload
 
     if selected_bosses:
-        boss_names = [
-            boss for boss in selected_bosses if isinstance(boss, str) and boss
-        ]
+        boss_names = [boss for boss in selected_bosses if isinstance(boss, str) and boss]
     else:
         bosses = {}
         for _, _, data in profiles:
@@ -1095,4 +1118,3 @@ def _build_uwu_dps_summary(
     }
     _cache_set(UWU_PDPS_SUMMARY_CACHE, cache_key, payload)
     return payload
-

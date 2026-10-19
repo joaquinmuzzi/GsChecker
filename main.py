@@ -22,13 +22,9 @@ def configure_logging() -> logging.Logger:
     logger = logging.getLogger("gschecker")
     logger.setLevel(logging.INFO)
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-    info_handler = RotatingFileHandler(
-        "logs/bot.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8"
-    )
+    info_handler = RotatingFileHandler("logs/bot.log", maxBytes=2_000_000, backupCount=5, encoding="utf-8")
     info_handler.setLevel(logging.INFO)
     info_handler.setFormatter(formatter)
 

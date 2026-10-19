@@ -1,4 +1,5 @@
 """Guías BiS por reino generadas desde el armory (static/bis/<reino>.json)."""
+
 from __future__ import annotations
 
 import json
@@ -70,8 +71,9 @@ def test_available_guides_labels(realm_files):
 
 
 def _char(items):
-    return CharacterData(name="Srpingu", server="Lordaeron", char_class="Death Knight",
-                         spec="Blood", items=items)
+    return CharacterData(
+        name="Srpingu", server="Lordaeron", char_class="Death Knight", spec="Blood", items=items
+    )
 
 
 def test_item_issue_shows_equipped_item_name(realm_files):

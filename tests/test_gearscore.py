@@ -20,9 +20,25 @@ import gearscore
 # Real gear_ids for Veletriel/Lordaeron, in armory DOM order (Head..Ranged),
 # with the Tabard slot (index 6) unworn — captured live while diagnosing the bug.
 VELETRIEL_GEAR_IDS = [
-    "51178", "50061", "51175", "53489", "51176", "52019", "", "50032",
-    "51179", "50063", "49891", "49893", "50610", "50400", "47041", "50366",
-    "51910", "40699", "51326",
+    "51178",
+    "50061",
+    "51175",
+    "53489",
+    "51176",
+    "52019",
+    "",
+    "50032",
+    "51179",
+    "50063",
+    "49891",
+    "49893",
+    "50610",
+    "50400",
+    "47041",
+    "50366",
+    "51910",
+    "40699",
+    "51326",
 ]
 VELETRIEL_CORRECT_GS = 5896
 VELETRIEL_FILTERED_BUG_GS = 4086
@@ -47,14 +63,16 @@ class TestCalculateCharacterGsDoesNotFilter:
     @patch("tools.preload_character_gs._fetch_specs")
     @patch("tools.preload_character_gs._fetch_gear_data")
     @patch("tools.preload_character_gs._fetch_summary")
-    def test_preload_character_gs_scores_correctly(
-        self, mock_summary, mock_gear, mock_specs
-    ):
+    def test_preload_character_gs_scores_correctly(self, mock_summary, mock_gear, mock_specs):
         from tools.preload_character_gs import _calculate_character_gs
 
         mock_summary.return_value = {
-            "name": "Veletriel", "level": 80, "race": "Human",
-            "class": "Priest", "guild": "Sin guild", "gearScore": "N/A",
+            "name": "Veletriel",
+            "level": 80,
+            "race": "Human",
+            "class": "Priest",
+            "guild": "Sin guild",
+            "gearScore": "N/A",
         }
         mock_gear.return_value = [
             {"item": gid, "slot": f"slot{i}", "gems": ["0", "0", "0"], "ench": "0"}
@@ -115,18 +133,25 @@ class TestPreloadPersonajeCacheDoesNotFilter:
         from tools.preload_personaje_cache import build_personaje_cache_entry
 
         mock_summary.return_value = {
-            "name": "Veletriel", "level": 80, "race": "Human",
-            "class": "Priest", "guild": "Sin guild", "gearScore": "N/A",
+            "name": "Veletriel",
+            "level": 80,
+            "race": "Human",
+            "class": "Priest",
+            "guild": "Sin guild",
+            "gearScore": "N/A",
         }
         mock_gear.return_value = [
             {"item": gid, "slot": f"slot{i}", "gems": ["0", "0", "0"], "ench": "0"}
             for i, gid in enumerate(VELETRIEL_GEAR_IDS)
         ]
         mock_achi.return_value = {
-            "halion_10n_achieved": False, "halion_10h_achieved": False,
-            "halion_25n_achieved": False, "halion_25h_achieved": False,
+            "halion_10n_achieved": False,
+            "halion_10h_achieved": False,
+            "halion_25n_achieved": False,
+            "halion_25h_achieved": False,
             "completed_ids": set(),
-            "storming_10h_achieved": False, "storming_25n_achieved": False,
+            "storming_10h_achieved": False,
+            "storming_25n_achieved": False,
             "storming_25h_achieved": False,
         }
         mock_stats.return_value = [["Lord Marrowgar kills (Icecrown 25 player)", "- -"]]
