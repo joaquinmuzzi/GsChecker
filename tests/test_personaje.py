@@ -11,7 +11,8 @@ Cubre los 3 escenarios que corresponden a los bugs que ya vimos:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from contextlib import ExitStack
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -83,6 +84,22 @@ def _happy_achievements() -> dict:
     }
 
 
+# Cada comando importa los fetchers por nombre, así que se patchean en cada
+# módulo que los usa (el mismo mock en todos, como cuando había un solo
+# commands.py).
+_COMMANDS = "src.controller.commands"
+FETCHER_TARGETS = {
+    "summary": ("_fetch_summary", ("personaje", "dps", "ia")),
+    "specs": ("_fetch_specs", ("personaje", "ia")),
+    "professions": ("_fetch_professions", ("personaje",)),
+    "gear": ("_fetch_gear_data", ("personaje", "ia")),
+    "achievements": ("_fetch_achievements", ("personaje",)),
+    "statistics": ("_fetch_statistics", ("personaje",)),
+    "uwu_icc": ("_uwu_icc_bugfix_kills", ("personaje",)),
+    "uwu_perf": ("_fetch_uwu_performance", ("personaje",)),
+}
+
+
 @pytest.fixture
 def patched_fetchers():
     """Patchea todas las funciones armory + uwu que /p invoca por executor.
@@ -91,51 +108,28 @@ def patched_fetchers():
     les interesa (ej: patched_fetchers['summary'].return_value = ...) y
     ejecutar el comando.
     """
-    targets = {
-        "summary": "src.controller.commands._fetch_summary",
-        "specs": "src.controller.commands._fetch_specs",
-        "professions": "src.controller.commands._fetch_professions",
-        "gear": "src.controller.commands._fetch_gear_data",
-        "achievements": "src.controller.commands._fetch_achievements",
-        "statistics": "src.controller.commands._fetch_statistics",
-        "guild_rank": "src.services.profile._fetch_guild_rank",
-        "uwu_icc": "src.controller.commands._uwu_icc_bugfix_kills",
-        "uwu_perf": "src.controller.commands._fetch_uwu_performance",
-    }
-    with (
-        patch(targets["summary"]) as m_summary,
-        patch(targets["specs"]) as m_specs,
-        patch(targets["professions"]) as m_prof,
-        patch(targets["gear"]) as m_gear,
-        patch(targets["achievements"]) as m_achi,
-        patch(targets["statistics"]) as m_stats,
-        patch(targets["guild_rank"]) as m_rank,
-        patch(targets["uwu_icc"]) as m_uwu,
-        patch(targets["uwu_perf"]) as m_perf,
-    ):
-        m_summary.return_value = _happy_summary()
-        m_specs.return_value = [
+    mocks = {key: MagicMock(name=attr) for key, (attr, _) in FETCHER_TARGETS.items()}
+    # El guild rank lo pide la lógica del perfil compartida con el cron.
+    mocks["guild_rank"] = MagicMock(name="_fetch_guild_rank")
+    with ExitStack() as stack:
+        for key, (attr, modules) in FETCHER_TARGETS.items():
+            for module in modules:
+                stack.enter_context(patch(f"{_COMMANDS}.{module}.{attr}", mocks[key]))
+        stack.enter_context(patch("src.services.profile._fetch_guild_rank", mocks["guild_rank"]))
+
+        mocks["summary"].return_value = _happy_summary()
+        mocks["specs"].return_value = [
             {"name": "Blood", "active": True},
             {"name": "Frost", "active": False},
         ]
-        m_prof.return_value = ["Engineering 450", "Enchanting 450"]
-        m_gear.return_value = _happy_gear_data()
-        m_achi.return_value = _happy_achievements()
-        m_stats.return_value = []
-        m_rank.return_value = "Gran Canciller"
-        m_uwu.return_value = {}
-        m_perf.return_value = {}
-        yield {
-            "summary": m_summary,
-            "specs": m_specs,
-            "professions": m_prof,
-            "gear": m_gear,
-            "achievements": m_achi,
-            "statistics": m_stats,
-            "guild_rank": m_rank,
-            "uwu_icc": m_uwu,
-            "uwu_perf": m_perf,
-        }
+        mocks["professions"].return_value = ["Engineering 450", "Enchanting 450"]
+        mocks["gear"].return_value = _happy_gear_data()
+        mocks["achievements"].return_value = _happy_achievements()
+        mocks["statistics"].return_value = []
+        mocks["guild_rank"].return_value = "Gran Canciller"
+        mocks["uwu_icc"].return_value = {}
+        mocks["uwu_perf"].return_value = {}
+        yield mocks
 
 
 @pytest.mark.asyncio
@@ -301,7 +295,7 @@ async def test_cached_profile_without_ranking_gets_it(bot, interaction, patched_
         "spec": "Demonology", "points": 44.65, "rank": 895, "total": 1869,
     }
     with patch(
-        "src.controller.commands.async_get_external_cache",
+        "src.controller.commands.personaje.async_get_external_cache",
         new_callable=AsyncMock,
         return_value=old_payload,
     ):
@@ -331,7 +325,7 @@ async def test_cached_profile_with_empty_ranking_is_refetched(bot, interaction, 
         "spec": "Balance", "points": 29.69, "rank": 2034, "total": 3143,
     }
     with patch(
-        "src.controller.commands.async_get_external_cache",
+        "src.controller.commands.personaje.async_get_external_cache",
         new_callable=AsyncMock,
         return_value=payload,
     ):
@@ -357,7 +351,7 @@ async def test_hung_uwu_lookup_still_ends_in_final_state(
 
     release = threading.Event()
     patched_fetchers["uwu_icc"].side_effect = lambda *a, **k: release.wait(10) or {}
-    monkeypatch.setattr("src.controller.commands.PERSONAJE_UWU_WAIT_SECONDS", 0.1)
+    monkeypatch.setattr("src.controller.commands.personaje.PERSONAJE_UWU_WAIT_SECONDS", 0.1)
     try:
         await _find_command(bot, "p").callback(interaction, nombre="Suramar")
     finally:

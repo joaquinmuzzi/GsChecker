@@ -81,7 +81,7 @@ def test_embed_and_view():
 @pytest.mark.asyncio
 async def test_command_without_logs(bot, interaction, monkeypatch):  # noqa: F811
     monkeypatch.setattr(
-        "src.controller.commands._fetch_uwu_recent_logs",
+        "src.controller.commands.logs._fetch_uwu_recent_logs",
         lambda nombre, server: {"total": 0, "reports": []},
     )
     await _find_command(bot, "logs").callback(interaction, nombre="nadie")
@@ -92,7 +92,7 @@ async def test_command_without_logs(bot, interaction, monkeypatch):  # noqa: F81
 @pytest.mark.asyncio
 async def test_command_when_uwu_is_down(bot, interaction, monkeypatch):  # noqa: F811
     monkeypatch.setattr(
-        "src.controller.commands._fetch_uwu_recent_logs", lambda nombre, server: None
+        "src.controller.commands.logs._fetch_uwu_recent_logs", lambda nombre, server: None
     )
     await _find_command(bot, "logs").callback(interaction, nombre="Flappyaladin")
 

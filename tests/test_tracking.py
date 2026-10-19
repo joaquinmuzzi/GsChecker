@@ -84,7 +84,7 @@ async def test_dps_does_not_track_missing_character(
 @pytest.mark.asyncio
 async def test_ptoc_does_not_track(bot, interaction, tracked):  # noqa: F811
     toc = {"toc_10n": False, "toc_10h": False, "toc_25n": False, "toc_25h": False}
-    with patch("src.controller.commands._fetch_toc_achievements", return_value=toc):
+    with patch("src.controller.commands.ptoc._fetch_toc_achievements", return_value=toc):
         await _run(bot, "ptoc", interaction, nombre="Kynrwe")
 
     tracked.assert_not_called()
