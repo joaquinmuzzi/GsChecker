@@ -89,14 +89,14 @@ def _happy_achievements() -> dict:
 # commands.py).
 _COMMANDS = "src.controller.commands"
 FETCHER_TARGETS = {
-    "summary": ("_fetch_summary", ("personaje", "dps", "ia")),
-    "specs": ("_fetch_specs", ("personaje", "ia")),
-    "professions": ("_fetch_professions", ("personaje",)),
-    "gear": ("_fetch_gear_data", ("personaje", "ia")),
-    "achievements": ("_fetch_achievements", ("personaje",)),
-    "statistics": ("_fetch_statistics", ("personaje",)),
-    "uwu_icc": ("_uwu_icc_bugfix_kills", ("personaje",)),
-    "uwu_perf": ("_fetch_uwu_performance", ("personaje",)),
+    "summary": ("_fetch_summary", ("personaje_live", "dps", "ia")),
+    "specs": ("_fetch_specs", ("personaje_live", "ia")),
+    "professions": ("_fetch_professions", ("personaje_live",)),
+    "gear": ("_fetch_gear_data", ("personaje_live", "ia")),
+    "achievements": ("_fetch_achievements", ("personaje_live",)),
+    "statistics": ("_fetch_statistics", ("personaje_live",)),
+    "uwu_icc": ("_uwu_icc_bugfix_kills", ("personaje_live",)),
+    "uwu_perf": ("_fetch_uwu_performance", ("personaje", "personaje_live")),
 }
 
 
@@ -351,7 +351,7 @@ async def test_hung_uwu_lookup_still_ends_in_final_state(
 
     release = threading.Event()
     patched_fetchers["uwu_icc"].side_effect = lambda *a, **k: release.wait(10) or {}
-    monkeypatch.setattr("src.controller.commands.personaje.PERSONAJE_UWU_WAIT_SECONDS", 0.1)
+    monkeypatch.setattr("src.controller.commands.personaje_live.PERSONAJE_UWU_WAIT_SECONDS", 0.1)
     try:
         await _find_command(bot, "p").callback(interaction, nombre="Suramar")
     finally:

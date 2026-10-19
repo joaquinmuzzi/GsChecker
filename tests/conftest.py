@@ -177,4 +177,4 @@ def interaction() -> FakeInteraction:
 
 @pytest.fixture(autouse=True)
 def _no_final_edit_check_wait(monkeypatch):
-    monkeypatch.setattr("src.controller.commands.personaje.PERSONAJE_FINAL_CHECK_SECONDS", 0)
+    monkeypatch.setattr("src.controller.commands.personaje_live.PERSONAJE_FINAL_CHECK_SECONDS", 0)

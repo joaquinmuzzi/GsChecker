@@ -5,11 +5,10 @@ import asyncio
 import discord
 
 from src.controller.commands.interactions import (
-    _is_expired_token,
     _log_command_usage,
+    _reply_command_error,
     _safe_defer,
     _safe_edit_original_response,
-    _safe_send_error,
 )
 from src.functions.embeds import _build_uwu_logs_embed, _build_uwu_logs_view
 from src.functions.uwu import UWU_DOWN_MESSAGE, _fetch_uwu_recent_logs
@@ -69,13 +68,5 @@ def register(bot):
                 view=_build_uwu_logs_view(nombre, realm),
             )
 
-        except discord.NotFound:
-            return
-        except discord.HTTPException as e:
-            if _is_expired_token(e):
-                return
-            await _safe_send_error(interaction, f"❌ Error de red: {e}")
-        except ValueError as e:
-            await _safe_send_error(interaction, str(e))
-        except Exception as e:
-            await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
+        except Exception as exc:
+            await _reply_command_error(interaction, exc, "❌ Error al obtener datos")

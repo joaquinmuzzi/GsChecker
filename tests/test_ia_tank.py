@@ -65,7 +65,7 @@ def _srpingu_fetchers(patched_fetchers):
 async def test_ia_audits_blood_tank_with_tank_guide(bot, interaction, patched_fetchers):  # noqa: F811
     _srpingu_fetchers(patched_fetchers)
     audit = AsyncMock(return_value=None)
-    with patch("profile_scraper.get_character_stats",
+    with patch("src.controller.commands.ia.get_character_stats",
                return_value={"hit_rating": 244.9, "dodge_pct": 24.84}), \
          patch("src.controller.commands.ia.run_full_audit", audit):
         await _find_command(bot, "ia").callback(interaction, nombre="Srpingu")

@@ -132,3 +132,22 @@ async def _safe_send_error(interaction: discord.Interaction, message: str) -> No
                 await interaction.response.send_message(message)
         except Exception:
             logger.exception("_safe_send_error: retry send failed")
+
+
+async def _reply_command_error(
+    interaction: discord.Interaction, exc: Exception, fallback: str
+) -> None:
+    """La respuesta de todos los comandos cuando algo falla: Discord ya no tiene
+    el mensaje o el token venció (nada que responder), error de red de Discord,
+    `ValueError` con un mensaje para el usuario (nombre o reino inválido) o
+    cualquier otro error, que se muestra como `{fallback}: {exc}`."""
+    if isinstance(exc, discord.NotFound):
+        return
+    if isinstance(exc, discord.HTTPException):
+        if not _is_expired_token(exc):
+            await _safe_send_error(interaction, f"❌ Error de red: {exc}")
+        return
+    if isinstance(exc, ValueError):
+        await _safe_send_error(interaction, str(exc))
+        return
+    await _safe_send_error(interaction, f"{fallback}: {exc}")

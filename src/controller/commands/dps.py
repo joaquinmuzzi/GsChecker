@@ -5,11 +5,10 @@ import asyncio
 import discord
 
 from src.controller.commands.interactions import (
-    _is_expired_token,
     _log_command_usage,
+    _reply_command_error,
     _safe_defer,
     _safe_edit_original_response,
-    _safe_send_error,
 )
 from src.db.postgres import async_get_external_cache, async_set_external_cache
 from src.functions.embeds import _format_uwu_dps_table, _format_uwu_overview_table
@@ -30,21 +29,17 @@ from src.services.tracking import _track_character
 DPS_COMMAND_TIMEOUT_SECONDS = 45
 
 
-def _build_dps_embed_from_cache(payload: dict):
-    nombre_char = payload["nombre_char"]
-    spec_display = payload.get("spec_display", "")
-    uwu_rows = payload.get("uwu_rows", [])
-    failed_by_mode = payload.get("failed_by_mode", {})
-    timed_out = bool(payload.get("timed_out", False))
-
+def _group_rows_by_boss(rows: list[dict]) -> list[dict]:
+    """Intercala una fila separadora entre bosses y saca la clave interna `_boss`
+    de las filas (las modifica)."""
     grouped_rows = []
-    for i, row in enumerate(uwu_rows):
-        grouped_rows.append(dict(row))
-        is_last = i == len(uwu_rows) - 1
+    for i, row in enumerate(rows):
+        grouped_rows.append(row)
+        is_last = i == len(rows) - 1
         if is_last:
             continue
         current_boss = row.get("_boss")
-        next_boss = uwu_rows[i + 1].get("_boss")
+        next_boss = rows[i + 1].get("_boss")
         if current_boss != next_boss:
             grouped_rows.append(
                 {
@@ -60,7 +55,18 @@ def _build_dps_embed_from_cache(payload: dict):
 
     for row in grouped_rows:
         row.pop("_boss", None)
+    return grouped_rows
 
+
+def _build_dps_embed(
+    nombre_char: str,
+    spec: str | None,
+    spec_display: str,
+    grouped_rows: list[dict],
+    failed_by_mode,
+    timed_out: bool,
+    uwu_overview,
+) -> discord.Embed:
     has_any_logs = any(
         row.get("Raids") not in {"0", "--"}
         for row in grouped_rows
@@ -76,7 +82,7 @@ def _build_dps_embed_from_cache(payload: dict):
     if not has_any_logs:
         warning_note = (
             "\n⚠️ No se encontraron logs para este personaje"
-            f"{' con esa spec' if payload.get('spec') else ''} en UwU Logs."
+            f"{' con esa spec' if spec else ''} en UwU Logs."
         )
 
     failed_parts = []
@@ -97,8 +103,7 @@ def _build_dps_embed_from_cache(payload: dict):
             "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
         )
 
-    # Bloque de overview (rank/points/dps por boss) almacenado en caché
-    uwu_overview = payload.get("uwu_overview")
+    # Bloque de overview (rank/points/dps por boss), encima de la tabla DPS
     overview_prefix = ""
     if isinstance(uwu_overview, dict) and uwu_overview.get("rows"):
         overview_table = _format_uwu_overview_table(uwu_overview["rows"])
@@ -119,6 +124,21 @@ def _build_dps_embed_from_cache(payload: dict):
         inline=True,
     )
     return embed
+
+
+def _build_dps_embed_from_cache(payload: dict):
+    nombre_char = payload["nombre_char"]
+    # Copias, como antes: armar el embed no modifica el payload.
+    rows = [dict(row) for row in payload.get("uwu_rows", [])]
+    return _build_dps_embed(
+        nombre_char,
+        payload.get("spec"),
+        payload.get("spec_display", ""),
+        _group_rows_by_boss(rows),
+        payload.get("failed_by_mode", {}),
+        bool(payload.get("timed_out", False)),
+        payload.get("uwu_overview"),
+    )
 
 
 def register(bot):
@@ -277,86 +297,17 @@ def register(bot):
                 ),
             )
 
-            grouped_rows = []
-            for i, row in enumerate(uwu_rows):
-                grouped_rows.append(row)
-                is_last = i == len(uwu_rows) - 1
-                if is_last:
-                    continue
-                current_boss = row.get("_boss")
-                next_boss = uwu_rows[i + 1].get("_boss")
-                if current_boss != next_boss:
-                    grouped_rows.append(
-                        {
-                            "Boss": "---------",
-                            "Mode": "--",
-                            "Raids": "--",
-                            "Max DPS": "---------",
-                            "Avg DPS": "---------",
-                            "_boss": "__sep__",
-                            "_sep": True,
-                        }
-                    )
-
-            uwu_rows = grouped_rows
-            for row in uwu_rows:
-                row.pop("_boss", None)
-
-            has_any_logs = any(
-                row.get("Raids") not in {"0", "--"}
-                for row in uwu_rows
-                if not row.get("_sep")
-            )
-
-            uwu_table = _format_uwu_dps_table(uwu_rows)
-            table_block = f"```\n{uwu_table}\n```"
-            if len(table_block) > 3900:
-                table_block = f"```\n{uwu_table[:3880]}\n...\n```"
-
-            warning_note = ""
-            if not has_any_logs:
-                warning_note = (
-                    "\n⚠️ No se encontraron logs para este personaje"
-                    f"{' con esa spec' if spec else ''} en UwU Logs."
-                )
-
-            failed_parts = []
-            if isinstance(failed_by_mode, dict):
-                for mode in UWU_MODES_ALL:
-                    value = failed_by_mode.get(mode, 0)
-                    if isinstance(value, int) and value > 0:
-                        failed_parts.append(f"{mode}:{value}")
-            failed_note = ""
-            if failed_parts:
-                failed_note = "\n⚠️ Consultas UwU fallidas por mode: " + " | ".join(
-                    failed_parts
-                )
-
-            timeout_note = ""
-            if timed_out:
-                timeout_note = (
-                    "\n⚠️ Resultado parcial: se alcanzó el tiempo límite de consulta."
-                )
-
-            # --- Bloque de overview (va encima de la tabla DPS) ---
-            overview_prefix = ""
-            if uwu_overview and uwu_overview.get("rows"):
-                overview_table = _format_uwu_overview_table(uwu_overview["rows"])
-                overall_pts = uwu_overview.get("overall_points", "?")
-                overview_prefix = (
-                    f"**Overall: {overall_pts} pts**\n"
-                    f"```\n{overview_table}\n```\n"
-                )
-
-            embed = discord.Embed(
-                title=f"{nombre_char} - Uwulogs DPS{spec_display}",
-                description=overview_prefix + table_block + warning_note + failed_note + timeout_note,
-                color=0x2B2D31,
-            )
-            embed.add_field(
-                name="Si ves datos vacíos, consulte:",
-                value=DOCS_NOTAS_URL,
-                inline=True,
+            # Sin copias, como antes: las filas que se guardan en caché (y las de
+            # la caché en memoria de uwu.py) quedan sin `_boss`, así que un /dps
+            # servido desde caché sale sin las líneas separadoras entre bosses.
+            embed = _build_dps_embed(
+                nombre_char,
+                spec,
+                spec_display,
+                _group_rows_by_boss(uwu_rows),
+                failed_by_mode,
+                timed_out,
+                uwu_overview,
             )
             await async_set_external_cache(
                 "command_dps",
@@ -375,13 +326,5 @@ def register(bot):
             )
             await _safe_edit_original_response(interaction, content=None, embed=embed)
 
-        except discord.NotFound:
-            return
-        except discord.HTTPException as e:
-            if _is_expired_token(e):
-                return
-            await _safe_send_error(interaction, f"❌ Error de red: {e}")
-        except ValueError as e:
-            await _safe_send_error(interaction, str(e))
-        except Exception as e:
-            await _safe_send_error(interaction, f"❌ Error al obtener DPS: {e}")
+        except Exception as exc:
+            await _reply_command_error(interaction, exc, "❌ Error al obtener DPS")

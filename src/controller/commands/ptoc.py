@@ -5,11 +5,10 @@ import asyncio
 import discord
 
 from src.controller.commands.interactions import (
-    _is_expired_token,
     _log_command_usage,
+    _reply_command_error,
     _safe_defer,
     _safe_edit_original_response,
-    _safe_send_error,
 )
 from src.functions.embeds import _render_table
 from src.functions.warmane import _fetch_toc_achievements
@@ -75,13 +74,5 @@ def register(bot):
 
             await _safe_edit_original_response(interaction, content=None, embed=embed)
 
-        except discord.NotFound:
-            return
-        except discord.HTTPException as e:
-            if _is_expired_token(e):
-                return
-            await _safe_send_error(interaction, f"❌ Error de red: {e}")
-        except ValueError as e:
-            await _safe_send_error(interaction, str(e))
-        except Exception as e:
-            await _safe_send_error(interaction, f"❌ Error al obtener datos: {e}")
+        except Exception as exc:
+            await _reply_command_error(interaction, exc, "❌ Error al obtener datos")

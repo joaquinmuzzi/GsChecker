@@ -62,9 +62,13 @@ def _cron_payload() -> dict:
 async def test_live_and_cron_cache_the_same_payload(bot, interaction):  # noqa: F811
     with ExitStack() as stack:
         _patch_fetchers(stack, "src.controller.commands.personaje")
+        _patch_fetchers(stack, "src.controller.commands.personaje_live")
         _patch_fetchers(stack, "src.services.profile")
         mock_set = stack.enter_context(
-            patch("src.controller.commands.personaje.async_set_external_cache", new_callable=AsyncMock)
+            patch(
+                "src.controller.commands.personaje_live.async_set_external_cache",
+                new_callable=AsyncMock,
+            )
         )
         await _find_command(bot, "p").callback(interaction, nombre="Samsara")
 

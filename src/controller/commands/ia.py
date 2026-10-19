@@ -1,8 +1,11 @@
 """/ia: análisis BiS del equipo y resumen de coach por IA (Groq)."""
 
 import asyncio
+import os
 
 import discord
+
+from profile_scraper import get_character_stats
 
 from src.audit.bis_guides import (
     GUIDE_REALMS,
@@ -13,12 +16,12 @@ from src.audit.bis_guides import (
 )
 from src.audit.coach import build_fallback_summary
 from src.audit.integration import run_full_audit
+from src.audit.models import AuditReport
 from src.controller.commands.interactions import (
-    _is_expired_token,
     _log_command_usage,
+    _reply_command_error,
     _safe_defer,
     _safe_edit_original_response,
-    _safe_send_error,
 )
 from src.functions.warmane import _fetch_gear_data, _fetch_specs, _fetch_summary
 from src.schemas.constants import EXECUTOR
@@ -27,6 +30,70 @@ from src.services.character_input import (
     _normalize_character_realm,
 )
 from src.services.tracking import _track_character
+
+
+def _build_ia_embed(report: AuditReport, nombre_char: str) -> discord.Embed:
+    # Si Groq falló, usar el fallback de texto plano
+    coach_text = report.coach_summary or build_fallback_summary(report)
+
+    # Color por score
+    if report.overall_score >= 80:
+        color = 0x57F287   # verde
+    elif report.overall_score >= 50:
+        color = 0xFEE75C   # amarillo
+    else:
+        color = 0xED4245   # rojo
+
+    embed = discord.Embed(
+        title=f"🤖 Análisis IA · {nombre_char} ({report.spec_name})",
+        color=color,
+    )
+    embed.add_field(
+        name=(
+            f"Score: {report.overall_score}/100  |  "
+            f"{report.critical_count} crítico(s) · {report.warning_count} aviso(s)"
+        ),
+        value=coach_text[:1020] if coach_text else "Sin análisis disponible.",
+        inline=False,
+    )
+
+    # Caps de estadísticas compactos
+    if report.stat_caps:
+        cap_lines = []
+        for s in report.stat_caps:
+            if s.is_capped:
+                icon = "✅"
+            elif s.must_reach:
+                icon = "❌"
+            else:
+                icon = "ℹ️"
+            line = f"{icon} **{s.display_name}**: {s.current_value:.0f}/{s.cap_value:.0f}"
+            if not s.is_capped and s.must_reach:
+                line += f" *(falta {s.delta:.0f})*"
+            cap_lines.append(line)
+        embed.add_field(
+            name="Caps de estadísticas",
+            value="\n".join(cap_lines),
+            inline=False,
+        )
+
+    # Resumen rápido de problemas críticos
+    crit_lines = (
+        [f"• {i.message}" for i in report.item_issues if i.severity.value == "critical"]
+        + [f"• {e.message}" for e in report.enchant_issues if e.severity.value == "critical"]
+        + [f"• {g.slot}: {g.issue}" for g in report.gem_issues if g.severity.value == "critical"]
+    )
+    if crit_lines:
+        embed.add_field(
+            name="🚨 Críticos",
+            value="\n".join(crit_lines[:8])[:1020],
+            inline=False,
+        )
+
+    embed.set_footer(
+        text="Fuente: Armory Warmane · IA: Groq llama-3.3-70b · /p para resumen completo"
+    )
+    return embed
 
 
 def register(bot):
@@ -106,12 +173,11 @@ def register(bot):
             _track_character(nombre_char, realm)
 
             # Determinar spec activa y stats del personaje en paralelo
-            from profile_scraper import get_character_stats as _ps_get_char_stats
             specs_task2 = loop.run_in_executor(
                 EXECUTOR, _fetch_specs, nombre_char, realm
             )
             stats_task2 = loop.run_in_executor(
-                EXECUTOR, _ps_get_char_stats, nombre_char, realm
+                EXECUTOR, get_character_stats, nombre_char, realm
             )
             specs_raw, raw_stats = await asyncio.gather(specs_task2, stats_task2)
 
@@ -133,7 +199,6 @@ def register(bot):
             role = detect_role(char_class, active_spec, char_stats)
 
             # Ejecutar auditoría + Groq
-            import os as _os
             report = await run_full_audit(
                 char_name=nombre_char,
                 server=realm,
@@ -142,7 +207,7 @@ def register(bot):
                 stats=char_stats,
                 gear_data=gear_data or [],
                 generate_summary=True,
-                groq_api_key=_os.getenv("GROQ_API_KEY"),
+                groq_api_key=os.getenv("GROQ_API_KEY"),
                 role=role,
             )
 
@@ -159,78 +224,11 @@ def register(bot):
                 )
                 return
 
-            # Si Groq falló, usar el fallback de texto plano
-            coach_text = report.coach_summary or build_fallback_summary(report)
-
-            # Color por score
-            if report.overall_score >= 80:
-                color = 0x57F287   # verde
-            elif report.overall_score >= 50:
-                color = 0xFEE75C   # amarillo
-            else:
-                color = 0xED4245   # rojo
-
-            embed = discord.Embed(
-                title=f"🤖 Análisis IA · {nombre_char} ({report.spec_name})",
-                color=color,
-            )
-            embed.add_field(
-                name=(
-                    f"Score: {report.overall_score}/100  |  "
-                    f"{report.critical_count} crítico(s) · {report.warning_count} aviso(s)"
-                ),
-                value=coach_text[:1020] if coach_text else "Sin análisis disponible.",
-                inline=False,
-            )
-
-            # Caps de estadísticas compactos
-            if report.stat_caps:
-                cap_lines = []
-                for s in report.stat_caps:
-                    if s.is_capped:
-                        icon = "✅"
-                    elif s.must_reach:
-                        icon = "❌"
-                    else:
-                        icon = "ℹ️"
-                    line = f"{icon} **{s.display_name}**: {s.current_value:.0f}/{s.cap_value:.0f}"
-                    if not s.is_capped and s.must_reach:
-                        line += f" *(falta {s.delta:.0f})*"
-                    cap_lines.append(line)
-                embed.add_field(
-                    name="Caps de estadísticas",
-                    value="\n".join(cap_lines),
-                    inline=False,
-                )
-
-            # Resumen rápido de problemas críticos
-            crit_lines = (
-                [f"• {i.message}" for i in report.item_issues if i.severity.value == "critical"]
-                + [f"• {e.message}" for e in report.enchant_issues if e.severity.value == "critical"]
-                + [f"• {g.slot}: {g.issue}" for g in report.gem_issues if g.severity.value == "critical"]
-            )
-            if crit_lines:
-                embed.add_field(
-                    name="🚨 Críticos",
-                    value="\n".join(crit_lines[:8])[:1020],
-                    inline=False,
-                )
-
-            embed.set_footer(
-                text="Fuente: Armory Warmane · IA: Groq llama-3.3-70b · /p para resumen completo"
-            )
+            embed = _build_ia_embed(report, nombre_char)
 
             await _safe_edit_original_response(
                 interaction, content=None, embed=embed
             )
 
-        except discord.NotFound:
-            return
-        except discord.HTTPException as e:
-            if _is_expired_token(e):
-                return
-            await _safe_send_error(interaction, f"❌ Error de red: {e}")
-        except ValueError as e:
-            await _safe_send_error(interaction, str(e))
-        except Exception as e:
-            await _safe_send_error(interaction, f"❌ Error en /ia: {e}")
+        except Exception as exc:
+            await _reply_command_error(interaction, exc, "❌ Error en /ia")
