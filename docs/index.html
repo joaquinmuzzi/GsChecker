@@ -798,7 +798,8 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
       <h3>Arquitectura general</h3>
       <p>
         El bot corre como proceso único (Python). Los slash commands están en
-        <code>src/controller/commands.py</code> y ejecutan tareas concurrentes con
+        <code>src/controller/commands/</code> (un módulo por comando), la lógica
+        compartida con el cron en <code>src/services/</code>, y ejecutan tareas concurrentes con
         <code>asyncio</code> + <code>ThreadPoolExecutor</code> para consultas a Warmane/UwU.
       </p>
 
@@ -829,11 +830,11 @@ Trial of the Crusader   | <span class="green">✅</span>    | <span class="red">
           </ul>
         </div>
         <div class="arch-card">
-          <div class="arch-title">src/controller/commands.py</div>
+          <div class="arch-title">src/controller/commands/</div>
           <ul>
-            <li>Implementación de /personaje, /p, /dps, /ptoc, /ping</li>
+            <li>Un módulo por comando: /personaje, /p, /dps, /logs, /ptoc, /ia, /ping</li>
             <li>Orquestación async de fuentes externas</li>
-            <li>Cache command-level y serialización de payload</li>
+            <li>Cache command-level (cálculo del perfil y kills en <code>src/services/</code>)</li>
           </ul>
         </div>
         <div class="arch-card">

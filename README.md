@@ -69,7 +69,7 @@ GROQ_API_KEY=...
 
 `requirements.txt` es la fuente de verdad (es lo que instala Railway) y tiene las versiones **fijas** que corre producción. Para actualizar una librería: subí la versión ahí, corré los tests y dejá que el CI lo valide antes del deploy.
 
-`requirements-dev.txt` agrega `pytest` y `pytest-asyncio` (configuración en `pytest.ini`).
+`requirements-dev.txt` agrega las herramientas de desarrollo: `pytest`, `pytest-asyncio`, Ruff y Mypy. Su configuración está en `pyproject.toml`, que no define el paquete: Railway sigue instalando desde `requirements.txt`.
 
 ### Ejecutar
 
@@ -84,14 +84,34 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Tests
+### Docker (opcional)
+
+`docker/Dockerfile` arma una imagen multi-stage (Python 3.11.11, usuario sin privilegios) para correr el bot fuera de Railway. Railway no la usa: sigue construyendo con Nixpacks.
+
+```bash
+docker build -f docker/Dockerfile -t gschecker .
+docker run --rm --env-file .env gschecker                                        # bot
+docker run --rm --env-file .env gschecker python -m tools.run_scheduled_preload  # cron
+```
+
+### Tests y lint
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest -q
+
+python -m pytest -q        # tests
+ruff check .               # lint (pyflakes, isort, bugbear, pyupgrade, pytest-style, ...)
+ruff format .              # formato (en CI: ruff format --check .)
+mypy                       # tipos (archivos y opciones en pyproject.toml)
 ```
 
-El CI (`.github/workflows/tests.yml`) corre los tests en cada push a `master` y en cada PR, y Railway espera a que pase antes de deployar.
+El CI (`.github/workflows/tests.yml`) corre dos jobs en cada push a `master` y en cada PR: `lint` (`ruff check`, `ruff format --check` y `mypy`) y `pytest`. Railway espera a que pasen los dos antes de deployar.
+
+El commit que formateó todo el repo con `ruff format` está en `.git-blame-ignore-revs`. Para que `git blame` lo saltee:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
 
 ## Deploy en Railway
 
@@ -274,8 +294,23 @@ profile_scraper.py             # scraping HTML de armory.warmane.com (gear, ench
 
 src/
 ├── controller/
-│   └── commands.py            # slash commands + cálculo del perfil compartido con el cron
-│                              #   (_compute_personaje_base, _resolve_uwu_icc_kills)
+│   └── commands/              # un módulo por slash command (solo Discord: defer, embeds, edits)
+│       ├── __init__.py        # register_commands(bot)
+│       ├── interactions.py    # helpers de interacción: defer, edits con reintento, errores
+│       ├── personaje.py       # /personaje y /p: caché, perfil viejo si el Armory está caído
+│       ├── personaje_live.py  # /p sin caché: armory + uwu-logs, mensaje con ⌛ y final
+│       ├── dps.py             # /dps
+│       ├── logs.py            # /logs
+│       ├── ptoc.py            # /ptoc
+│       ├── ia.py              # /ia
+│       └── ping.py            # /ping
+├── services/                  # lógica de negocio sin Discord, compartida con el cron
+│   ├── profile.py             # _compute_personaje_base: perfil completo a partir del armory
+│   ├── icc_kills.py           # _resolve_uwu_icc_kills: kills de Marrowgar/Deathwhisper
+│   ├── spec_gearscore.py      # specs activa/inactiva y GS por spec
+│   ├── cache_keys.py          # claves de caché en Postgres
+│   ├── character_input.py     # normalización de nombre y reino
+│   └── tracking.py            # registro de personajes para el cron
 ├── functions/
 │   ├── warmane.py             # summary/specs/achievements/gear/stats/guild-rank
 │   ├── uwu.py                 # integración uwu-logs.xyz (overview + DPS por boss)
@@ -310,8 +345,12 @@ tools/
 ├── build_bis_from_armory.py  # genera el BiS por reino para /ia (static/bis/)
 └── seed_names.py              # arma data/tracked_characters.txt desde rosters / uwu-logs
 
+tests/                         # pytest (conftest.py: bot con los comandos y fetchers falsos)
+
 .railway/railway.py            # infraestructura de Railway como código
-.github/workflows/tests.yml    # CI: pytest en cada push / PR
+.github/workflows/tests.yml    # CI: lint (ruff + mypy) y pytest en cada push / PR
+pyproject.toml                 # configuración de Ruff, Mypy y pytest
+docker/Dockerfile              # imagen opcional para correr el bot fuera de Railway
 ```
 
 ## Cache
