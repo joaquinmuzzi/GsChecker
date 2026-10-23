@@ -488,8 +488,26 @@ def _build_uwu_logs_view(nombre: str, server: str) -> discord.ui.View:
     return view
 
 
+# Botón "🔄 Actualizar ahora" de /p. El custom_id lleva el reino y el
+# personaje, así el botón sigue andando en mensajes viejos y después de un
+# reinicio del bot: lo atiende un DynamicItem (`personaje_refresh`). Acá es un
+# botón sin callback a propósito: discord.py guarda la vista enviada unos
+# minutos y, si tuviera uno, el click se atendería dos veces.
+PERSONAJE_REFRESH_CUSTOM_ID = re.compile(r"personaje:refresh:(?P<realm>[^:]+):(?P<name>[^:]+)$")
+
+
+def _build_personaje_refresh_button(nombre_char: str, server: str) -> discord.ui.Button:
+    return discord.ui.Button(
+        label="Actualizar ahora",
+        emoji="🔄",
+        style=discord.ButtonStyle.primary,
+        custom_id=f"personaje:refresh:{server}:{nombre_char}",
+    )
+
+
 def _build_personaje_view(nombre_char: str, server: str = "Lordaeron") -> discord.ui.View:
     view = discord.ui.View()
+    view.add_item(_build_personaje_refresh_button(nombre_char, server))
     view.add_item(
         discord.ui.Button(
             label="Armory",
