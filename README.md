@@ -6,7 +6,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 
 ## Features
 
-- **GearScore** calculado localmente a partir de los ítems equipados (tabla WotLK).
+- **GearScore** calculado localmente a partir de los ítems equipados, con la fórmula del addon GearScore (ilvl, calidad y slot de cada ítem de 3.3.5a).
 - **Resumen de personaje** (embed) con:
   - clase / raza / nivel,
   - specs activa e inactiva con ícono,
@@ -291,7 +291,7 @@ Los sub-loggers heredan del logger raíz `gschecker` (configurado en `main.py`):
 
 ```
 main.py                        # arranque, sync slash, lock de proceso, logging global
-gearscore.py                   # cálculo local de GS a partir de item IDs (static/GS.json)
+gearscore.py                   # cálculo local de GS a partir de item IDs (fórmula del addon + static/item_levels.json)
 profile_scraper.py             # scraping HTML de armory.warmane.com (gear, enchants, gems)
 
 src/
@@ -334,7 +334,8 @@ src/
     └── constants.py           # TTLs, caches in-memory, rate limit, mapeos de boss/spec
 
 static/
-├── GS.json                    # tabla WotLK: item_id → ilvl bucket → GS por slot type
+├── item_levels.json           # ilvl, calidad y slot de los ~23 000 ítems equipables de 3.3.5a (tools/build_item_levels.py)
+├── GS.json                    # tabla vieja: item_id → ilvl bucket → GS por slot type (respaldo de gearscore.py)
 ├── gem_data.json              # mapeos gem enchant_id → item info
 ├── item_sockets_cache.json    # sockets por item_id (evita hits a evowow)
 ├── raid_items_extra.json      # IDs extra para precarga
@@ -347,6 +348,7 @@ tools/
 ├── preload_personaje_cache.py # precarga del perfil completo de /personaje
 ├── preload_item_sockets_cache.py  # precarga sockets de items de raid
 ├── build_bis_from_armory.py  # genera el BiS por reino para /ia (static/bis/)
+├── build_item_levels.py       # genera static/item_levels.json desde el item_template de AzerothCore
 └── seed_names.py              # arma data/tracked_characters.txt desde rosters / uwu-logs
 
 tests/                         # pytest (conftest.py: bot con los comandos y fetchers falsos)
@@ -377,6 +379,7 @@ Nunca se persiste una respuesta incompleta. Si el Armory falla a mitad de un per
 - `/p` edita su mensaje varias veces (perfil con ⌛ mientras espera a uwu-logs, después el final). Una vez Discord aceptó la edición final sin error pero el mensaje quedó con el ⌛ (Kuvez, 2026-10-07), así que 3 s después de la edición final `/p` relee el mensaje y, si no tiene el embed final, lo vuelve a mandar y lo deja en el log (`final edit not kept by Discord`).
 - El GS por spec se sirve desde Postgres una vez que el bot vio al personaje en esa spec; primera vez muestra `?` en las specs no activas.
 - La API JSON del Armory (`/api/character/.../summary`) no devuelve `gearScore` — se calcula siempre localmente desde el equipo scrapeado.
+- GearScore: cada ítem suma lo que da la fórmula de GearScore/GearScoreLite con su ilvl, calidad y tipo de slot, sacados de `static/item_levels.json` (el `item_template` de AzerothCore, que es la DB de ítems de 3.3.5a). Se usa esa fuente y no Wowhead porque Wowhead `/wotlk` es Wrath Classic y ahí varios ítems de Ulduar tienen otro ilvl (Constellus 252 en vez de 239). Como en el addon, la camisa y el tabardo no suman, y un arma de dos manos junto con otra arma (Titan's Grip) cuenta la mitad. Un ítem que no está en ese archivo se busca en la tabla vieja `static/GS.json` y, si tampoco está, suma 0. Para regenerar el archivo, seguí las instrucciones de `tools/build_item_levels.py`.
 
 ## Ejemplo
 

@@ -41,7 +41,10 @@ VELETRIEL_GEAR_IDS = [
     "51326",
 ]
 VELETRIEL_CORRECT_GS = 5896
-VELETRIEL_FILTERED_BUG_GS = 4086
+# Production showed 4086 back when every slot was scored by its position. Items
+# are now scored by their own slot type, but the shift still drops the wrists:
+# they land on the Tabard position, which never counts.
+VELETRIEL_FILTERED_BUG_GS = 5618
 
 
 class TestGearscoreIsPositional:
@@ -50,11 +53,124 @@ class TestGearscoreIsPositional:
 
     def test_filtering_blank_slots_corrupts_the_score(self):
         """Documents *why* the filter must never come back: dropping the
-        blank Tabard entry shifts every following item's assumed category
-        and reproduces the exact wrong number seen in production."""
+        blank Tabard entry shifts every following item one position up and
+        the total comes out wrong."""
         filtered = [gid for gid in VELETRIEL_GEAR_IDS if gid]
         assert sum(gearscore.main(filtered)) == VELETRIEL_FILTERED_BUG_GS
         assert sum(gearscore.main(filtered)) != VELETRIEL_CORRECT_GS
+
+
+# Real gear_ids for Demmir/Lordaeron (Priest), armory DOM order, captured live on
+# 2026-10-23 00:05 UTC. The off-hand Tome of Salramm (37086) is a blue of ilvl 187
+# that GS.json does not list: the bot scored it 0 and, taking the unknown item for
+# a Titan's Grip two-hander, also halved the main hand. It showed 4427 while the
+# player saw 4.8k in game.
+DEMMIR_GEAR_IDS = [
+    "46197",
+    "50182",
+    "50449",
+    "40723",
+    "47936",
+    "53",
+    "",
+    "47173",
+    "47982",
+    "50263",
+    "50769",
+    "50286",
+    "49967",
+    "49486",
+    "47215",
+    "50260",
+    "45612",
+    "37086",
+    "45257",
+]
+DEMMIR_CORRECT_GS = 4880
+DEMMIR_OLD_BUG_GS = 4427
+
+# Real gear_ids for Kuvez/Lordaeron (Fury Warrior), captured the same day: two
+# Tyrannical Beheader (50267, two-hander of ilvl 232) with Titan's Grip.
+KUVEZ_GEAR_IDS = [
+    "50311",
+    "50452",
+    "48374",
+    "51354",
+    "48372",
+    "2575",
+    "",
+    "50230",
+    "48375",
+    "50270",
+    "48373",
+    "49906",
+    "52569",
+    "50453",
+    "49074",
+    "47214",
+    "50267",
+    "50267",
+    "47659",
+]
+
+
+class TestOffHandOutsideTheOldTable:
+    def test_demmir_scores_like_the_addon(self):
+        total = sum(gearscore.main(DEMMIR_GEAR_IDS))
+        assert total == DEMMIR_CORRECT_GS
+        assert total != DEMMIR_OLD_BUG_GS
+
+    def test_blue_off_hand_is_scored_by_the_formula(self):
+        assert gearscore.main(DEMMIR_GEAR_IDS)[17] == 242
+
+    def test_unknown_off_hand_does_not_halve_the_main_hand(self):
+        gear = list(DEMMIR_GEAR_IDS)
+        gear[17] = "999999"  # not an item
+        values = gearscore.main(gear)
+        assert values[16] == 422  # Constellus, epic main hand of ilvl 239
+        assert values[17] == 0
+        assert gearscore.get_weapon_GS("999999") == (0, None)
+
+
+class TestTitansGrip:
+    def test_two_two_handers_count_half_each(self):
+        values = gearscore.main(KUVEZ_GEAR_IDS)
+        assert values[16] == values[17] == 402
+        assert sum(values) == 5087
+
+    def test_a_two_hander_alone_counts_full(self):
+        gear = list(KUVEZ_GEAR_IDS)
+        gear[17] = ""
+        assert gearscore.main(gear)[16] == 805
+
+
+class TestItemLevelData:
+    """static/item_levels.json comes from the 3.3.5a item DB of AzerothCore."""
+
+    def test_epics_match_the_old_table(self):
+        checked = 0
+        for category, by_ilvl in gearscore.GS_DATA.items():
+            for ilvl, item_ids in by_ilvl.items():
+                expected = gearscore.ILVL_GS[ilvl][gearscore.ITEM_TYPE[category]]
+                for item_id in item_ids:
+                    item_level = gearscore.ITEM_LEVELS.get(item_id)
+                    if item_level is not None and item_level[1] == 4:
+                        assert gearscore.formula_gs(*item_level) == expected, item_id
+                        checked += 1
+        assert checked > 5000
+
+    def test_legendaries_match_the_old_table(self):
+        for item_id, expected in gearscore.LEGENDARY.items():
+            assert gearscore.get_weapon_GS(item_id)[0] == expected
+
+    def test_ulduar_items_have_their_335a_item_level(self):
+        # Wowhead /wotlk is Wrath Classic, where these are 252 and 232
+        assert gearscore.ITEM_LEVELS["45612"] == (239, 4, 21)  # Constellus
+        assert gearscore.ITEM_LEVELS["46197"] == (226, 4, 1)  # Conqueror's Cowl of Sanctification
+
+    def test_ilvl_200_blue_scores_as_blue(self):
+        # GS.json listed the heroic dungeon blues of ilvl 200 with the epic value (310)
+        assert gearscore.item_gs("37135", "high") == 271  # Arcane-Shielded Helm
 
 
 class TestCalculateCharacterGsDoesNotFilter:
