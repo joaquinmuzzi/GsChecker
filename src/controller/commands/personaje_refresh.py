@@ -1,4 +1,4 @@
-"""Botón 🔄 Actualizar ahora del mensaje de /p.
+"""Botón Actualizar del mensaje de /p.
 
 Rehace el perfil contra el armory y UwU Logs en el momento, sin esperar a que
 el cron regenere la caché a la noche, y edita el mismo mensaje con el

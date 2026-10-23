@@ -2,7 +2,7 @@
 
 Cada módulo expone `register(bot)`; `register_commands` los registra todos en
 `bot.tree`, en el mismo orden de siempre. `personaje_refresh` registra el botón
-🔄 Actualizar ahora de /p.
+Actualizar de /p.
 """
 
 from src.controller.commands import dps, ia, logs, personaje, personaje_refresh, ping, ptoc

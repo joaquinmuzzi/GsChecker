@@ -3,7 +3,7 @@
 El primer embed sale apenas responde el armory; Marrowgar y Deathwhisper muestran
 un reloj animado mientras UwU Logs busca sus kills, hasta un tope. Después se
 manda el embed final, se guarda en caché y se confirma que Discord se lo quedó.
-El botón 🔄 Actualizar ahora (`personaje_refresh`) usa el mismo camino sobre el
+El botón Actualizar (`personaje_refresh`) usa el mismo camino sobre el
 mensaje que ya tiene un perfil.
 """
 
@@ -140,7 +140,7 @@ async def _send_live_profile(
     refresh: bool = False,
 ) -> None:
     """Arma el perfil en vivo editando el mensaje original. Con `refresh`
-    (botón 🔄) ese mensaje ya tiene un perfil: queda a la vista mientras se
+    (botón Actualizar) ese mensaje ya tiene un perfil: queda a la vista mientras se
     calcula y, si el armory no deja armar el nuevo, se avisa solo a quien
     apretó el botón y el mensaje queda como estaba."""
     previous_embed = _current_embed(interaction) if refresh else None

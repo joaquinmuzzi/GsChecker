@@ -1,4 +1,4 @@
-"""Cooldown de los perfiles de /p armados en vivo (botón 🔄 Actualizar ahora).
+"""Cooldown de los perfiles de /p armados en vivo (botón Actualizar).
 
 Rehacer un perfil gasta ~15 requests del armory, y su rate limit lo comparten
 todos los usuarios del bot: un botón que cualquiera puede apretar muchas veces

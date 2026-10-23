@@ -192,7 +192,7 @@ def _no_final_edit_check_wait(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _fresh_refresh_cooldowns():
-    # Cada /p en vivo arranca el cooldown del botón 🔄: no se arrastra entre tests.
+    # Cada /p en vivo arranca el cooldown del botón Actualizar: no se arrastra entre tests.
     _reset_refresh_cooldowns()
     yield
     _reset_refresh_cooldowns()
