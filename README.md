@@ -17,7 +17,8 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
   - enchants y gemas faltantes,
   - GearScore por spec (cachea el GS de cada spec en Postgres para mostrarlas todas),
   - **ranking de UwU Logs** de la spec principal: puesto en el reino por Performance Points y percentil (ej. `Fire · #37 (top 1,2 %)`),
-  - links a Armory y UwU Logs.
+  - links a Armory y UwU Logs,
+  - botón **🔄 Actualizar ahora**: rehace el perfil en el momento contra el armory y UwU Logs, sin esperar a que el cron lo regenere a la noche, y edita el mismo mensaje.
 - **DPS por boss** (máximo y promedio) vía uwu-logs.xyz, con overview rápido y tabla detallada.
 - **Trial of the Crusader**: logros 10N / 10H / 25N / 25H.
 - **Últimos logs** con `/logs`: los 10 reportes más nuevos de UwU Logs donde aparece el personaje, con la raid de cada uno (`ICC 11/12`, `Halion`, `Toravon` u `otro raid`). uwu-logs no trae los bosses en la lista, así que se pide una vez por pelea (14 consultas, 2 a la vez) y se cachea 10 min.
@@ -239,6 +240,7 @@ Con ~19.6k nombres, 500 por corrida y una corrida por día, la lista completa se
 1. Un usuario ejecuta `/p Samsara Lordaeron` → el armory confirma que existe y es 80 → el bot registra `(Samsara, Lordaeron)` en `tracked_characters`.
 2. En la próxima corrida, el cron recalcula el perfil completo y lo guarda como `command_personaje` (y el GS por spec como `character_spec_gs`).
 3. La próxima vez que alguien consulte a Samsara, `/p` responde desde Postgres al instante. Si el cache venció y el armory está rate-limitado, sirve el último perfil bueno (stale) en vez de fallar.
+4. Si alguien quiere verlo al día antes de la próxima corrida, aprieta **🔄 Actualizar ahora** en el mensaje: el bot rehace el perfil en vivo, edita ese mismo mensaje y lo guarda en la caché.
 
 ## BiS por reino (`/ia`)
 
@@ -299,6 +301,7 @@ src/
 │       ├── interactions.py    # helpers de interacción: defer, edits con reintento, errores
 │       ├── personaje.py       # /personaje y /p: caché, perfil viejo si el Armory está caído
 │       ├── personaje_live.py  # /p sin caché: armory + uwu-logs, mensaje con ⌛ y final
+│       ├── personaje_refresh.py  # botón 🔄 Actualizar ahora de /p, con cooldown
 │       ├── dps.py             # /dps
 │       ├── logs.py            # /logs
 │       ├── ptoc.py            # /ptoc
@@ -310,6 +313,7 @@ src/
 │   ├── spec_gearscore.py      # specs activa/inactiva y GS por spec
 │   ├── cache_keys.py          # claves de caché en Postgres
 │   ├── character_input.py     # normalización de nombre y reino
+│   ├── refresh_cooldown.py    # cooldown del botón 🔄 Actualizar ahora
 │   └── tracking.py            # registro de personajes para el cron
 ├── functions/
 │   ├── warmane.py             # summary/specs/achievements/gear/stats/guild-rank
@@ -359,6 +363,8 @@ Dos niveles:
 
 - **In-memory** (`src/schemas/constants.py`): dicts `{key: (timestamp, value)}` por dominio (SUMMARY, GEAR, ACHIEVEMENTS, STATS, …) con TTLs entre 120 s y 300 s. Se pierde al reiniciar el proceso.
 - **Postgres** (`external_api_cache`): perfiles completos de `/personaje` (`COMMAND_PERSONAJE_TTL = 25h`) y GS por spec (`CHARACTER_SPEC_GS_TTL = 30 días`). Requiere `DATABASE_URL`.
+
+El botón **🔄 Actualizar ahora** de `/p` no lee ninguna de las dos: rehace el perfil con el mismo camino que un `/p` sin caché y pisa la copia de Postgres. Lo puede apretar cualquiera que vea el mensaje, así que para no gastar el rate limit del Armory (compartido por todos) cada personaje se actualiza como mucho una vez cada 5 min, contando también los `/p` que se armaron en vivo, y cada usuario actualiza un personaje por minuto. Si el Armory está rate-limitado o no deja armar el perfil, el mensaje queda como estaba y el aviso lo ve solo quien apretó el botón. El botón sigue andando en mensajes viejos y después de un reinicio, porque el personaje y el reino van en el `custom_id`.
 
 Nunca se persiste una respuesta incompleta. Si el Armory falla a mitad de un perfil (por ejemplo, 429 en una categoría de logros), los ❌ resultantes significarían "no pudimos leerlo", no "no lo hizo": ese perfil no se guarda, y `/p` muestra el último perfil bueno de Postgres si existe.
 

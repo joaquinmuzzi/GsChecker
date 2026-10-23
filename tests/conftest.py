@@ -23,6 +23,7 @@ import pytest
 from discord.ext import commands as discord_commands
 
 from src.controller.commands import register_commands
+from src.services.refresh_cooldown import _reset_refresh_cooldowns
 from tests.helpers import _happy_achievements, _happy_gear_data, _happy_summary
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +42,7 @@ class SentPayload:
     embed: Any = None
     view: Any = None
     ephemeral: bool = False
+    thinking: bool = False
 
 
 class FakeUser:
@@ -65,7 +67,7 @@ class FakeResponse:
 
     async def defer(self, thinking: bool = False) -> None:
         self._done = True
-        self._parent.sent.append(SentPayload(kind="defer"))
+        self._parent.sent.append(SentPayload(kind="defer", thinking=thinking))
 
     async def send_message(
         self,
@@ -138,6 +140,8 @@ class FakeInteraction:
     response: FakeResponse = field(init=False)
     followup: FakeFollowup = field(init=False)
     command: Any = None
+    # El mensaje que tiene el botón, en las interacciones de componentes.
+    message: Any = None
     # Simula que Discord se quedó con la anteúltima edición (/p Kuvez,
     # 2026-10-07).
     keeps_previous_edit: bool = False
@@ -184,6 +188,14 @@ def interaction() -> FakeInteraction:
 @pytest.fixture(autouse=True)
 def _no_final_edit_check_wait(monkeypatch):
     monkeypatch.setattr("src.controller.commands.personaje_live.PERSONAJE_FINAL_CHECK_SECONDS", 0)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_refresh_cooldowns():
+    # Cada /p en vivo arranca el cooldown del botón 🔄: no se arrastra entre tests.
+    _reset_refresh_cooldowns()
+    yield
+    _reset_refresh_cooldowns()
 
 
 @pytest.fixture

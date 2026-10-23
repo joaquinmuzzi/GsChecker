@@ -3,6 +3,8 @@
 El primer embed sale apenas responde el armory; Marrowgar y Deathwhisper muestran
 un reloj animado mientras UwU Logs busca sus kills, hasta un tope. Después se
 manda el embed final, se guarda en caché y se confirma que Discord se lo quedó.
+El botón 🔄 Actualizar ahora (`personaje_refresh`) usa el mismo camino sobre el
+mensaje que ya tiene un perfil.
 """
 
 import asyncio
@@ -14,6 +16,7 @@ from src.controller.commands.interactions import (
     _is_expired_token,
     _message_has_embed,
     _safe_edit_original_response,
+    _safe_send_error,
 )
 from src.db.postgres import async_get_external_cache_stale, async_set_external_cache
 from src.functions.embeds import _build_personaje_embed, _build_personaje_view
@@ -40,6 +43,7 @@ from src.services.profile import (
     _is_valid_personaje_payload,
     _serialize_personaje_payload,
 )
+from src.services.refresh_cooldown import _mark_live_profile
 from src.services.spec_gearscore import _format_spec_gs_value
 from src.services.tracking import _track_character
 
@@ -115,17 +119,36 @@ async def _ensure_final_edit_landed(
         logger.exception("final edit check failed")
 
 
+def _summary_problem(summary, nombre: str) -> str | None:
+    """El mensaje para el usuario si el summary no deja armar el perfil."""
+    if isinstance(summary, dict) and summary.get("__error__"):
+        return summary["__error__"]
+    if not isinstance(summary, dict):
+        return "⚠️ Formato inesperado en 'summary'. Revisa la consola."
+    if summary.get("level", "N/A") != 80:
+        return f"⚠️ **{summary.get('name', nombre)}** no es nivel 80."
+    return None
+
+
 async def _send_live_profile(
     interaction: discord.Interaction,
     nombre: str,
     realm: str,
     command_name: str,
     personaje_cache_key: str,
+    *,
+    refresh: bool = False,
 ) -> None:
+    """Arma el perfil en vivo editando el mensaje original. Con `refresh`
+    (botón 🔄) ese mensaje ya tiene un perfil: queda a la vista mientras se
+    calcula y, si el armory no deja armar el nuevo, se avisa solo a quien
+    apretó el botón y el mensaje queda como estaba."""
+    previous_embed = _current_embed(interaction) if refresh else None
+    verb = "Actualizando" if refresh else "Calculando"
     await _safe_edit_original_response(
         interaction,
-        content=f"⏳ Calculando perfil de {nombre} en {realm}...",
-        embed=None,
+        content=f"⏳ {verb} perfil de {nombre} en {realm}...",
+        embed=previous_embed,
     )
 
     loop = asyncio.get_running_loop()
@@ -135,30 +158,18 @@ async def _send_live_profile(
     # segundos, sin gastar ~15 requests del armory en logros/estadísticas.
     summary = await loop.run_in_executor(EXECUTOR, _fetch_summary, nombre, realm)
 
-    if isinstance(summary, dict) and summary.get("__error__"):
-        await _safe_edit_original_response(interaction, content=summary["__error__"], embed=None)
-        return
-
-    if not isinstance(summary, dict):
-        await _safe_edit_original_response(
-            interaction,
-            content="⚠️ Formato inesperado en 'summary'. Revisa la consola.",
-            embed=None,
-        )
+    problem = _summary_problem(summary, nombre)
+    if problem is not None:
+        if previous_embed is not None:
+            await _safe_edit_original_response(interaction, content=None, embed=previous_embed)
+            await _safe_send_error(interaction, problem, ephemeral=True)
+        else:
+            await _safe_edit_original_response(interaction, content=problem, embed=None)
         return
 
     nombre_char = summary.get("name", nombre)
-    nivel = summary.get("level", "N/A")
-
-    if nivel != 80:
-        await _safe_edit_original_response(
-            interaction,
-            content=f"⚠️ **{nombre_char}** no es nivel 80.",
-            embed=None,
-        )
-        return
-
     _track_character(nombre_char, realm)
+    _mark_live_profile(nombre_char, realm)
 
     # uwu-logs en paralelo con el resto del armory. Va después del summary
     # porque usa la clase del armory cuando uwu-logs no tiene perfil.
@@ -252,12 +263,27 @@ async def _send_live_profile(
         interaction, content=None, embed=embed_final, view=personaje_view
     )
     logger.info(
-        "personaje done character='%s' realm='%s' elapsed=%.1fs",
+        "personaje done character='%s' realm='%s' elapsed=%.1fs refresh=%s",
         nombre_char,
         realm,
         loop.time() - started_at,
+        refresh,
     )
+    if refresh and not _is_valid_personaje_payload(payload):
+        await _safe_send_error(
+            interaction,
+            "⚠️ El armory de Warmane respondió incompleto: puede que el perfil no esté al día. "
+            "Probá de nuevo en unos minutos.",
+            ephemeral=True,
+        )
     await _ensure_final_edit_landed(interaction, embed_final, personaje_view, patched)
+
+
+def _current_embed(interaction: discord.Interaction) -> discord.Embed | None:
+    """El embed del mensaje que tiene el botón (el perfil que se va a actualizar)."""
+    message = getattr(interaction, "message", None)
+    embeds = getattr(message, "embeds", None) or []
+    return embeds[0] if embeds else None
 
 
 async def _wait_for_uwu_kills(
