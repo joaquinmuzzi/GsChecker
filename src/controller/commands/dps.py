@@ -22,8 +22,9 @@ from src.schemas.constants import (
     UWU_PDPS_BOSS_ORDER,
     UWU_SERVER,
 )
+from src.services.autocomplete import make_name_autocomplete
 from src.services.cache_keys import _build_dps_cache_key
-from src.services.character_input import _normalize_character_name
+from src.services.character_input import _normalize_character_name, split_name_and_realm
 from src.services.tracking import _track_character
 
 DPS_COMMAND_TIMEOUT_SECONDS = 45
@@ -138,8 +139,10 @@ def register(bot):
         nombre="Nombre del personaje en Lordaeron.",
         spec="Filtro opcional por spec (ej: fury, udk, frost).",
     )
+    @discord.app_commands.autocomplete(nombre=make_name_autocomplete("Lordaeron"))
     async def dps(interaction: discord.Interaction, nombre: str, spec: str | None = None):
         try:
+            nombre, _ = split_name_and_realm(nombre)
             nombre = _normalize_character_name(nombre)
             _log_command_usage(interaction, "dps", nombre, "Lordaeron", spec=spec)
             spec_display = f" [{spec.upper()}]" if spec else ""

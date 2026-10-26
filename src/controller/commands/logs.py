@@ -13,9 +13,11 @@ from src.controller.commands.interactions import (
 from src.functions.embeds import _build_uwu_logs_embed, _build_uwu_logs_view
 from src.functions.uwu import UWU_DOWN_MESSAGE, _fetch_uwu_recent_logs
 from src.schemas.constants import EXECUTOR
+from src.services.autocomplete import make_name_autocomplete
 from src.services.character_input import (
     _normalize_character_name,
     _normalize_character_realm,
+    split_name_and_realm,
 )
 
 
@@ -28,12 +30,14 @@ def register(bot):
         nombre="Nombre del personaje.",
         reino="Reino opcional. Por defecto: Lordaeron.",
     )
+    @discord.app_commands.autocomplete(nombre=make_name_autocomplete())
     async def logs(
         interaction: discord.Interaction,
         nombre: str,
         reino: str | None = None,
     ):
         try:
+            nombre, reino = split_name_and_realm(nombre, reino)
             nombre = _normalize_character_name(nombre)
             realm = _normalize_character_realm(reino)
             _log_command_usage(interaction, "logs", nombre, realm)
