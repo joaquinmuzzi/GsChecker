@@ -454,7 +454,7 @@ def _build_personaje_embed(
         )
 
     embed.set_footer(
-        text="La información se actualiza a las 03:00 (UTC)",
+        text="ℹ️ La información se actualiza a las 03:00 (UTC)",
     )
 
     return embed
@@ -498,7 +498,7 @@ PERSONAJE_REFRESH_CUSTOM_ID = re.compile(r"personaje:refresh:(?P<realm>[^:]+):(?
 
 def _build_personaje_refresh_button(nombre_char: str, server: str) -> discord.ui.Button:
     return discord.ui.Button(
-        label="Actualizar",
+        label="Actualizar ahora",
         style=discord.ButtonStyle.primary,
         custom_id=f"personaje:refresh:{server}:{nombre_char}",
     )
