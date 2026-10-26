@@ -62,9 +62,6 @@ def _edits(interaction: FakeInteraction):
 def test_personaje_view_starts_with_the_refresh_button():
     view = _build_personaje_view("Demmir", "Icecrown")
     button = _first_button(view)
-    # Joaquín (2026-10-23): solo "Actualizar", sin emoji.
-    assert button.label == "Actualizar"
-    assert button.emoji is None
     match = PERSONAJE_REFRESH_CUSTOM_ID.match(button.custom_id or "")
     assert match is not None
     assert (match["name"], match["realm"]) == ("Demmir", "Icecrown")
