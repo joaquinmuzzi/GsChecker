@@ -38,6 +38,8 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 | `/ia <nombre> [reino]`       | Análisis BiS + resumen de coach por IA (requiere `GROQ_API_KEY`). | Lordaeron / Icecrown |
 | `/ping`                      | Latencia actual del bot.                                | —                   |
 
+Al escribir `nombre` en `/p`, `/personaje`, `/dps`, `/ptoc`, `/ia` y `/logs`, Discord sugiere hasta **3** personajes de `tracked_characters` (por prefijo, los más consultados primero). Si ya elegiste `[reino]` (o el comando es de Lordaeron) filtra por ese reino; si no, muestra `Nombre (Reino)` y el comando usa ese reino. La lista se cachea en memoria y se refresca cada 5 min (`src/services/autocomplete.py`); nunca consulta el armory.
+
 Reinos aceptados en `[reino]` (por defecto **Lordaeron**):
 
 - Lordaeron

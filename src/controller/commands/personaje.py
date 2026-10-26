@@ -24,11 +24,13 @@ from src.db.postgres import async_get_external_cache, async_get_external_cache_s
 from src.functions.embeds import _build_personaje_view
 from src.functions.uwu import _fetch_uwu_performance
 from src.schemas.constants import ARMORY_CIRCUIT, COMMAND_PERSONAJE_TTL, EXECUTOR
+from src.services.autocomplete import make_name_autocomplete
 from src.services.cache_keys import _build_personaje_cache_key
 from src.services.character_input import (
     DEFAULT_CHARACTER_REALM,
     _normalize_character_name,
     _normalize_character_realm,
+    split_name_and_realm,
 )
 from src.services.tracking import _track_character
 
@@ -43,6 +45,7 @@ async def _personaje_impl(
     reino: str | None = None,
 ):
     try:
+        nombre, reino = split_name_and_realm(nombre, reino)
         nombre = _normalize_character_name(nombre)
         realm = _normalize_character_realm(reino)
         _log_command_usage(interaction, command_name, nombre, realm)
@@ -140,6 +143,7 @@ def register(bot):
         nombre="Nombre del personaje.",
         reino="Reino opcional. Por defecto: Lordaeron.",
     )
+    @discord.app_commands.autocomplete(nombre=make_name_autocomplete())
     async def personaje(
         interaction: discord.Interaction,
         nombre: str,
@@ -155,6 +159,7 @@ def register(bot):
         nombre="Nombre del personaje.",
         reino="Reino opcional. Por defecto: Lordaeron.",
     )
+    @discord.app_commands.autocomplete(nombre=make_name_autocomplete())
     async def p(
         interaction: discord.Interaction,
         nombre: str,

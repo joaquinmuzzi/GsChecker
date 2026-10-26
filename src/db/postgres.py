@@ -180,6 +180,27 @@ def list_tracked_characters(server: str | None = None, limit: int | None = None)
         return []
 
 
+def list_autocomplete_characters() -> list[tuple[str, str, int]]:
+    """(nombre, reino, consultas) de todos los personajes registrados, los más
+    consultados primero. Solo lectura: lo usa el autocompletado de los comandos."""
+    if not db_enabled():
+        return []
+
+    try:
+        with _get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT character_name, server, lookup_count
+                FROM tracked_characters
+                ORDER BY lookup_count DESC, last_seen_at DESC
+                """
+            )
+            return [(row[0], row[1], row[2]) for row in cur.fetchall()]
+    except Exception as exc:
+        logger.warning("Error listando personajes para autocompletar: %s", exc)
+        return []
+
+
 def get_app_state(key: str):
     """Estado persistente del cron (índice rotativo, lista de GS alto). El
     filesystem de Railway se resetea en cada deploy, así que vive en Postgres."""

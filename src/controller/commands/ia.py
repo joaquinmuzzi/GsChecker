@@ -24,9 +24,11 @@ from src.controller.commands.interactions import (
 )
 from src.functions.warmane import _fetch_gear_data, _fetch_specs, _fetch_summary
 from src.schemas.constants import EXECUTOR
+from src.services.autocomplete import make_name_autocomplete
 from src.services.character_input import (
     _normalize_character_name,
     _normalize_character_realm,
+    split_name_and_realm,
 )
 from src.services.tracking import _track_character
 
@@ -102,12 +104,14 @@ def register(bot):
         nombre="Nombre del personaje.",
         reino="Reino opcional. Por defecto: Lordaeron.",
     )
+    @discord.app_commands.autocomplete(nombre=make_name_autocomplete())
     async def ia(
         interaction: discord.Interaction,
         nombre: str,
         reino: str | None = None,
     ):
         try:
+            nombre, reino = split_name_and_realm(nombre, reino)
             nombre = _normalize_character_name(nombre)
             realm = _normalize_character_realm(reino)
             _log_command_usage(interaction, "ia", nombre, realm)

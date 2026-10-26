@@ -13,7 +13,8 @@ from src.controller.commands.interactions import (
 from src.functions.embeds import _render_table
 from src.functions.warmane import _fetch_toc_achievements
 from src.schemas.constants import EXECUTOR
-from src.services.character_input import _normalize_character_name
+from src.services.autocomplete import make_name_autocomplete
+from src.services.character_input import _normalize_character_name, split_name_and_realm
 
 
 def register(bot):
@@ -22,8 +23,10 @@ def register(bot):
         description="Muestra logros de Trial of the Crusader (TOC) en formato tabla.",
     )
     @discord.app_commands.describe(nombre="Nombre del personaje en Lordaeron.")
+    @discord.app_commands.autocomplete(nombre=make_name_autocomplete("Lordaeron"))
     async def ptoc(interaction: discord.Interaction, nombre: str):
         try:
+            nombre, _ = split_name_and_realm(nombre)
             nombre = _normalize_character_name(nombre)
             _log_command_usage(interaction, "ptoc", nombre, "Lordaeron")
             await _safe_defer(interaction)
