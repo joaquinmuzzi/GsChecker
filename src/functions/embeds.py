@@ -454,7 +454,7 @@ def _build_personaje_embed(
         )
 
     embed.set_footer(
-        text="☕ Apóyame con una donación para mantener el bot online",
+        text="La información se actualiza a las 03:00 (UTC)",
     )
 
     return embed
