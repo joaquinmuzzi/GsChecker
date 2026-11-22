@@ -1,9 +1,10 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
 from discord.ext import commands
 
-from src.functions.rate_limit import CircuitBreaker, TokenBucket
+from src.functions.rate_limit import AdaptiveTokenBucket, CircuitBreaker
 
 PREFIX = commands.when_mentioned
 
@@ -245,12 +246,59 @@ UWU_SPEC_KEYWORDS_BY_CLASS: dict[str, dict[int, int]] = {
 
 # ---------- Shared HTTP session / executor ----------
 SESSION = requests.Session()
-EXECUTOR = ThreadPoolExecutor(max_workers=6)
+# Con el armory en paralelo puede haber más de 10 requests a la vez (el pool por
+# defecto de requests): más grande, para no abrir y descartar conexiones.
+for _scheme in ("https://", "http://"):
+    SESSION.mount(_scheme, requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=20))
+# /p usa 7 a la vez (6 páginas del armory en paralelo + uwu-logs).
+EXECUTOR = ThreadPoolExecutor(max_workers=8)
+
 
 # ---------- Armory throttle + circuit breaker ----------
-# Medición en vivo (Cloudflare del armory): ~5-6 requests / 10s por IP antes de 429.
-# Con rate=0.5 (1 req / 2s) y burst=3 nunca deberíamos disparar el rate limit.
-ARMORY_LIMITER = TokenBucket(rate=0.5, capacity=3)
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    try:
+        return float(raw) if raw else default
+    except ValueError:
+        return default
+
+
+# Ritmo lento: el de siempre. Con el límite viejo de Cloudflare (~5-6 requests
+# cada 10 s por IP) 1 req / 2 s con burst 3 nunca disparaba el 429.
+ARMORY_SLOW_RATE = 0.5
+ARMORY_SLOW_BURST = 3
+# Ritmo rápido: Warmane sacó el límite por IP de las páginas (prueba del
+# 2026-11-22 desde la PC de Joaquín: 12/12 a 1 cada 3 s, 20/20 a 1 por segundo y
+# ~7 req/s con 3 en paralelo sin ningún 429/1015; picos de 14 requests en 10 s).
+# Con ráfaga 6 un /p manda casi todas sus páginas juntas; el sostenido queda
+# cerca de lo medido. ARMORY_FAST_RATE=0 en las variables de Railway vuelve al
+# ritmo lento sin tocar el código.
+_fast_rate = _env_float("ARMORY_FAST_RATE", 1.5)
+_fast_burst = int(_env_float("ARMORY_FAST_BURST", 6))
+if _fast_rate <= 0 or _fast_burst < 1:
+    _fast_rate, _fast_burst = ARMORY_SLOW_RATE, ARMORY_SLOW_BURST
+# Ante un 429/5xx/1015 se vuelve al ritmo lento por este tiempo (cada rate limit
+# nuevo lo extiende); después se retoma el rápido.
+ARMORY_SLOW_PERIOD_S = _env_float("ARMORY_SLOW_PERIOD_SECONDS", 600.0)
+ARMORY_LIMITER = AdaptiveTokenBucket(
+    fast_rate=_fast_rate,
+    fast_capacity=_fast_burst,
+    slow_rate=ARMORY_SLOW_RATE,
+    slow_capacity=ARMORY_SLOW_BURST,
+    slow_period_s=ARMORY_SLOW_PERIOD_S,
+)
+# El API JSON (/api/...) tiene un límite propio, más estricto: en la misma prueba
+# un /summary 0,5 s después de otro respondió {"error": "Too many requests."} y
+# con 5 s o más entre llamadas pasaron todos. Se espacia aparte (además del
+# bucket general) para que ese límite no frene también las páginas HTML.
+# 1 cada 3 s es lo que ya usaba el cron sin problemas (inferido de sus corridas).
+ARMORY_API_LIMITER = AdaptiveTokenBucket(
+    fast_rate=_env_float("ARMORY_API_RATE", 1 / 3),
+    fast_capacity=1,
+    slow_rate=0.1,
+    slow_capacity=1,
+    slow_period_s=ARMORY_SLOW_PERIOD_S,
+)
 
 # El circuit se abre 60s tras 3× 429/5xx en 30s, o 90s inmediatamente si
 # detectamos "error code: 1015" en el body (IP baneada por Cloudflare).

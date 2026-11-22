@@ -304,3 +304,33 @@ async def test_final_embed_is_sent_once_when_discord_keeps_it(bot, interaction, 
 
     edits = [s for s in interaction.sent if s.kind == "edit"]
     assert edits[-1].embed is not edits[-2].embed
+
+
+@pytest.mark.asyncio
+async def test_personaje_prefetches_guild_rank_with_the_rest_of_the_armory(
+    bot, interaction, patched_fetchers
+):
+    """El rango de guild se pide junto con logros/estadísticas y no recién
+    después: el cálculo del perfil lo lee de la caché."""
+    patched_fetchers["guild_rank"].return_value = "Officer"
+
+    await _find_command(bot, "p").callback(interaction, nombre="Samsara")
+
+    # El mock no cachea: una llamada es el prefetch del gather y la otra la del
+    # cálculo del perfil (en prod esa segunda sale de la caché, sin request).
+    assert patched_fetchers["guild_rank"].call_count == 2
+    patched_fetchers["guild_rank"].assert_any_call("Samsara", "Newbie Ink", "Lordaeron")
+    assert interaction.last_edit().embed is not None
+
+
+@pytest.mark.asyncio
+async def test_personaje_guild_rank_prefetch_failure_does_not_break_p(bot, interaction, patched_fetchers):
+    """Si el prefetch del rango explota, /p sigue: el cálculo lo vuelve a pedir."""
+    patched_fetchers["guild_rank"].side_effect = [RuntimeError("boom"), "Officer"]
+
+    await _find_command(bot, "p").callback(interaction, nombre="Samsara")
+
+    edit = interaction.last_edit()
+    assert edit is not None
+    assert edit.embed is not None
+    assert patched_fetchers["guild_rank"].call_count == 2

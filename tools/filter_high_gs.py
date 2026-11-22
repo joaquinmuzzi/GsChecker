@@ -26,6 +26,7 @@ import gearscore
 from src.db.postgres import init_database, set_app_state
 from src.functions.names import is_valid_character_name
 from src.schemas.constants import (
+    ARMORY_API_LIMITER,
     ARMORY_CIRCUIT,
     ARMORY_LIMITER,
     HTTP_TIMEOUT,
@@ -69,10 +70,13 @@ def _fetch_summary_gs(nombre: str, server: str) -> int | None:
     """Fetch character summary from armory, calculate GS from equipment IDs."""
     url = f"https://armory.warmane.com/api/character/{nombre}/{server}/summary"
     try:
+        ARMORY_API_LIMITER.acquire()
         ARMORY_LIMITER.acquire()
         resp = SESSION.get(url, headers=_HEADERS, timeout=HTTP_TIMEOUT)
         if resp.status_code == 429:
+            ARMORY_LIMITER.slow_down(reason=f"status=429 on {url}")
             time.sleep(10)
+            ARMORY_API_LIMITER.acquire()
             ARMORY_LIMITER.acquire()
             resp = SESSION.get(url, headers=_HEADERS, timeout=HTTP_TIMEOUT)
         if resp.status_code != 200:

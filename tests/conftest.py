@@ -239,6 +239,8 @@ def patched_fetchers():
             for module in modules:
                 stack.enter_context(patch(f"{_COMMANDS}.{module}.{attr}", mocks[key]))
         stack.enter_context(patch("src.services.profile._fetch_guild_rank", mocks["guild_rank"]))
+        # /p lo pide por adelantado, junto con el resto del armory.
+        stack.enter_context(patch(f"{_COMMANDS}.personaje_live._fetch_guild_rank", mocks["guild_rank"]))
 
         mocks["summary"].return_value = _happy_summary()
         mocks["specs"].return_value = [

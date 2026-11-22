@@ -2,6 +2,7 @@ import logging
 import random
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from urllib.parse import quote_plus
 
@@ -13,6 +14,7 @@ from src.functions.rate_limit import is_cf_1015
 from src.schemas.constants import (
     ACHIEVEMENTS_CACHE,
     ACHIEVEMENTS_TTL,
+    ARMORY_API_LIMITER,
     ARMORY_BACKOFF_MAX,
     ARMORY_BACKOFF_MIN,
     ARMORY_CIRCUIT,
@@ -45,6 +47,11 @@ WOW_CLASSES = (
 
 logger = logging.getLogger("gschecker.warmane")
 
+# Pool propio para pedir en paralelo varias páginas del armory dentro de una
+# misma función (las categorías de logros). No usa EXECUTOR porque estas
+# funciones ya corren adentro de EXECUTOR y podrían quedarse esperando workers.
+_ARMORY_FANOUT = ThreadPoolExecutor(max_workers=8, thread_name_prefix="armory-fanout")
+
 
 def _is_rate_limited(status_code: int) -> bool:
     return status_code == 429 or 500 <= status_code < 600
@@ -75,9 +82,12 @@ def _armory_request(
 
     Aplica en orden:
       1. Circuit breaker: si está abierto (por 1015 o burst de 429), devuelve None sin tocar la red.
-      2. Token bucket: bloquea hasta tener 1 token (~1 request cada 2s).
+      2. Token bucket: bloquea hasta tener 1 token (ritmo rápido, o 1 request
+         cada 2s si hubo un rate limit hace poco). El API JSON (/api/...) pasa
+         además por su propio bucket, más lento.
       3. Reintento con backoff 8-20s ante 429/5xx; scheme fallback https→http.
-      4. Detección de "error code: 1015" en body → fatal → abre circuit 90s.
+         Cada 429/5xx pasa el token bucket al ritmo lento por un rato.
+      4. Detección de "error code: 1015" en body → fatal → ritmo lento y abre circuit 90s.
 
     Devuelve el `Response` (si parse_json=False) o el dict parseado (si True),
     o None si todos los intentos fallaron / circuit abierto.
@@ -98,6 +108,8 @@ def _armory_request(
 
         for scheme in ("https", "http"):
             url = f"{scheme}://armory.warmane.com{path}"
+            if path.startswith("/api/"):
+                ARMORY_API_LIMITER.acquire()
             ARMORY_LIMITER.acquire()
             try:
                 if method == "GET":
@@ -111,6 +123,7 @@ def _armory_request(
             last_status = resp.status_code
 
             if is_cf_1015(resp.text):
+                ARMORY_LIMITER.slow_down(reason=f"1015 on {path}")
                 ARMORY_CIRCUIT.record_failure(fatal=True, reason=f"1015 on {path}")
                 return None
 
@@ -130,6 +143,7 @@ def _armory_request(
 
             if _is_rate_limited(resp.status_code):
                 rate_limited_resp = resp
+                ARMORY_LIMITER.slow_down(reason=f"status={resp.status_code} on {path}")
                 ARMORY_CIRCUIT.record_failure(reason=f"status={resp.status_code} on {path}")
                 if ARMORY_CIRCUIT.is_open():
                     return None
@@ -205,7 +219,15 @@ def _fetch_api_summary(nombre: str, server: str) -> dict | None:
         )
         return None
 
-    if not isinstance(payload, dict) or payload.get("error"):
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    if error:
+        # El API rate-limita con HTTP 200 y {"error": "Too many requests."}. Es un
+        # límite solo del API: se frena ese bucket y las páginas HTML siguen
+        # (_fetch_summary cae al perfil HTML).
+        if "too many" in str(error).lower():
+            ARMORY_API_LIMITER.slow_down(reason=f"api 'Too many requests' for {nombre}/{server}")
         return None
 
     server_name = str(payload.get("realmName") or payload.get("realm") or "").strip()
@@ -810,19 +832,15 @@ def _fetch_achievements(nombre: str, server: str):
                 ids.append(ach_id_full.replace("ach", ""))
         return ids
 
-    # Fetch sequentially to avoid 429s from parallel armory requests.
-    # Each category POST gets its own rate-limit token + small inter-request delay.
+    # Las categorías van en paralelo: el token bucket del armory pone el ritmo
+    # (todas juntas en modo rápido, 1 cada 2 s después de un rate limit).
     results = []
     failed_categories = set()
-    for category_id in raid_categories:
-        ids = fetch_category(category_id)
+    for category_id, ids in zip(raid_categories, _ARMORY_FANOUT.map(fetch_category, raid_categories)):
         if ids is None:
             failed_categories.add(category_id)
             ids = []
         results.append(ids)
-        if category_id != raid_categories[-1]:
-            ARMORY_LIMITER.acquire()
-            time.sleep(random.uniform(1.0, 2.0))
 
     for ids in results:
         for ach_id in ids:
@@ -852,10 +870,8 @@ def _fetch_achievements(nombre: str, server: str):
     # Rescue pass: transient upstream failures can miss the Ruby Sanctum category
     # while still returning partial achievements in other categories.
     if not any(ach_id in completed_ids for ach_id in target_achievements):
-        for category_id in [14922, 14923]:
-            ARMORY_LIMITER.acquire()
-            time.sleep(random.uniform(1.0, 2.0))
-            ids = fetch_category(category_id)
+        rescue_categories = [14922, 14923]
+        for category_id, ids in zip(rescue_categories, _ARMORY_FANOUT.map(fetch_category, rescue_categories)):
             if ids is None:
                 continue
             failed_categories.discard(category_id)

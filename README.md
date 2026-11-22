@@ -24,7 +24,7 @@ Scrapea directamente `armory.warmane.com` (HTML + API JSON) y `uwu-logs.xyz`.
 - **Últimos logs** con `/logs`: los 10 reportes más nuevos de UwU Logs donde aparece el personaje, con la raid de cada uno (`ICC 11/12`, `Halion`, `Toravon` u `otro raid`). uwu-logs no trae los bosses en la lista, así que se pide una vez por pelea (14 consultas, 2 a la vez) y se cachea 10 min.
 - **Análisis BiS + coach por IA** (Groq) con `/ia`, contra un BiS **por reino** (Lordaeron / Icecrown) armado con lo que equipan los mejores jugadores de cada spec en Warmane.
 - **Cache en memoria + Postgres** (`external_api_cache`) para reducir requests al Armory / UwU.
-- **Rate limit propio + circuit breaker** para no gatillar el 429 / ban de Cloudflare del Armory.
+- **Rate limit propio con freno automático + circuit breaker**: el Armory se pide en paralelo y, ante el primer 429 / ban de Cloudflare, el bot vuelve solo al ritmo lento.
 
 ## Comandos
 
@@ -374,7 +374,12 @@ Nunca se persiste una respuesta incompleta. Si el Armory falla a mitad de un per
 
 ## Diagnóstico y notas conocidas
 
-- El Armory de Warmane rate-limita por IP (~5-6 requests / 10 s → 429; abuso sostenido → "error code: 1015"). Todo el tráfico pasa por `_armory_request`: token bucket de 1 request cada 2 s (ráfaga de 3), hasta 4 intentos con backoff de 8–20 s ante 429/5xx, y circuit breaker (60 s tras 3 fallos en 30 s, 90 s si aparece 1015).
+- Rate limit del Armory. Hasta noviembre de 2026 limitaba las páginas por IP (~5-6 requests / 10 s → 429; abuso sostenido → "error code: 1015"). Warmane lo sacó: en una prueba del 2026-11-22 pasaron 1 request por segundo y ~7 por segundo con 3 en paralelo, sin 429. El API JSON (`/api/...`) sí mantiene un límite propio: un `/summary` medio segundo después de otro responde HTTP 200 con `{"error": "Too many requests."}`.
+- Todo el tráfico al Armory pasa por `_armory_request` (o `_armory_get` en `profile_scraper.py`):
+  - **Token bucket adaptativo** (`ARMORY_LIMITER`): ritmo rápido de 1,5 requests/s con ráfaga de 6, así `/p` pide juntas sus páginas (logros, estadísticas, equipo y rango de guild; las 4 categorías de logros van en paralelo). Ante cualquier 429, 5xx o 1015 pasa solo al ritmo lento de siempre (1 cada 2 s, ráfaga de 3) durante 10 min; cada rate limit nuevo extiende el plazo, y después vuelve al rápido. En los logs queda `armory throttle slowed down` / `back to fast mode`.
+  - **Bucket del API** (`ARMORY_API_LIMITER`): además del general, los `/api/...` van a 1 cada 3 s. Si el API contesta "Too many requests" se frena solo ese bucket (1 cada 10 s por 10 min) y `/p` sigue con el perfil HTML.
+  - Hasta 4 intentos con backoff de 8–20 s ante 429/5xx, y circuit breaker (60 s tras 3 fallos en 30 s, 90 s si aparece 1015).
+  - Variables opcionales (bot y cron): `ARMORY_FAST_RATE` (default `1.5`; `0` vuelve al ritmo lento fijo, como antes), `ARMORY_FAST_BURST` (default `6`), `ARMORY_SLOW_PERIOD_SECONDS` (default `600`) y `ARMORY_API_RATE` (default `0.333`).
 - **Halion**: la página de estadísticas de Warmane muestra `- -` en todas las filas "Halion kills (...)", incluso para personajes con el logro ganado. Por eso Ruby Sanctum se basa sólo en los logros.
 - `/dps` depende 100% de uwu-logs.xyz; si están lentos, el timeout es 45 s. Usa la spec principal del personaje (una spec de DPS con logs antes que healer/tank; entre esas, la que tiene más bosses con logs en `/character`; lo mismo para el ranking de `/p`) o la que se pase en `spec` (`frost`, `holy` y `prot` se resuelven según la clase). Como `/top` de uwu-logs no filtra por jugador, pide hasta 10 000 filas de la spec por boss y modo (2 consultas en paralelo; ante un 429 de uwu-logs espera y reintenta) y se queda con las del personaje. Si la spec tiene más filas que eso, la columna Raids sale con `+` (por ejemplo `38+`): pueden faltar las raids de menor DPS, así que el máximo es exacto y el promedio queda algo inflado.
 - Kills de Marrowgar y Deathwhisper en 10H/25N/25H (`/p` y el cron): se buscan en la lista de jugadores de cada spec de uwu-logs (hasta 10 000, cacheada 1 h y compartida entre personajes). Si uwu-logs no responde quedan sin dato en vez de ❌. Si `/character` de uwu-logs devuelve el personaje como `Unknown-...` (sin perfil, aunque figure en los rankings), `/p`, `/dps` y el cron usan la clase del armory para buscarlo en las 3 specs.

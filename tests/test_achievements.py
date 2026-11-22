@@ -1,7 +1,8 @@
-"""Tests for _fetch_achievements sequential fetching and stale cache fallback."""
+"""Tests for _fetch_achievements parallel fetching and stale cache fallback."""
 
 from __future__ import annotations
 
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -28,46 +29,79 @@ def _make_empty_response() -> dict:
     return {"content": ""}
 
 
-class TestSequentialFetching:
+class TestParallelFetching:
+    """Warmane sacó el límite por IP (noviembre 2026): las categorías se piden
+    juntas y el token bucket del armory es el único que pone el ritmo."""
+
     @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
     @patch("src.functions.warmane.ARMORY_LIMITER")
     @patch("src.functions.warmane.time.sleep")
-    def test_categories_fetched_one_by_one(self, mock_sleep, mock_limiter, mock_post):
-        call_order = []
+    def test_categories_fetched_in_parallel(self, mock_sleep, mock_limiter, mock_post):
+        # Las 4 llamadas tienen que estar en vuelo a la vez para pasar la
+        # barrera; en serie, la primera esperaría sola hasta el timeout.
+        barrier = threading.Barrier(4, timeout=5)
+        fetched = []
 
         def track_call(path, headers, data):
             cat = data.get("category")
-            call_order.append(cat)
+            fetched.append(cat)
+            barrier.wait()
             if cat in (14922, 14923):
                 return _make_category_response("4817")
             return _make_category_response("4531")
 
         mock_post.side_effect = track_call
-        mock_limiter.acquire.return_value = None
 
-        _fetch_achievements("Testchar", "Lordaeron")
+        payload = _fetch_achievements("Testchar", "Lordaeron")
 
-        assert call_order == [15041, 15042, 14922, 14923]
-        assert mock_sleep.call_count == 3
+        assert sorted(fetched) == sorted([15041, 15042, 14922, 14923])
+        assert payload["storming_10n_achieved"] is True
+        assert payload["halion_10n_achieved"] is True
+        assert payload["complete"] is True
+        # Sin pausas fijas ni tokens extra entre categorías.
+        mock_sleep.assert_not_called()
+        mock_limiter.acquire.assert_not_called()
 
     @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
     @patch("src.functions.warmane.ARMORY_LIMITER")
     @patch("src.functions.warmane.time.sleep")
-    def test_rescue_also_fetches_sequentially(self, mock_sleep, mock_limiter, mock_post):
-        """When rescue fires, it also fetches RS categories one-by-one."""
+    def test_rescue_refetches_ruby_sanctum_in_parallel(self, mock_sleep, mock_limiter, mock_post):
+        """Sin Halion en la primera pasada, se vuelven a pedir las dos
+        categorías de Ruby Sanctum, también juntas."""
+        rescue_barrier = threading.Barrier(2, timeout=5)
+        calls = []
 
         def side_effect(path, headers, data):
             cat = data.get("category")
+            calls.append(cat)
             if cat in (14922, 14923):
+                if calls.count(cat) == 1:
+                    return _make_empty_response()
+                rescue_barrier.wait()
                 return _make_category_response("4817")
             return _make_category_response("4531")
 
         mock_post.side_effect = side_effect
-        mock_limiter.acquire.return_value = None
 
-        _fetch_achievements("Testchar", "Lordaeron")
+        payload = _fetch_achievements("Testchar", "Lordaeron")
 
-        assert mock_sleep.call_count == 3
+        assert calls.count(14922) == 2
+        assert calls.count(14923) == 2
+        assert payload["halion_10n_achieved"] is True
+        mock_sleep.assert_not_called()
+
+    @patch("src.functions.warmane._warmane_post_json_with_scheme_fallback")
+    def test_failed_category_marks_payload_incomplete(self, mock_post):
+        def side_effect(path, headers, data):
+            if data.get("category") == 15042:
+                return None
+            return _make_category_response("4531")
+
+        mock_post.side_effect = side_effect
+
+        payload = _fetch_achievements("Testchar", "Lordaeron")
+
+        assert payload["complete"] is False
 
 
 class TestStaleCacheFallback:
