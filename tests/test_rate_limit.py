@@ -1,4 +1,4 @@
-"""Tests para src.functions.rate_limit (TokenBucket + CircuitBreaker + is_cf_1015).
+"""Tests para src.functions.rate_limit (TokenBucket, AdaptiveTokenBucket, CircuitBreaker, is_cf_1015).
 
 Estos tests son los que respaldan el fix del bug de 'no se encontró' —
 si el circuit deja de abrirse cuando debe, o si is_cf_1015 deja de
@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from src.functions.rate_limit import CircuitBreaker, TokenBucket, is_cf_1015
+from src.functions.rate_limit import AdaptiveTokenBucket, CircuitBreaker, TokenBucket, is_cf_1015
 
 
 class TestTokenBucket:
@@ -70,6 +70,88 @@ class TestTokenBucket:
 
         wins = sum(1 for r in results if r)
         assert wins == 5, f"expected 5 wins with capacity=5, got {wins}"
+
+
+def _adaptive(
+    *,
+    fast_rate: float = 100.0,
+    fast_capacity: int = 6,
+    slow_rate: float = 1.0,
+    slow_capacity: int = 3,
+    slow_period_s: float = 60.0,
+) -> AdaptiveTokenBucket:
+    return AdaptiveTokenBucket(
+        fast_rate=fast_rate,
+        fast_capacity=fast_capacity,
+        slow_rate=slow_rate,
+        slow_capacity=slow_capacity,
+        slow_period_s=slow_period_s,
+    )
+
+
+class TestAdaptiveTokenBucket:
+    """Ritmo rápido mientras el armory responde bien; ante un rate limit
+    frena solo y después vuelve al rápido."""
+
+    def test_fast_mode_allows_the_whole_p_burst_at_once(self):
+        tb = _adaptive(fast_rate=0.001, fast_capacity=6)
+        t0 = time.monotonic()
+        for _ in range(6):
+            assert tb.acquire(timeout=0.1) is True
+        assert time.monotonic() - t0 < 0.05
+        assert tb.is_slow() is False
+
+    def test_slow_down_drains_tokens_and_switches_to_slow_rate(self):
+        tb = _adaptive()
+        tb.slow_down(reason="status=429")
+        assert tb.is_slow() is True
+        # Sin tokens y a 1 req/s: no hay token en 0,2 s.
+        t0 = time.monotonic()
+        assert tb.acquire(timeout=0.2) is False
+        assert time.monotonic() - t0 >= 0.15
+
+    def test_slow_capacity_caps_the_burst_while_slow(self):
+        tb = _adaptive(slow_rate=1000.0, slow_capacity=2)
+        tb.slow_down()
+        time.sleep(0.05)  # a 1000 req/s se llena enseguida, pero hasta 2
+        tb._lock.acquire()
+        try:
+            tb._refill()
+            assert tb._tokens <= 2.0
+        finally:
+            tb._lock.release()
+
+    def test_goes_back_to_fast_after_the_slow_period(self):
+        tb = _adaptive(slow_rate=0.001, slow_period_s=0.1)
+        tb.slow_down()
+        assert tb.acquire(timeout=0.05) is False
+        time.sleep(0.15)
+        assert tb.is_slow() is False
+        t0 = time.monotonic()
+        for _ in range(6):
+            assert tb.acquire(timeout=0.2) is True
+        assert time.monotonic() - t0 < 0.2
+
+    def test_new_rate_limit_while_slow_extends_the_period(self):
+        tb = _adaptive(slow_period_s=0.2)
+        tb.slow_down()
+        time.sleep(0.12)
+        tb.slow_down()
+        time.sleep(0.12)
+        # 0,24 s después del primero, pero solo 0,12 s del segundo.
+        assert tb.is_slow() is True
+
+    def test_same_fast_and_slow_params_behave_like_the_old_bucket(self):
+        tb = _adaptive(fast_rate=1.0, fast_capacity=3, slow_rate=1.0, slow_capacity=3)
+        for _ in range(3):
+            assert tb.acquire(timeout=0.05) is True
+        assert tb.acquire(timeout=0.05) is False
+
+    def test_invalid_slow_params_rejected(self):
+        with pytest.raises(ValueError, match="rate must be > 0"):
+            _adaptive(slow_rate=0)
+        with pytest.raises(ValueError, match="capacity must be >= 1"):
+            _adaptive(slow_capacity=0)
 
 
 class TestCircuitBreaker:

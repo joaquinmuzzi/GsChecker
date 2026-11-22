@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 
 from src.functions.rate_limit import is_cf_1015
 from src.schemas.constants import (
+    ARMORY_API_LIMITER,
     ARMORY_BACKOFF_MAX,
     ARMORY_BACKOFF_MIN,
     ARMORY_CIRCUIT,
@@ -46,6 +47,8 @@ def _armory_get(url: str, timeout: int = 8):
 
     last_resp = None
     for attempt in range(ARMORY_MAX_ATTEMPTS):
+        if "/api/" in url:
+            ARMORY_API_LIMITER.acquire()
         ARMORY_LIMITER.acquire()
         try:
             resp = SESSION.get(url, headers=HEADERS, timeout=timeout)
@@ -55,6 +58,7 @@ def _armory_get(url: str, timeout: int = 8):
         last_resp = resp
 
         if is_cf_1015(resp.text):
+            ARMORY_LIMITER.slow_down(reason=f"1015 on {url}")
             ARMORY_CIRCUIT.record_failure(fatal=True, reason=f"1015 on {url}")
             return None
 
@@ -65,6 +69,7 @@ def _armory_get(url: str, timeout: int = 8):
         if resp.status_code != 429 and not (500 <= resp.status_code < 600):
             return resp
 
+        ARMORY_LIMITER.slow_down(reason=f"status={resp.status_code} on {url}")
         ARMORY_CIRCUIT.record_failure(reason=f"status={resp.status_code} on {url}")
         if ARMORY_CIRCUIT.is_open() or attempt >= ARMORY_MAX_ATTEMPTS - 1:
             break

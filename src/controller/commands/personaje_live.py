@@ -24,6 +24,7 @@ from src.functions.uwu import _fetch_uwu_performance, _uwu_icc_bugfix_kills
 from src.functions.warmane import (
     _fetch_achievements,
     _fetch_gear_data,
+    _fetch_guild_rank,
     _fetch_professions,
     _fetch_specs,
     _fetch_statistics,
@@ -130,6 +131,19 @@ def _summary_problem(summary, nombre: str) -> str | None:
     return None
 
 
+def _prefetch_guild_rank(nombre_char: str, guild, realm: str) -> None:
+    """Pide el rango de guild junto con el resto del armory para dejarlo en
+    caché: `_compute_personaje_base` (compartida con el cron) lo lee de ahí en
+    vez de pedirlo recién después de todo lo demás. Si falla no pasa nada: el
+    cálculo del perfil lo vuelve a intentar como siempre."""
+    if not isinstance(guild, str):
+        return
+    try:
+        _fetch_guild_rank(nombre_char, guild, realm)
+    except Exception:
+        logger.warning("guild rank prefetch failed for '%s'/%s", nombre_char, realm, exc_info=True)
+
+
 async def _send_live_profile(
     interaction: discord.Interaction,
     nombre: str,
@@ -181,12 +195,13 @@ async def _send_live_profile(
         summary.get("class"),
     )
 
-    gear_data, achi_payload, stats_rows, professions, talents = await asyncio.gather(
+    gear_data, achi_payload, stats_rows, professions, talents, _ = await asyncio.gather(
         loop.run_in_executor(EXECUTOR, _fetch_gear_data, nombre_char, realm),
         loop.run_in_executor(EXECUTOR, _fetch_achievements, nombre_char, realm),
         loop.run_in_executor(EXECUTOR, _fetch_statistics, nombre_char, realm, 15062),
         loop.run_in_executor(EXECUTOR, _fetch_professions, nombre_char, realm),
         loop.run_in_executor(EXECUTOR, _fetch_specs, nombre_char, realm),
+        loop.run_in_executor(EXECUTOR, _prefetch_guild_rank, nombre_char, summary.get("guild"), realm),
     )
 
     base = await asyncio.to_thread(
